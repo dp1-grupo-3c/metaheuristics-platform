@@ -89,6 +89,9 @@ mvnw.cmd clean install
 Los archivos de entrada no se versionan porque son voluminosos y reproducibles. Se generan
 con un solo comando:
 
+Requiere haber ejecutado antes `./mvnw clean install`, que deja el modulo `core` disponible
+para los demas.
+
 ```bash
 ./mvnw -q -pl experiments exec:java \
   -Dexec.mainClass=org.kindbox.experiments.GenerarDatos \
