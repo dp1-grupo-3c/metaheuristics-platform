@@ -8,6 +8,9 @@ release.properties
 pom.xml.releaseBackup
 pom.xml.versionsBackup
 
+### Documentacion de trabajo interna del equipo ###
+/docs/
+
 ### Datos generados ###
 # Los juegos de datos se producen con GenerarDatos y no se versionan.
 # Ver la seccion "Generar los juegos de datos" del README.
