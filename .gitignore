@@ -1,17 +1,28 @@
+### Maven ###
 target/
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
-.kotlin
+dependency-reduced-pom.xml
+release.properties
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+
+### Datos generados ###
+# Los juegos de datos se producen con GenerarDatos y no se versionan.
+# Ver la seccion "Generar los juegos de datos" del README.
+/data/
+/salidas/
+*.bloqueadas
+ventas[0-9][0-9][0-9][0-9][0-9][0-9]
+mant.preventivo.*
 
 ### IntelliJ IDEA ###
-.idea/modules.xml
-.idea/jarRepositories.xml
-.idea/compiler.xml
-.idea/libraries/
+.idea/
 *.iws
 *.iml
 *.ipr
+out/
 
 ### Eclipse ###
 .apt_generated
@@ -21,6 +32,7 @@ target/
 .settings
 .springBeans
 .sts4-cache
+bin/
 
 ### NetBeans ###
 /nbproject/private/
@@ -35,7 +47,12 @@ build/
 ### VS Code ###
 .vscode/
 
-### Mac OS ###
+### Java ###
+*.class
+*.log
+hs_err_pid*
+replay_pid*
+
+### Sistema operativo ###
 .DS_Store
-### KindBox ###
-/salidas/
+Thumbs.db
