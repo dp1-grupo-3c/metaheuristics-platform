@@ -23,6 +23,16 @@ import org.kindbox.core.util.Aleatorio;
  * <b>reasignacion</b> de una ruta a otra unidad libre, que es lo que permite que el reparto
  * por tipo se afine dentro de la busqueda local y no solo entre generaciones.</p>
  *
+ * <h2>Estabilidad del plan</h2>
+ * <p>El valor penalizado de una ruta no es solo su costo mas su desfase: lleva ademas el
+ * termino blando del apartado 11.4 del ISA, un peso por cada pedido de la ruta que cambia de
+ * unidad respecto del plan vigente. El termino es aditivo por ruta, de modo que encaja sin mas
+ * en {@link #valor(int, double)} y por tanto en todos los movimientos, que ya comparan sumas de
+ * valores de ruta. La consecuencia buscada es que mover un pedido a otra unidad deje de ser
+ * gratis cuando su costo empata, que es justo el caso en que la busqueda estocastica lo movia
+ * sin ganar nada. {@link EstabilidadPlan} resuelve la consulta en un acceso a un arreglo
+ * primitivo, sin tablas asociativas ni comparacion de cadenas dentro del bucle.</p>
+ *
  * <h2>Granularidad</h2>
  * <p>Los movimientos se restringen a pares de vertices geograficamente proximos, con la
  * lista de vecinos que precalcula {@link TareasEntrega} a partir de
@@ -60,6 +70,7 @@ public final class Educacion {
     private final Aleatorio aleatorio;
     private final ParametrosHgs parametros;
     private final PresupuestoComputo presupuesto;
+    private final EstabilidadPlan estabilidad;
 
     private final int cantidadTareas;
     private final int cantidadUnidades;
@@ -70,6 +81,8 @@ public final class Educacion {
     private final int[] unidad;
     private final double[] costoRuta;
     private final int[] desfaseRuta;
+    /** Pedidos de cada ruta que cambian de unidad respecto del plan vigente. */
+    private final int[] desviacionRuta;
     private int cantidadRutas;
 
     private final int[] rutaDeTarea;
@@ -92,19 +105,23 @@ public final class Educacion {
     private final int[] rutaDeUnidad;
     private final int[] candidatos;
     private final int[] distanciaCandidato;
+    /** Candidatas que se eligen por cercania; el resto de la lista la ocupan las vigentes. */
+    private final int candidatosPorDistancia;
     private int sello;
 
     private double ultimoCosto;
     private int ultimoDesfase;
 
     public Educacion(InstanciaPlanificacion instancia, TareasEntrega tareas, ProgramadorRuta programador,
-                     Aleatorio aleatorio, ParametrosHgs parametros, PresupuestoComputo presupuesto) {
+                     Aleatorio aleatorio, ParametrosHgs parametros, PresupuestoComputo presupuesto,
+                     EstabilidadPlan estabilidad) {
         this.instancia = instancia;
         this.tareas = tareas;
         this.programador = programador;
         this.aleatorio = aleatorio;
         this.parametros = parametros;
         this.presupuesto = presupuesto;
+        this.estabilidad = estabilidad;
         this.cantidadTareas = tareas.cantidad();
         this.cantidadUnidades = instancia.cantidadUnidades();
 
@@ -115,6 +132,7 @@ public final class Educacion {
         this.unidad = new int[rutas];
         this.costoRuta = new double[rutas];
         this.desfaseRuta = new int[rutas];
+        this.desviacionRuta = new int[rutas];
 
         this.rutaDeTarea = new int[Math.max(1, cantidadTareas)];
         this.posicionDeTarea = new int[Math.max(1, cantidadTareas)];
@@ -130,7 +148,9 @@ public final class Educacion {
         this.marcaPedido = new int[Math.max(1, instancia.cantidadPedidos())];
         this.libre = new boolean[rutas];
         this.rutaDeUnidad = new int[rutas];
-        this.candidatos = new int[Math.max(1, parametros.candidatosUnidadPorRuta())];
+        this.candidatosPorDistancia = Math.max(1, parametros.candidatosUnidadPorRuta());
+        // A las candidatas por cercania se suman las unidades vigentes de las tareas de la ruta.
+        this.candidatos = new int[candidatosPorDistancia + capacidad];
         this.distanciaCandidato = new int[candidatos.length];
     }
 
@@ -194,6 +214,7 @@ public final class Educacion {
             evaluarSecuencia(unidad[r], ruta[r], largo[r], pesoDesfase);
             costoRuta[r] = ultimoCosto;
             desfaseRuta[r] = ultimoDesfase;
+            desviacionRuta[r] = estabilidad.desviacion(unidad[r], ruta[r], largo[r]);
         }
         for (int u = 0; u < cantidadUnidades && cantidadRutas < largo.length; u++) {
             if (!libre[u]) {
@@ -203,6 +224,7 @@ public final class Educacion {
             unidad[cantidadRutas] = u;
             costoRuta[cantidadRutas] = 0.0;
             desfaseRuta[cantidadRutas] = 0;
+            desviacionRuta[cantidadRutas] = 0;
             cantidadRutas++;
         }
         cantidadBanco = individuo.cantidadBanco();
@@ -223,6 +245,7 @@ public final class Educacion {
         int posicion = 0;
         double costo = 0.0;
         long desfase = 0;
+        int desviacion = 0;
         for (int r = 0; r < cantidadRutas; r++) {
             if (largo[r] == 0) {
                 continue;
@@ -243,6 +266,7 @@ public final class Educacion {
             }
             costo += costoRuta[r];
             desfase += desfaseRuta[r];
+            desviacion += desviacionRuta[r];
             rutas++;
         }
         for (int i = 0; i < cantidadBanco; i++) {
@@ -253,6 +277,7 @@ public final class Educacion {
         individuo.cantidadBanco(cantidadBanco);
         individuo.costo(costo);
         individuo.desfase((int) Math.min(desfase, Integer.MAX_VALUE / 4));
+        individuo.desviacionPlan(desviacion);
         individuo.pedidosNoAtendidos(contarPedidos());
     }
 
@@ -691,6 +716,11 @@ public final class Educacion {
      * Reasignacion de una ruta a otra unidad libre. Es el movimiento propio de la flota
      * heterogenea: la particion del Split fija que tareas van juntas, pero el tipo mas
      * conveniente para atenderlas puede cambiar cuando la busqueda local reorganiza la ruta.
+     *
+     * <p>Es tambien el movimiento por el que la ruta puede <b>volver</b> a la unidad que sus
+     * pedidos tenian en el plan vigente, y por eso las candidatas no son solo las libres mas
+     * proximas sino tambien las vigentes de sus tareas. Con el termino de estabilidad en el
+     * valor de la ruta, ese retorno gana siempre que el costo empate.</p>
      */
     private boolean reasignarUnidades(double peso) {
         if (cantidadRutas == 0) {
@@ -709,13 +739,13 @@ public final class Educacion {
             if (largo[r] == 0) {
                 continue;
             }
-            int cantidad = seleccionarLibres(tareas.punto(ruta[r][0]));
+            int cantidad = seleccionarLibres(tareas.punto(ruta[r][0]), ruta[r], largo[r]);
             int elegida = -1;
             double mejorValor = valor(r, peso);
             double mejorCosto = 0.0;
             int mejorDesfase = 0;
             for (int c = 0; c < cantidad; c++) {
-                if (costoArcos(candidatos[c], ruta[r], largo[r]) >= mejorValor - EPSILON) {
+                if (cotaDeSecuencia(candidatos[c], ruta[r], largo[r]) >= mejorValor - EPSILON) {
                     continue;
                 }
                 double nuevo = evaluarSecuencia(candidatos[c], ruta[r], largo[r], peso);
@@ -741,16 +771,20 @@ public final class Educacion {
                 rutaDeUnidad[elegida] = r;
                 costoRuta[r] = mejorCosto;
                 desfaseRuta[r] = mejorDesfase;
+                desviacionRuta[r] = estabilidad.desviacion(elegida, ruta[r], largo[r]);
                 mejoro = true;
             }
         }
         return mejoro;
     }
 
-    /** Unidades libres mas proximas al punto dado, sin distincion de tipo. */
-    private int seleccionarLibres(int punto) {
+    /**
+     * Unidades libres candidatas para una ruta: las mas proximas al punto dado, sin distincion
+     * de tipo, mas las unidades vigentes de sus tareas que sigan libres.
+     */
+    private int seleccionarLibres(int punto, int[] secuencia, int longitud) {
         final MatrizDistancias matriz = instancia.matriz();
-        final int maximo = candidatos.length;
+        final int maximo = candidatosPorDistancia;
         int cantidad = 0;
         for (int u = 0; u < cantidadUnidades; u++) {
             if (!libre[u]) {
@@ -776,23 +810,57 @@ public final class Educacion {
                 }
             }
         }
+        return anadirVigentesLibres(cantidad, secuencia, longitud);
+    }
+
+    /** Anade a la lista de candidatas las unidades vigentes de las tareas que sigan libres. */
+    private int anadirVigentesLibres(int cantidad, int[] secuencia, int longitud) {
+        if (!estabilidad.activa()) {
+            return cantidad;
+        }
+        for (int i = 0; i < longitud && cantidad < candidatos.length; i++) {
+            final int unidadPrevia = estabilidad.unidadVigente(secuencia[i]);
+            if (unidadPrevia < 0 || !libre[unidadPrevia]) {
+                continue;
+            }
+            boolean repetida = false;
+            for (int c = 0; c < cantidad; c++) {
+                if (candidatos[c] == unidadPrevia) {
+                    repetida = true;
+                    break;
+                }
+            }
+            if (!repetida) {
+                candidatos[cantidad++] = unidadPrevia;
+            }
+        }
         return cantidad;
     }
 
     // ------------------------------------------------------ primitivas de ruta
 
-    /** Valor penalizado de la ruta con la penalizacion vigente. */
+    /**
+     * Valor penalizado de la ruta: costo de operacion, mas la penalizacion dinamica de sus
+     * minutos de desfase, mas el termino blando de estabilidad del apartado 11.4 del ISA por
+     * cada pedido que cambia de unidad respecto del plan vigente.
+     */
     private double valor(int r, double peso) {
-        return costoRuta[r] + peso * desfaseRuta[r];
+        return costoRuta[r] + peso * desfaseRuta[r] + estabilidad.peso() * desviacionRuta[r];
     }
 
     /**
-     * Costo de los arcos de una secuencia sin resolver los abastecimientos. Es una
-     * <b>cota inferior</b> del costo real de la ruta: las distancias de la matriz son caminos
-     * minimos sobre la reticula y cumplen la desigualdad triangular, de modo que intercalar
-     * una parada de abastecimiento nunca acorta el recorrido.
+     * Cota inferior del valor penalizado de una secuencia atendida por una unidad: el costo de
+     * sus arcos sin resolver los abastecimientos, mas el termino de estabilidad, que si es
+     * exacto. Es cota inferior porque las distancias de la matriz son caminos minimos sobre la
+     * reticula y cumplen la desigualdad triangular, de modo que intercalar una parada de
+     * abastecimiento nunca acorta el recorrido, y porque el desfase nunca es negativo.
+     *
+     * <p>Que el termino de estabilidad entre tambien aqui, y no solo en el valor exacto, es lo
+     * que mantiene apretada la poda: si la cota se quedase en el costo de arcos mientras el
+     * valor a batir ya incluye la estabilidad, se descartarian menos movimientos y cada uno de
+     * los rescatados costaria una llamada al decodificador, que es varias veces mas cara.</p>
      */
-    private double costoArcos(int unidadRuta, int[] secuencia, int longitud) {
+    private double cotaDeSecuencia(int unidadRuta, int[] secuencia, int longitud) {
         if (longitud == 0) {
             return 0.0;
         }
@@ -808,7 +876,8 @@ public final class Educacion {
             kilometros += tramo;
             punto = siguiente;
         }
-        return kilometros * instancia.unidadTipo(unidadRuta).costoPorKm();
+        return kilometros * instancia.unidadTipo(unidadRuta).costoPorKm()
+                + estabilidad.penalizacion(unidadRuta, secuencia, longitud);
     }
 
     /**
@@ -820,18 +889,18 @@ public final class Educacion {
      * ninguna mejora: solo descarta movimientos que con seguridad no la son.
      */
     private boolean descartablePorDistancia(int r, int[] secuencia, int longitud, double peso) {
-        return costoArcos(unidad[r], secuencia, longitud) >= valor(r, peso) - EPSILON;
+        return cotaDeSecuencia(unidad[r], secuencia, longitud) >= valor(r, peso) - EPSILON;
     }
 
     /** Misma poda para un movimiento que toca dos rutas. */
     private boolean descartablePorDistancia(int r1, int[] secuencia1, int longitud1,
                                             int r2, int[] secuencia2, int longitud2, double peso) {
         final double actual = valor(r1, peso) + valor(r2, peso) - EPSILON;
-        double cota = costoArcos(unidad[r1], secuencia1, longitud1);
+        double cota = cotaDeSecuencia(unidad[r1], secuencia1, longitud1);
         if (cota >= actual) {
             return true;
         }
-        cota += costoArcos(unidad[r2], secuencia2, longitud2);
+        cota += cotaDeSecuencia(unidad[r2], secuencia2, longitud2);
         return cota >= actual;
     }
 
@@ -937,7 +1006,11 @@ public final class Educacion {
         return mejorPosicion;
     }
 
-    /** Valora una secuencia de tareas sobre una unidad concreta con el decodificador. */
+    /**
+     * Valora una secuencia de tareas sobre una unidad concreta con el decodificador. Devuelve
+     * el valor penalizado completo, con la misma composicion que {@link #valor(int, double)},
+     * de modo que los dos son comparables termino a termino.
+     */
     private double evaluarSecuencia(int unidadRuta, int[] secuencia, int longitud, double peso) {
         if (longitud == 0) {
             ultimoCosto = 0.0;
@@ -956,15 +1029,24 @@ public final class Educacion {
         }
         ultimoCosto = programador.ultimoCosto();
         ultimoDesfase = programador.ultimoDesfase();
-        return ultimoCosto + peso * ultimoDesfase;
+        return ultimoCosto + peso * ultimoDesfase
+                + estabilidad.penalizacion(unidadRuta, secuencia, longitud);
     }
 
-    /** Sustituye el contenido de una ruta y reindexa las posiciones de sus tareas. */
+    /**
+     * Sustituye el contenido de una ruta y reindexa las posiciones de sus tareas. La desviacion
+     * respecto del plan vigente se recalcula aqui y no se recibe como argumento porque es
+     * funcion exacta de la secuencia y de la unidad, y porque no todo movimiento la aplica
+     * sobre la ultima secuencia valorada: la reinsercion del banco reconstruye la mejor
+     * insercion despues de haber tanteado otras. Recalcularla cuesta un recorrido de accesos a
+     * un arreglo primitivo sobre una ruta de siete u ocho paradas.
+     */
     private void aplicarUna(int r, int[] nuevo, int largoNuevo, double costo, int desfase) {
         System.arraycopy(nuevo, 0, ruta[r], 0, largoNuevo);
         largo[r] = largoNuevo;
         costoRuta[r] = costo;
         desfaseRuta[r] = desfase;
+        desviacionRuta[r] = estabilidad.desviacion(unidad[r], ruta[r], largoNuevo);
         for (int i = 0; i < largoNuevo; i++) {
             rutaDeTarea[ruta[r][i]] = r;
             posicionDeTarea[ruta[r][i]] = i;

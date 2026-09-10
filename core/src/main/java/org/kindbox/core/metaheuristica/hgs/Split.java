@@ -63,6 +63,18 @@ import org.kindbox.core.util.Aleatorio;
  * instantes de la solucion devuelta son los de la unidad que realmente la atiende y no los
  * del representante.</p>
  *
+ * <h2>5. Estabilidad del plan entre replanificaciones</h2>
+ * <p>La asignacion de rutas a unidades concretas es el unico punto del algoritmo en que se
+ * conoce que unidad atendera cada pedido, y por tanto el unico en que puede evaluarse el
+ * termino blando del apartado 11.4 del ISA. Aqui entra por dos vias. La primera es el valor con
+ * el que se compara una unidad candidata, que suma
+ * {@link ParametrosHgs#pesoEstabilidad()} por cada pedido de la ruta que cambiaria de unidad:
+ * a igualdad de costo gana la unidad que ya tenia el pedido. La segunda, y la que mas
+ * estabilidad compra por menos computo, es la lista de candidatas: a las unidades libres mas
+ * proximas se anaden las <b>unidades vigentes</b> de los pedidos de la ruta, que de otro modo
+ * podrian no llegar a probarse nunca por estar mas lejos que las tres primeras. Sin ese sesgo
+ * el termino solo sabria puntuar candidatas que ya estaban en la lista.</p>
+ *
  * <h2>Tareas sin particion factible</h2>
  * <p>Cuando un segmento no admite ninguna programacion, sus tareas no se rechazan de plano:
  * el grafo lleva ademas un arco de salto por posicion, que deja una tarea sin asignar al
@@ -87,6 +99,7 @@ public final class Split {
     private final TareasEntrega tareas;
     private final ProgramadorRuta programador;
     private final ParametrosHgs parametros;
+    private final EstabilidadPlan estabilidad;
 
     private final int cantidadUnidades;
     private final int cantidadAlmacenes;
@@ -133,17 +146,20 @@ public final class Split {
     private final long[] urgencia;
     private final int[] candidatos;
     private final int[] distanciaCandidato;
+    /** Candidatas que se eligen por cercania; el resto de la lista la ocupan las vigentes. */
+    private final int candidatosPorDistancia;
     private final int[] pedidosBuffer;
     private final int[] cantidadesBuffer;
     private final int[] marcaPedido;
     private int sello;
 
-    public Split(InstanciaPlanificacion instancia, TareasEntrega tareas,
-                 ProgramadorRuta programador, ParametrosHgs parametros) {
+    public Split(InstanciaPlanificacion instancia, TareasEntrega tareas, ProgramadorRuta programador,
+                 ParametrosHgs parametros, EstabilidadPlan estabilidad) {
         this.instancia = instancia;
         this.tareas = tareas;
         this.programador = programador;
         this.parametros = parametros;
+        this.estabilidad = estabilidad;
         this.cantidadUnidades = instancia.cantidadUnidades();
         this.cantidadAlmacenes = instancia.cantidadAlmacenes();
 
@@ -183,7 +199,10 @@ public final class Split {
         this.libre = new boolean[Math.max(1, cantidadUnidades)];
         this.orden = new int[m];
         this.urgencia = new long[m];
-        this.candidatos = new int[Math.max(1, parametros.candidatosUnidadPorRuta())];
+        this.candidatosPorDistancia = Math.max(1, parametros.candidatosUnidadPorRuta());
+        // A las candidatas por cercania se les suman las unidades vigentes de las tareas de la
+        // ruta, que no pasan de la longitud maxima de un arco.
+        this.candidatos = new int[candidatosPorDistancia + longitudMaxima];
         this.distanciaCandidato = new int[candidatos.length];
         this.pedidosBuffer = new int[m];
         this.cantidadesBuffer = new int[m];
@@ -273,6 +292,7 @@ public final class Split {
         individuo.pedidosNoAtendidos(contarPedidos(banco, m));
         individuo.costo(0.0);
         individuo.desfase(0);
+        individuo.desviacionPlan(0);
     }
 
     // ------------------------------------------------------- valoracion de arcos
@@ -483,6 +503,10 @@ public final class Split {
      * que es el segundo tiempo de la resolucion de la dependencia circular. Las rutas se
      * atienden por urgencia creciente del plazo mas apretado que contienen, de modo que las
      * unidades escasas se reservan para las rutas que menos margen tienen.
+     *
+     * <p>Es tambien donde entra el termino de estabilidad del apartado 11.4: la unidad se elige
+     * por costo mas desfase penalizado <b>mas la desviacion respecto del plan vigente</b>, y la
+     * lista de candidatas incluye las unidades que ya tenian los pedidos de la ruta.</p>
      */
     private void asignarUnidades(Individuo individuo, double pesoDesfase) {
         final int[] permutacion = individuo.permutacion();
@@ -516,6 +540,7 @@ public final class Split {
         int posicion = 0;
         double costoTotal = 0.0;
         long desfaseTotal = 0;
+        int desviacionTotal = 0;
 
         for (int k = 0; k < cantidadRutasTmp; k++) {
             final int r = orden[k];
@@ -531,25 +556,29 @@ public final class Split {
             double mejorValor = Double.POSITIVE_INFINITY;
             double costoElegido = 0.0;
             int desfaseElegido = 0;
+            int desviacionElegida = 0;
 
             final int puntoPrimero = tareas.punto(permutacion[inicio]);
             // Primer intento con unidades del tipo que valoro el arco. Si su cuota se agoto o
             // ninguna de sus unidades sirve, el segundo intento abre la busqueda a toda la
             // flota libre antes de mandar las tareas al banco.
             for (int intento = 0; intento < 2 && unidadElegida < 0 && rutas < maximoRutas; intento++) {
-                final int cantidadCandidatos =
-                        seleccionarCandidatos(rutaTipoTmp[r], puntoPrimero, intento == 1);
+                final int cantidadCandidatos = seleccionarCandidatos(
+                        rutaTipoTmp[r], puntoPrimero, intento == 1, permutacion, inicio, longitud);
                 for (int c = 0; c < cantidadCandidatos; c++) {
                     final int unidad = candidatos[c];
                     if (!programador.evaluar(unidad, pedidosBuffer, cantidadesBuffer, longitud)) {
                         continue;
                     }
-                    double valor = programador.ultimoCosto() + pesoDesfase * programador.ultimoDesfase();
+                    int desviacion = estabilidad.desviacion(unidad, permutacion, inicio, longitud);
+                    double valor = programador.ultimoCosto() + pesoDesfase * programador.ultimoDesfase()
+                            + estabilidad.peso() * desviacion;
                     if (valor < mejorValor) {
                         mejorValor = valor;
                         unidadElegida = unidad;
                         costoElegido = programador.ultimoCosto();
                         desfaseElegido = programador.ultimoDesfase();
+                        desviacionElegida = desviacion;
                     }
                 }
             }
@@ -576,12 +605,14 @@ public final class Split {
             rutas++;
             costoTotal += costoElegido;
             desfaseTotal += desfaseElegido;
+            desviacionTotal += desviacionElegida;
         }
 
         individuo.cantidadRutas(rutas);
         individuo.cantidadBanco(cantidadBanco);
         individuo.costo(costoTotal);
         individuo.desfase((int) Math.min(desfaseTotal, Integer.MAX_VALUE / 4));
+        individuo.desviacionPlan(desviacionTotal);
         individuo.pedidosNoAtendidos(contarPedidos(banco, cantidadBanco));
     }
 
@@ -600,18 +631,29 @@ public final class Split {
     }
 
     /**
-     * Unidades libres candidatas a atender una ruta, las mas proximas al destino de su
-     * primera tarea. El desempate por mayor margen de turno y por menor indice hace la
-     * seleccion reproducible.
+     * Unidades libres candidatas a atender una ruta: las mas proximas al destino de su primera
+     * tarea, mas las <b>unidades que el plan vigente tenia asignadas</b> a los pedidos de la
+     * ruta. El desempate por mayor margen de turno y por menor indice hace la seleccion
+     * reproducible.
+     *
+     * <p>Anadir las vigentes es lo que vuelve util el termino de estabilidad en este punto. La
+     * unidad que ya tenia un pedido no tiene por que estar entre las tres mas proximas al
+     * destino, y si no se prueba, ninguna penalizacion puede preferirla: el termino solo sabe
+     * puntuar las candidatas que se le presentan. Son a lo sumo tantas como tareas tenga la
+     * ruta, es decir unas pocas, y no se duplican con las que ya entraron por cercania.</p>
      *
      * @param tipoRuta      tipo con el que el Split valoro la ruta
      * @param puntoPrimero  punto de la primera tarea de la ruta
      * @param cualquierTipo si {@code true} se consideran unidades de cualquier tipo
+     * @param permutacion   cromosoma del individuo, del que se leen las tareas de la ruta
+     * @param inicio        posicion de la primera tarea de la ruta dentro del cromosoma
+     * @param longitud      numero de tareas de la ruta
      * @return numero de candidatos dejados en {@code candidatos}
      */
-    private int seleccionarCandidatos(int tipoRuta, int puntoPrimero, boolean cualquierTipo) {
+    private int seleccionarCandidatos(int tipoRuta, int puntoPrimero, boolean cualquierTipo,
+                                      int[] permutacion, int inicio, int longitud) {
         final MatrizDistancias matriz = instancia.matriz();
-        final int maximo = candidatos.length;
+        final int maximo = candidatosPorDistancia;
         int cantidad = 0;
         for (int u = 0; u < cantidadUnidades; u++) {
             if (!libre[u]) {
@@ -638,6 +680,39 @@ public final class Split {
                 if (cantidad < maximo) {
                     cantidad++;
                 }
+            }
+        }
+        return anadirVigentes(cantidad, tipoRuta, cualquierTipo, permutacion, inicio, longitud);
+    }
+
+    /**
+     * Anade al final de la lista de candidatas las unidades vigentes de los pedidos de la ruta
+     * que sigan libres y admitidas por el filtro de tipo del intento en curso.
+     *
+     * @return numero total de candidatos
+     */
+    private int anadirVigentes(int cantidad, int tipoRuta, boolean cualquierTipo,
+                               int[] permutacion, int inicio, int longitud) {
+        if (!estabilidad.activa()) {
+            return cantidad;
+        }
+        for (int i = 0; i < longitud && cantidad < candidatos.length; i++) {
+            final int unidad = estabilidad.unidadVigente(permutacion[inicio + i]);
+            if (unidad < 0 || !libre[unidad]) {
+                continue;
+            }
+            if (!cualquierTipo && instancia.unidadTipo(unidad).ordinal() != tipoRuta) {
+                continue;
+            }
+            boolean repetida = false;
+            for (int c = 0; c < cantidad; c++) {
+                if (candidatos[c] == unidad) {
+                    repetida = true;
+                    break;
+                }
+            }
+            if (!repetida) {
+                candidatos[cantidad++] = unidad;
             }
         }
         return cantidad;

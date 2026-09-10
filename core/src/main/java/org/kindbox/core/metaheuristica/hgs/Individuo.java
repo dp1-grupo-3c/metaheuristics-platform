@@ -44,6 +44,7 @@ public final class Individuo {
     private int pedidosNoAtendidos;
     private double costo;
     private int desfase;
+    private int desviacionPlan;
 
     /** Aptitud combinada de valor objetivo y diversidad, que fija la subpoblacion. */
     private double aptitud;
@@ -181,6 +182,19 @@ public final class Individuo {
     }
 
     /**
+     * Pedidos que cambian de unidad respecto del plan vigente, es decir la desviacion del
+     * apartado 11.4 del ISA medida sobre las rutas de este individuo. La calcula
+     * {@link EstabilidadPlan} y la dejan aqui el {@link Split} y la {@link Educacion}.
+     */
+    public int desviacionPlan() {
+        return desviacionPlan;
+    }
+
+    public void desviacionPlan(int valor) {
+        this.desviacionPlan = valor;
+    }
+
+    /**
      * Indica si el individuo pertenece a la subpoblacion factible: ninguna de sus rutas
      * incumple un plazo ni se pasa del cierre del turno. Las tareas del banco no lo vuelven
      * infactible, porque no atender un pedido es el nivel 1 del objetivo y no una violacion
@@ -196,23 +210,38 @@ public final class Individuo {
     }
 
     /**
-     * Valor con el que la busqueda interna compara individuos: costo de operacion mas la
-     * penalizacion de las tareas sin atender mas la penalizacion dinamica del desfase.
+     * Costo de operacion mas la penalizacion blanda de estabilidad. Es el nivel 2 del objetivo
+     * tal como lo ve la busqueda interna: el costo del apartado 2.5 del ISA mas el termino del
+     * apartado 11.4, que desempata dentro de ese nivel y nunca por encima de el.
      */
-    public double costoInterno(double pesoDesfase) {
-        return costo + ParametrosHgs.PENALIZACION_TAREA_NO_ATENDIDA * cantidadBanco
-                + pesoDesfase * desfase;
+    public double costoPenalizado(double pesoEstabilidad) {
+        return costo + pesoEstabilidad * desviacionPlan;
     }
 
-    /** Indica si este individuo es mejor que el otro segun el objetivo jerarquico. */
-    public boolean mejorQue(Individuo otro) {
+    /**
+     * Valor con el que la busqueda interna compara individuos: costo de operacion mas la
+     * penalizacion de las tareas sin atender, mas la penalizacion dinamica del desfase, mas la
+     * penalizacion blanda de la desviacion respecto del plan vigente.
+     */
+    public double costoInterno(double pesoDesfase, double pesoEstabilidad) {
+        return costo + ParametrosHgs.PENALIZACION_TAREA_NO_ATENDIDA * cantidadBanco
+                + pesoDesfase * desfase + pesoEstabilidad * desviacionPlan;
+    }
+
+    /**
+     * Indica si este individuo es mejor que el otro segun el objetivo jerarquico, con la
+     * estabilidad desempatando dentro del nivel 2. Es la comparacion que fija el rango por
+     * valor objetivo de la aptitud combinada del apartado 6.3.3, y por tanto la que lleva el
+     * termino de estabilidad hasta la seleccion de progenitores y la supervivencia.
+     */
+    public boolean mejorQue(Individuo otro, double pesoEstabilidad) {
         if (otro == null) {
             return true;
         }
         if (pedidosNoAtendidos != otro.pedidosNoAtendidos) {
             return pedidosNoAtendidos < otro.pedidosNoAtendidos;
         }
-        return costo < otro.costo;
+        return costoPenalizado(pesoEstabilidad) < otro.costoPenalizado(pesoEstabilidad);
     }
 
     // ---------------------------------------------------------------- aptitud
@@ -254,6 +283,7 @@ public final class Individuo {
         this.pedidosNoAtendidos = otro.pedidosNoAtendidos;
         this.costo = otro.costo;
         this.desfase = otro.desfase;
+        this.desviacionPlan = otro.desviacionPlan;
         this.aptitud = otro.aptitud;
         this.contribucionDiversidad = otro.contribucionDiversidad;
     }
@@ -286,6 +316,7 @@ public final class Individuo {
     @Override
     public String toString() {
         return "Individuo[H=" + pedidosNoAtendidos + " costo=" + String.format("%.2f", costo)
-                + " desfase=" + desfase + " rutas=" + cantidadRutas + " banco=" + cantidadBanco + "]";
+                + " desfase=" + desfase + " desviacion=" + desviacionPlan
+                + " rutas=" + cantidadRutas + " banco=" + cantidadBanco + "]";
     }
 }

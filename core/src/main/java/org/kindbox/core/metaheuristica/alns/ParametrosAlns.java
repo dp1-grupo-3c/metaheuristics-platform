@@ -36,6 +36,7 @@ public final class ParametrosAlns {
     private double fraccionTemperaturaInicial = 0.05;
     private double fraccionTemperaturaFinal = 1.0e-5;
     private double factorPenalizacionBanco = 10.0;
+    private double factorPenalizacionEstabilidad = 0.25;
 
     private long maximoIteracionesSinMejora = 0L;
     private long iteracionesParaReinicio = 1500L;
@@ -327,6 +328,42 @@ public final class ParametrosAlns {
         return this;
     }
 
+    /**
+     * Peso del termino blando de estabilidad del apartado 11.4 del ISA, expresado como
+     * multiplo del costo medio por tarea colocada de la solucion de partida. Cada pedido que
+     * cambia de unidad respecto del plan vigente suma ese peso al escalar interno con que la
+     * busqueda compara movimientos.
+     *
+     * <p>La escala es relativa y no absoluta por la misma razon que la del banco: el costo
+     * medio por tarea cambia de una fotografia a otra segun la dispersion de los destinos y la
+     * composicion de la flota disponible, de modo que un peso en soles fijo penalizaria mucho
+     * en una hora floja y nada en una hora punta. Al expresarlo como multiplo del mismo costo
+     * medio que usa {@link #factorPenalizacionBanco} la razon entre los dos terminos queda
+     * fijada por construccion: con los valores por defecto, 0.25 contra 10.0, abandonar un
+     * pedido cuesta cuarenta veces mas que reasignarlo, con lo que el apartado 11.4 se cumple
+     * al pie de la letra y la estabilidad no puede prevalecer jamas sobre el cumplimiento del
+     * plazo. El nivel 1 del objetivo, que es lexicografico, sigue ademas decidiendo por su
+     * cuenta que solucion se conserva como mejor.</p>
+     *
+     * <p>El valor por defecto sale de la calibracion sobre la simulacion 5D de
+     * {@code data} desde el 2026-09-01 con salto de 30 minutos y tres semillas: con 0.25 la
+     * tasa de reasignacion cae de forma clara sin que el costo ni los pedidos entregados se
+     * resientan. Con {@code 0.0} el termino se apaga y el algoritmo se comporta como antes de
+     * existir, que es lo que permite contrastar las dos variantes en el banco de pruebas del
+     * apartado 12.</p>
+     */
+    public double factorPenalizacionEstabilidad() {
+        return factorPenalizacionEstabilidad;
+    }
+
+    public ParametrosAlns factorPenalizacionEstabilidad(double factor) {
+        if (factor < 0.0 || Double.isNaN(factor)) {
+            throw new IllegalArgumentException("Factor de penalizacion de estabilidad invalido: " + factor);
+        }
+        this.factorPenalizacionEstabilidad = factor;
+        return this;
+    }
+
     // ------------------------------------------------------- criterio de parada
 
     /**
@@ -378,6 +415,7 @@ public final class ParametrosAlns {
                 + " tope=" + maximoAbsolutoDestruccion + " cadena=" + longitudMaximaCadena
                 + " parpadeo=" + parpadeoMinimo + ".." + parpadeoMaximo
                 + " k=" + ordenArrepentimientoMinimo + ".." + ordenArrepentimientoMaximo
-                + " segmento=" + longitudSegmento + " reaccion=" + tasaReaccion + "]";
+                + " segmento=" + longitudSegmento + " reaccion=" + tasaReaccion
+                + " estabilidad=" + factorPenalizacionEstabilidad + "]";
     }
 }

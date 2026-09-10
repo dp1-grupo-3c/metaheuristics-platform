@@ -49,6 +49,29 @@ public final class ParametrosHgs {
      */
     public static final double PENALIZACION_TAREA_NO_ATENDIDA = 1_000_000.0;
 
+    /**
+     * Costo, en soles, con el que la busqueda interna penaliza cada pedido que cambia de
+     * unidad respecto del plan vigente. Es el termino blando de estabilidad del apartado 11.4
+     * del ISA, y {@link EstabilidadPlan} lo resuelve en tiempo constante por tarea.
+     *
+     * <p>El valor se elige por su relacion con los otros dos pesos del escalar interno y no
+     * por si mismo. Por arriba tiene que quedar <b>muy por debajo</b> de
+     * {@link #PENALIZACION_TAREA_NO_ATENDIDA}, que vale un millon: con 25 soles la relacion es
+     * de uno a cuarenta mil, de modo que ninguna acumulacion imaginable de estabilidad
+     * compensa dejar un pedido fuera de plazo, que es la exigencia expresa del apartado 11.4.
+     * Por abajo tiene que ser comparable al ahorro de costo que produce una eleccion de unidad
+     * distinta, porque si no, no desempata nada: el costo por kilometro de la flota va de 3
+     * soles la bicicleta a 8 el auto, de modo que 25 soles equivalen a un rodeo de entre tres y
+     * ocho kilometros. Leido asi, el peso dice que conservar la unidad de un pedido vale lo que
+     * un desvio de unos pocos kilometros, y que un ahorro mayor que ese sigue prevaleciendo.
+     * Un peso de 1 sol, que es el de {@code FuncionObjetivo.PESO_ESTABILIDAD} en la evaluacion
+     * final, solo llega a romper los empates exactos, que son muchos pero no todos.</p>
+     *
+     * <p>Con cero el termino queda desactivado y la busqueda se comporta como antes de
+     * cablearlo, lo que permite medir el efecto sin recompilar.</p>
+     */
+    public static final double PESO_ESTABILIDAD = 25.0;
+
     private int tamanoMinimoPoblacion = TAMANO_MINIMO_POBLACION;
     private int tamanoGeneracion = TAMANO_GENERACION;
     private int individuosElite = INDIVIDUOS_ELITE;
@@ -61,6 +84,8 @@ public final class ParametrosHgs {
     private int iteracionesLagrangiana = 6;
     private int candidatosUnidadPorRuta = 3;
     private int desfaseMaximoDeArco = 240;
+
+    private double pesoEstabilidad = PESO_ESTABILIDAD;
 
     private double penalizacionDesfaseInicial = 20_000.0;
     private double penalizacionDesfaseMinima = 1_000.0;
@@ -318,6 +343,26 @@ public final class ParametrosHgs {
         return this;
     }
 
+    /**
+     * Peso en soles de cada pedido que cambia de unidad respecto del plan vigente. El valor
+     * por defecto y su justificacion estan en {@link #PESO_ESTABILIDAD}.
+     */
+    public double pesoEstabilidad() {
+        return pesoEstabilidad;
+    }
+
+    public ParametrosHgs pesoEstabilidad(double valor) {
+        if (valor < 0.0 || !Double.isFinite(valor)) {
+            throw new IllegalArgumentException("Peso de estabilidad no valido: " + valor);
+        }
+        if (valor >= PENALIZACION_TAREA_NO_ATENDIDA) {
+            throw new IllegalArgumentException(
+                    "El peso de estabilidad debe quedar muy por debajo del de un pedido no atendido: " + valor);
+        }
+        this.pesoEstabilidad = valor;
+        return this;
+    }
+
     /** Factor de aumento cuando hay menos factibles de los deseados. */
     public double factorAumentoPenalizacion() {
         return factorAumentoPenalizacion;
@@ -428,6 +473,7 @@ public final class ParametrosHgs {
         return "ParametrosHgs[mu=" + tamanoMinimoPoblacion + " lambda=" + tamanoGeneracion
                 + " elite=" + individuosElite + " granularidad=" + granularidadVecindario
                 + " objetivoFactibles=" + proporcionObjetivoFactibles
+                + " pesoEstabilidad=" + pesoEstabilidad
                 + " esfuerzoElite=" + esfuerzoElite + "]";
     }
 }

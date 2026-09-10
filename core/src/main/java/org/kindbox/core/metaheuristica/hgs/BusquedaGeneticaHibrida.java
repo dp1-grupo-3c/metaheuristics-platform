@@ -86,6 +86,12 @@ public final class BusquedaGeneticaHibrida implements Algoritmo {
     public static final String NOMBRE = "HGS";
     /** Semilla por defecto de la corrida, para que una ejecucion sin semilla sea reproducible. */
     public static final long SEMILLA_POR_DEFECTO = 20262L;
+    /**
+     * Fraccion de los genes del vector de tipos que arranca sesgada hacia el tipo de la unidad
+     * vigente en la poblacion inicial aleatoria. La otra mitad se sortea, para no colapsar la
+     * diversidad en la dimension que sostiene la distancia entre individuos del apartado 6.3.3.
+     */
+    private static final double PROPORCION_SESGO_TIPO_VIGENTE = 0.50;
 
     private final HeuristicaConstructiva heuristica;
     private final ParametrosHgs parametros;
@@ -135,6 +141,7 @@ public final class BusquedaGeneticaHibrida implements Algoritmo {
         private final Aleatorio aleatorio;
         private final ProgramadorRuta programador;
         private final TareasEntrega tareas;
+        private final EstabilidadPlan estabilidad;
         private final Split split;
         private final Educacion educacion;
         private final CruceOrdenado cruce;
@@ -172,8 +179,13 @@ public final class BusquedaGeneticaHibrida implements Algoritmo {
             this.aleatorio = new Aleatorio(semilla);
             this.programador = new ProgramadorRuta(instancia);
             this.tareas = new TareasEntrega(instancia, parametros.granularidadVecindario());
-            this.split = new Split(instancia, tareas, programador, parametros);
-            this.educacion = new Educacion(instancia, tareas, programador, aleatorio, parametros, presupuesto);
+            // El plan vigente se resuelve una sola vez, al arrancar la corrida, a arreglos
+            // primitivos indexados por tarea: dentro del bucle de busqueda no se consulta ni el
+            // mapa de la instancia ni ningun codigo TTNN.
+            this.estabilidad = new EstabilidadPlan(instancia, tareas, parametros.pesoEstabilidad());
+            this.split = new Split(instancia, tareas, programador, parametros, estabilidad);
+            this.educacion = new Educacion(instancia, tareas, programador, aleatorio, parametros,
+                    presupuesto, estabilidad);
             this.cantidadTareas = tareas.cantidad();
             this.maximoRutas = Math.max(1, instancia.cantidadUnidades());
             this.cruce = new CruceOrdenado(aleatorio, cantidadTareas);
@@ -286,10 +298,10 @@ public final class BusquedaGeneticaHibrida implements Algoritmo {
             educacion.educar(elite, pesoDesfase);
             registrarMejor(elite);
 
-            double anterior = elite.costoInterno(pesoDesfase);
+            double anterior = elite.costoInterno(pesoDesfase, parametros.pesoEstabilidad());
             while (!presupuesto.agotado() && presupuesto.fraccionConsumida() < parametros.esfuerzoElite()) {
                 educacion.educar(elite, pesoDesfase);
-                double actual = elite.costoInterno(pesoDesfase);
+                double actual = elite.costoInterno(pesoDesfase, parametros.pesoEstabilidad());
                 if (actual >= anterior - 1e-7) {
                     break;
                 }
@@ -321,13 +333,27 @@ public final class BusquedaGeneticaHibrida implements Algoritmo {
             }
         }
 
-        /** Cromosoma con las tareas en orden aleatorio y tipos admisibles al azar. */
+        /**
+         * Cromosoma con las tareas en orden aleatorio y tipos admisibles al azar, sesgados
+         * hacia el <b>tipo de la unidad vigente</b> de cada tarea.
+         *
+         * <p>El vector de tipos es lo que decide que grafos por tipo considera el Split para
+         * cada arco, de modo que sesgarlo hacia el tipo que ya atendia el pedido acerca la
+         * particion inicial al plan vigente y le ahorra a la busqueda tener que reconquistar
+         * esa estructura movimiento a movimiento. El sesgo se aplica a la mitad de los genes y
+         * no a todos porque el vector de tipos es la mitad de la distancia entre individuos del
+         * apartado 6.3.3: fijarlo entero colapsaria la diversidad de la poblacion inicial justo
+         * en la dimension que la sostiene en una flota heterogenea.</p>
+         */
         private void cromosomaAleatorio(Individuo individuo) {
             final int[] permutacion = individuo.permutacion();
             final byte[] tipo = individuo.tipo();
             for (int t = 0; t < cantidadTareas; t++) {
                 permutacion[t] = t;
-                tipo[t] = (byte) split.tipoAleatorioAdmisible(aleatorio, t);
+                int vigente = estabilidad.tipoVigente(t);
+                boolean sesgar = vigente >= 0 && split.tipoAdmisible(vigente, t)
+                        && aleatorio.conProbabilidad(PROPORCION_SESGO_TIPO_VIGENTE);
+                tipo[t] = (byte) (sesgar ? vigente : split.tipoAleatorioAdmisible(aleatorio, t));
             }
             aleatorio.barajar(permutacion, cantidadTareas);
         }

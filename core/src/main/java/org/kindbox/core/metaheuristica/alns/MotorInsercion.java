@@ -378,10 +378,26 @@ public final class MotorInsercion {
      * la mas barata de ellas. Sin esa fusion el arrepentimiento seria siempre nulo mientras
      * quedasen dos unidades libres, porque la segunda mejor alternativa costaria practicamente
      * lo mismo que la primera y el operador degeneraria en la insercion voraz.</p>
+     *
+     * <h2>Termino de estabilidad</h2>
+     * <p>El delta con que se compara una unidad no es solo el aumento de costo de su ruta sino
+     * la variacion completa del escalar interno, que incluye el termino blando del apartado
+     * 11.4 del ISA: colocar la tarea en la unidad que el plan vigente le asignaba rebaja la
+     * desviacion en uno y el delta baja en el peso de ese termino. La cache de costos guarda
+     * costos de ruta puros y no se contamina; el descuento se aplica aqui, que es donde se
+     * elige la unidad. La posicion dentro de la ruta no altera la desviacion, de modo que
+     * {@link #valorarUnidad} no necesita conocer el termino.</p>
+     *
+     * <p>El descuento se resuelve con una sola consulta por tarea y una comparacion de enteros
+     * por unidad candidata, sin recorrer el pedido ni consultar tabla asociativa alguna.</p>
      */
     private void derivarMejor(EstadoAlns estado, int tarea, int ordenArrepentimiento) {
         int base = tarea * cantidadUnidades;
         int total = cantidadCandidatas[tarea];
+
+        final double pesoEstabilidad = estado.pesoEstabilidad();
+        final int unidadVigente =
+                pesoEstabilidad > 0.0 ? estado.unidadVigentePorRecuperar(tarea) : -1;
 
         double mejorVacia = INFINITO;
         int unidadVacia = -1;
@@ -398,6 +414,9 @@ public final class MotorInsercion {
                 continue;
             }
             double delta = costo - estado.costoRuta(unidad);
+            if (unidad == unidadVigente) {
+                delta -= pesoEstabilidad;
+            }
             if (estado.longitudRuta(unidad) == 0) {
                 if (delta < mejorVacia) {
                     mejorVacia = delta;

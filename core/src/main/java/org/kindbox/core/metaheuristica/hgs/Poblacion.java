@@ -108,11 +108,14 @@ public final class Poblacion {
         return false;
     }
 
-    /** Mejor individuo por valor objetivo jerarquico, o {@code null} si esta vacia. */
+    /**
+     * Mejor individuo por valor objetivo jerarquico, con la estabilidad desempatando dentro
+     * del nivel 2, o {@code null} si esta vacia.
+     */
     public Individuo mejor() {
         Individuo elegido = null;
         for (int i = 0; i < cantidad; i++) {
-            if (individuos[i].mejorQue(elegido)) {
+            if (individuos[i].mejorQue(elegido, parametros.pesoEstabilidad())) {
                 elegido = individuos[i];
             }
         }
@@ -249,12 +252,18 @@ public final class Poblacion {
         return suma / n;
     }
 
-    /** Ordenacion por insercion de indices segun el objetivo jerarquico, mejor primero. */
+    /**
+     * Ordenacion por insercion de indices segun el objetivo jerarquico, mejor primero. La
+     * comparacion incluye el termino blando de estabilidad del apartado 11.4, de modo que el
+     * rango por valor objetivo con el que se arma la aptitud combinada, y con ella el torneo de
+     * seleccion y la supervivencia, tambien prefiere el plan que se aparta menos del vigente.
+     */
     private void ordenarPorObjetivo(int[] orden, int n) {
+        final double pesoEstabilidad = parametros.pesoEstabilidad();
         for (int i = 1; i < n; i++) {
             int actual = orden[i];
             int j = i - 1;
-            while (j >= 0 && individuos[actual].mejorQue(individuos[orden[j]])) {
+            while (j >= 0 && individuos[actual].mejorQue(individuos[orden[j]], pesoEstabilidad)) {
                 orden[j + 1] = orden[j];
                 j--;
             }

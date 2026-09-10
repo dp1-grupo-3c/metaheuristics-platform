@@ -40,6 +40,17 @@ import org.kindbox.core.problema.ValorObjetivo;
  * infactible. La comprobacion vive en el operador de insercion, que solo acepta una posicion
  * cuando el decodificador la declara factible.</p>
  *
+ * <h2>Estabilidad del plan entre replanificaciones</h2>
+ * <p>El estado lleva tambien, y del mismo modo incremental, la <b>desviacion respecto del plan
+ * vigente</b> del apartado 11.4 del ISA: el numero de pedidos que el plan anterior asignaba a
+ * una unidad y que ninguna tarea colocada devuelve a ella. El plan vigente llega traducido a
+ * indices locales en {@link PlanVigenteAlns}, de modo que resolver a que unidad pertenecia un
+ * pedido cuesta un acceso a arreglo primitivo, sin tabla asociativa ni comparacion de codigos
+ * {@code TTNN}. Colocar o retirar una tarea actualiza el contador en tiempo constante y
+ * copiar un estado lo traslada tal cual, sin recorrer la solucion. La desviacion entra en
+ * {@link #escalar} y en {@link #valor()} con el peso que instala
+ * {@link #configurarEstabilidad}.</p>
+ *
  * <h2>Inventario de los almacenes intermedios</h2>
  * <p>Durante la busqueda cada ruta se valora con el inventario intacto, es decir con el modo
  * del decodificador que no consume inventario, porque valorar una posicion candidata no debe
@@ -90,6 +101,21 @@ public final class EstadoAlns {
     /** Pedidos con alguna tarea en el banco, que es exactamente la H del nivel 1. */
     private int pedidosPendientes;
 
+    /**
+     * Unidad que el plan vigente asignaba a cada pedido, o {@code -1}. Es el arreglo que
+     * {@link PlanVigenteAlns} precalcula al arrancar la corrida y que los tres estados
+     * comparten; se lee, nunca se escribe.
+     */
+    private int[] unidadVigenteDe;
+    /** Tareas de cada pedido colocadas ahora mismo en la unidad que le asignaba el plan vigente. */
+    private final int[] tareasEnUnidadVigenteDe;
+    /** Cota superior de la desviacion: pedidos con unidad vigente resoluble. */
+    private int pedidosConUnidadVigente;
+    /** Pedidos con unidad vigente que ninguna tarea colocada respeta. Es la desviacion del 11.4. */
+    private int desviacionVigente;
+    /** Peso del termino blando de estabilidad dentro del escalar interno, en soles por pedido. */
+    private double pesoEstabilidad;
+
     private double costoTotal;
     private int kilometrosTotales;
 
@@ -131,6 +157,10 @@ public final class EstadoAlns {
         this.banco = new int[Math.max(1, cantidadTareas)];
         this.posicionEnBanco = new int[Math.max(1, cantidadTareas)];
         this.tareasEnBancoDe = new int[Math.max(1, cantidadPedidos)];
+        this.tareasEnUnidadVigenteDe = new int[Math.max(1, cantidadPedidos)];
+        this.unidadVigenteDe = PlanVigenteAlns.ninguno(cantidadPedidos).unidades();
+        this.pedidosConUnidadVigente = 0;
+        this.pesoEstabilidad = 0.0;
         vaciar();
     }
 
@@ -290,19 +320,64 @@ public final class EstadoAlns {
         return capacidadRuta;
     }
 
-    /** Valor jerarquico del estado, con la penalizacion blanda en cero. */
-    public ValorObjetivo valor() {
-        return new ValorObjetivo(pedidosPendientes, costoTotal, 0.0);
+    /**
+     * Desviacion respecto del plan vigente, contada como el numero de pedidos que el plan
+     * vigente asignaba a una unidad y que ninguna tarea colocada devuelve a esa unidad. Es la
+     * distancia del apartado 11.4 del ISA y se lleva de forma incremental, de modo que
+     * consultarla cuesta tiempo constante.
+     *
+     * <p>La cuenta es <b>por pedido</b> y no por tarea, conforme al apartado, que habla del
+     * numero de pedidos que cambian de unidad asignada. Un pedido repartido en varias tareas
+     * de entrega se considera estable en cuanto <b>alguna</b> de ellas la atiende la unidad
+     * vigente: preguntar si la unidad que lo tenia asignado lo sigue atendiendo es una
+     * pregunta bien definida, mientras que preguntar cual es "la" unidad de un pedido
+     * repartido dependeria del orden de las rutas. Es exactamente el mismo criterio que aplica
+     * {@code FuncionObjetivoJerarquica.desviacionDelPlanVigente}, de modo que el termino que
+     * guia la busqueda y el que se reporta al final miden lo mismo.</p>
+     */
+    public int desviacionVigente() {
+        return desviacionVigente;
+    }
+
+    /** Peso con que el termino de estabilidad entra en el escalar interno. */
+    public double pesoEstabilidad() {
+        return pesoEstabilidad;
     }
 
     /**
-     * Escalar interno que guia la aceptacion por recocido simulado. Suma el costo y una
-     * penalizacion por pedido pendiente, de modo que el nivel 1 del objetivo se traduzca en
-     * un unico numero comparable. La comparacion entre soluciones que se reportan sigue
-     * siendo la jerarquica de {@link ValorObjetivo}.
+     * Unidad a la que el plan vigente asignaba el pedido de la tarea, cuando colocarla alli
+     * rebajaria la desviacion en uno, y {@code -1} en cualquier otro caso: sin plan vigente,
+     * con la unidad ya fuera de la fotografia o con otra tarea del mismo pedido ya colocada en
+     * ella. El motor de insercion la consulta una sola vez por tarea, antes de recorrer sus
+     * unidades candidatas, y cuesta dos accesos a arreglo.
+     */
+    public int unidadVigentePorRecuperar(int tarea) {
+        int pedido = tareas.pedido(tarea);
+        int unidad = unidadVigenteDe[pedido];
+        return unidad >= 0 && tareasEnUnidadVigenteDe[pedido] == 0 ? unidad : -1;
+    }
+
+    /**
+     * Valor jerarquico del estado. La penalizacion blanda recoge el termino de estabilidad del
+     * apartado 11.4, de modo que la mejor solucion que conserva el algoritmo se elige con el
+     * mismo criterio con que se aceptan los movimientos y no solo por costo.
+     */
+    public ValorObjetivo valor() {
+        return new ValorObjetivo(pedidosPendientes, costoTotal, pesoEstabilidad * desviacionVigente);
+    }
+
+    /**
+     * Escalar interno que guia la aceptacion por recocido simulado. Suma tres terminos: el
+     * costo, una penalizacion por pedido pendiente que traduce el nivel 1 del objetivo a un
+     * unico numero comparable, y la penalizacion blanda de estabilidad del apartado 11.4, que
+     * pesa cada pedido que cambia de unidad respecto del plan vigente. El peso de este ultimo
+     * queda muy por debajo del de la infactibilidad, de modo que la estabilidad nunca puede
+     * prevalecer sobre el cumplimiento del plazo. La comparacion entre soluciones que se
+     * reportan sigue siendo la jerarquica de {@link ValorObjetivo}.
      */
     public double escalar(double penalizacionPorPedidoDelBanco) {
-        return costoTotal + penalizacionPorPedidoDelBanco * pedidosPendientes;
+        return costoTotal + penalizacionPorPedidoDelBanco * pedidosPendientes
+                + pesoEstabilidad * desviacionVigente;
     }
 
     /** Acceso directo a la fila de tareas de una unidad. No debe modificarse desde fuera. */
@@ -322,6 +397,62 @@ public final class EstadoAlns {
 
     // ---------------------------------------------------------- modificacion
 
+    /**
+     * Instala el plan vigente del apartado 11.4 y el peso de su termino blando, y recuenta la
+     * desviacion del estado tal como esta.
+     *
+     * <p>Se llama una sola vez por corrida y por estado, antes de que el bucle de busqueda
+     * arranque. El plan se comparte entre los tres estados de la corrida, que es lo que
+     * permite que {@link #copiarDesde} traslade el contador sin recorrer nada.</p>
+     *
+     * @param plan  plan vigente resuelto a indices locales, o {@code null} para no penalizar
+     * @param peso  soles con que se penaliza cada pedido que cambia de unidad asignada
+     */
+    public void configurarEstabilidad(PlanVigenteAlns plan, double peso) {
+        PlanVigenteAlns efectivo = plan == null ? PlanVigenteAlns.ninguno(cantidadPedidos) : plan;
+        if (efectivo.unidades().length < Math.max(1, cantidadPedidos)) {
+            throw new IllegalArgumentException("El plan vigente no cubre todos los pedidos");
+        }
+        this.unidadVigenteDe = efectivo.unidades();
+        this.pedidosConUnidadVigente = efectivo.pedidosConUnidad();
+        this.pesoEstabilidad = Math.max(0.0, peso);
+        recontarDesviacion();
+    }
+
+    /**
+     * Recalibra el peso del termino sin tocar el plan ni los contadores. El algoritmo lo
+     * emplea para fijar el peso definitivo cuando ya conoce el costo de la solucion de
+     * partida, sin perder lo que la construccion ya haya colocado.
+     */
+    public void pesoEstabilidad(double peso) {
+        this.pesoEstabilidad = Math.max(0.0, peso);
+    }
+
+    /** Rehace desde cero el contador de desviacion. Solo se usa al configurar el estado. */
+    private void recontarDesviacion() {
+        for (int p = 0; p < cantidadPedidos; p++) {
+            tareasEnUnidadVigenteDe[p] = 0;
+        }
+        if (pedidosConUnidadVigente == 0) {
+            desviacionVigente = 0;
+            return;
+        }
+        for (int t = 0; t < cantidadTareas; t++) {
+            int unidad = unidadDe[t];
+            int pedido = tareas.pedido(t);
+            if (unidad >= 0 && unidadVigenteDe[pedido] == unidad) {
+                tareasEnUnidadVigenteDe[pedido]++;
+            }
+        }
+        int desviacion = 0;
+        for (int p = 0; p < cantidadPedidos; p++) {
+            if (unidadVigenteDe[p] >= 0 && tareasEnUnidadVigenteDe[p] == 0) {
+                desviacion++;
+            }
+        }
+        desviacionVigente = desviacion;
+    }
+
     /** Devuelve el estado a rutas vacias y banco completo. */
     public void vaciar() {
         for (int u = 0; u < cantidadUnidades; u++) {
@@ -332,8 +463,10 @@ public final class EstadoAlns {
         tamanoBanco = 0;
         for (int p = 0; p < cantidadPedidos; p++) {
             tareasEnBancoDe[p] = 0;
+            tareasEnUnidadVigenteDe[p] = 0;
         }
         pedidosPendientes = 0;
+        desviacionVigente = pedidosConUnidadVigente;
         for (int t = 0; t < cantidadTareas; t++) {
             unidadDe[t] = -1;
             posicionDe[t] = -1;
@@ -367,6 +500,7 @@ public final class EstadoAlns {
         unidadDe[tarea] = unidad;
         posicionDe[tarea] = posicion;
         sacarDelBanco(tarea);
+        anotarColocacion(tarea, unidad);
 
         costoTotal += costo - costoRuta[unidad];
         kilometrosTotales += kilometros - kilometrosRuta[unidad];
@@ -427,6 +561,7 @@ public final class EstadoAlns {
         unidadDe[tarea] = -1;
         posicionDe[tarea] = -1;
         meterEnBanco(tarea);
+        anotarRetiro(tarea, unidad);
         reevaluarRuta(unidad);
         return tarea;
     }
@@ -440,6 +575,7 @@ public final class EstadoAlns {
             unidadDe[tarea] = -1;
             posicionDe[tarea] = -1;
             meterEnBanco(tarea);
+            anotarRetiro(tarea, unidad);
         }
         longitud[unidad] = 0;
         costoTotal -= costoRuta[unidad];
@@ -466,6 +602,13 @@ public final class EstadoAlns {
         System.arraycopy(otro.banco, 0, banco, 0, otro.tamanoBanco);
         System.arraycopy(otro.posicionEnBanco, 0, posicionEnBanco, 0, cantidadTareas);
         System.arraycopy(otro.tareasEnBancoDe, 0, tareasEnBancoDe, 0, cantidadPedidos);
+        // El contador de estabilidad se traslada tal cual, sin recorrer la solucion. Los tres
+        // estados de una corrida se configuran con el mismo plan vigente, de modo que el
+        // numero que trae el otro estado es el que corresponde a estas mismas rutas.
+        if (pedidosConUnidadVigente > 0) {
+            System.arraycopy(otro.tareasEnUnidadVigenteDe, 0, tareasEnUnidadVigenteDe, 0, cantidadPedidos);
+        }
+        desviacionVigente = otro.desviacionVigente;
         tamanoBanco = otro.tamanoBanco;
         pedidosPendientes = otro.pedidosPendientes;
         costoTotal = otro.costoTotal;
@@ -511,6 +654,7 @@ public final class EstadoAlns {
                 unidadDe[tarea] = unidad;
                 posicionDe[tarea] = longitud[unidad];
                 sacarDelBanco(tarea);
+                anotarColocacion(tarea, unidad);
                 longitud[unidad]++;
             }
             recortarHastaFactible(unidad);
@@ -542,6 +686,7 @@ public final class EstadoAlns {
             unidadDe[tarea] = -1;
             posicionDe[tarea] = -1;
             meterEnBanco(tarea);
+            anotarRetiro(tarea, unidad);
         }
     }
 
@@ -652,8 +797,40 @@ public final class EstadoAlns {
             unidadDe[tarea] = -1;
             posicionDe[tarea] = -1;
             meterEnBanco(tarea);
+            anotarRetiro(tarea, unidad);
         }
         longitud[unidad] = 0;
+    }
+
+    /**
+     * Actualiza la desviacion tras colocar una tarea. Cuesta tiempo constante: dos accesos a
+     * arreglo y, en el caso que importa, un incremento.
+     */
+    private void anotarColocacion(int tarea, int unidad) {
+        if (pedidosConUnidadVigente == 0) {
+            return;
+        }
+        int pedido = tareas.pedido(tarea);
+        if (unidadVigenteDe[pedido] != unidad) {
+            return;
+        }
+        if (tareasEnUnidadVigenteDe[pedido]++ == 0) {
+            desviacionVigente--;
+        }
+    }
+
+    /** Actualiza la desviacion tras retirar una tarea de la unidad dada. Tiempo constante. */
+    private void anotarRetiro(int tarea, int unidad) {
+        if (pedidosConUnidadVigente == 0) {
+            return;
+        }
+        int pedido = tareas.pedido(tarea);
+        if (unidadVigenteDe[pedido] != unidad) {
+            return;
+        }
+        if (--tareasEnUnidadVigenteDe[pedido] == 0) {
+            desviacionVigente++;
+        }
     }
 
     private void meterEnBanco(int tarea) {
@@ -701,6 +878,7 @@ public final class EstadoAlns {
     @Override
     public String toString() {
         return "EstadoAlns[H=" + pedidosPendientes + " tareasEnBanco=" + tamanoBanco
-                + " S=" + String.format("%.2f", costoTotal) + " km=" + kilometrosTotales + "]";
+                + " S=" + String.format("%.2f", costoTotal) + " km=" + kilometrosTotales
+                + " desviacion=" + desviacionVigente + "]";
     }
 }

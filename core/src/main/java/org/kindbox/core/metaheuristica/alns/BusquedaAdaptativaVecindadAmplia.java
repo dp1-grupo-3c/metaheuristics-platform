@@ -50,6 +50,23 @@ import org.kindbox.core.util.Aleatorio;
  * {@code presupuesto.fraccionConsumida()} y no contra el contador de iteraciones, por la razon
  * que documenta {@link CriterioAceptacion}.</p>
  *
+ * <h2>Estabilidad del plan entre replanificaciones</h2>
+ * <p>La restriccion blanda del apartado 11.4 del ISA entra en la busqueda como un termino de
+ * penalizacion de bajo peso sobre el numero de pedidos que cambian de unidad respecto del plan
+ * vigente que trae la fotografia. El termino vive dentro del escalar interno de
+ * {@link EstadoAlns#escalar}, que es lo que compara el recocido, y dentro del delta con que el
+ * motor de insercion elige unidad, que es donde se decide de verdad quien atiende cada pedido.
+ * Sin el, la penalizacion solo aparecia en la evaluacion final y no guiaba nada: como el
+ * objetivo tiene muchos empates de costo y la busqueda es estocastica, cada replanificacion
+ * devolvia un desempate distinto y un pedido podia rotar de unidad en unidad sin que ninguna
+ * llegase a salir del almacen.</p>
+ *
+ * <p>El peso se fija con {@code ParametrosAlns.factorPenalizacionEstabilidad} muy por debajo
+ * del de la infactibilidad, de modo que la estabilidad nunca prevalece sobre el cumplimiento
+ * del plazo, y el nivel 1 del objetivo sigue decidiendo por su cuenta cual es la mejor
+ * solucion. El plan vigente se traduce una sola vez al arrancar la corrida en
+ * {@link PlanVigenteAlns}, y de ahi en adelante resolverlo cuesta un acceso a arreglo.</p>
+ *
  * <h2>Arranque desde el plan vigente</h2>
  * <p>{@link #resolverDesde} arranca desde un plan ya en ejecucion en lugar de desde la
  * heuristica constructiva. El apartado 11.4 del ISA senala que esa posibilidad favorece de
@@ -57,6 +74,14 @@ import org.kindbox.core.util.Aleatorio;
  * las asignaciones vigentes y solo se aparta de ellas cuando gana algo, y constituye una
  * hipotesis experimental de interes que el banco de pruebas del apartado 12 puede contrastar
  * contra el arranque constructivo.</p>
+ *
+ * <p>Los dos mecanismos se refuerzan y no se estorban: el arranque coloca los pedidos en la
+ * unidad que ya los tenia, con lo que la desviacion de partida es nula y el termino no
+ * penaliza nada; a partir de ahi el termino es justo lo que impide que la busqueda deshaga
+ * ese arranque por un empate de costo. Con el arranque constructivo la desviacion de partida
+ * es alta y el termino la va rebajando movimiento a movimiento. En ninguno de los dos casos
+ * hay penalizacion cruzada, porque el termino se mide siempre contra la asignacion vigente de
+ * la fotografia y nunca contra la solucion de partida.</p>
  *
  * <h2>Reproducibilidad</h2>
  * <p>Cada corrida construye su propio decodificador, sus propios operadores y su propio
@@ -193,11 +218,25 @@ public final class BusquedaAdaptativaVecindadAmplia implements Algoritmo {
         final EstadoAlns candidato = new EstadoAlns(instancia, tareas, programador);
         final EstadoAlns mejor = new EstadoAlns(instancia, tareas, programador);
 
+        // El plan vigente del apartado 11.4 se traduce a indices locales una sola vez, antes
+        // de que la busqueda arranque: dentro del bucle el termino de estabilidad se resuelve
+        // con un acceso a arreglo primitivo y sin comparar ningun codigo TTNN.
+        final PlanVigenteAlns vigentes = new PlanVigenteAlns(instancia);
+        vigente.configurarEstabilidad(vigentes, 0.0);
+        candidato.configurarEstabilidad(vigentes, 0.0);
+        mejor.configurarEstabilidad(vigentes, 0.0);
+
         arrancar(vigente, planVigente, programador, aleatorio, presupuesto, reconstruccion[0]);
+
+        final double penalizacion = penalizacionDelBanco(vigente);
+        final double pesoEstabilidad = pesoDeEstabilidad(vigente);
+        vigente.pesoEstabilidad(pesoEstabilidad);
+        candidato.pesoEstabilidad(pesoEstabilidad);
+        mejor.pesoEstabilidad(pesoEstabilidad);
+
         mejor.copiarDesde(vigente);
         ValorObjetivo mejorValor = mejor.valor();
 
-        final double penalizacion = penalizacionDelBanco(vigente);
         double escalarVigente = vigente.escalar(penalizacion);
         criterio.calibrar(escalarVigente);
 
@@ -289,6 +328,11 @@ public final class BusquedaAdaptativaVecindadAmplia implements Algoritmo {
         } else {
             estado.vaciar();
         }
+        // La insercion que cierra el banco del arranque ya se guia por la estabilidad: con el
+        // presupuesto de segundos del apartado 2.3 partir cerca del plan vigente vale tanto
+        // como converger hacia el. El peso se estima con el costo que la partida lleva
+        // acumulado y se rehace, sin perder nada de lo colocado, en cuanto el arranque cierra.
+        estado.pesoEstabilidad(pesoDeEstabilidad(estado));
         voraz.reconstruir(estado, aleatorio, presupuesto);
     }
 
@@ -300,9 +344,25 @@ public final class BusquedaAdaptativaVecindadAmplia implements Algoritmo {
      * quede incapaz de moverse entre soluciones con H distinta.
      */
     private double penalizacionDelBanco(EstadoAlns estado) {
+        return parametros.factorPenalizacionBanco() * costoMedioPorTarea(estado);
+    }
+
+    /**
+     * Peso con que cada pedido que cambia de unidad respecto del plan vigente entra en el
+     * escalar interno, conforme al apartado 11.4 del ISA. Se expresa sobre el mismo costo
+     * medio que la penalizacion del banco, de modo que la razon entre los dos terminos es la
+     * de sus factores y no depende de la fotografia: con los valores por defecto abandonar un
+     * pedido cuesta cuarenta veces mas que reasignarlo, que es el "muy por debajo" que el
+     * apartado exige.
+     */
+    private double pesoDeEstabilidad(EstadoAlns estado) {
+        return parametros.factorPenalizacionEstabilidad() * costoMedioPorTarea(estado);
+    }
+
+    /** Costo medio por tarea colocada, con un valor de respaldo para el estado vacio. */
+    private double costoMedioPorTarea(EstadoAlns estado) {
         int colocados = estado.asignados();
-        double medio = colocados > 0 && estado.costo() > 0.0 ? estado.costo() / colocados : 100.0;
-        return parametros.factorPenalizacionBanco() * medio;
+        return colocados > 0 && estado.costo() > 0.0 ? estado.costo() / colocados : 100.0;
     }
 
     /**
