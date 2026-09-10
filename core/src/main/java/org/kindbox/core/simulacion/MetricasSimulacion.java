@@ -13,9 +13,20 @@ import java.util.Map;
  * acumulado, kilometros por tipo de vehiculo, total de pedidos entregados y registro
  * cronologico de activaciones del semaforo de almacenes.</p>
  *
+ * <p><b>Reparto de los pedidos.</b> La particion de {@code pedidosRegistrados} en conjuntos
+ * disjuntos es {@code entregados + pendientes + incumplidos}. El campo
+ * {@code pedidosConEntregaParcial} <b>no</b> forma parte de esa particion: es un
+ * subconjunto de los pendientes y de los incumplidos, de modo que sumarlo a los otros tres
+ * cuenta de mas. Se expone aparte porque el operador necesita saber cuantos pedidos van a
+ * medias, no porque sea una categoria propia. Use {@link #particionCoherente()} para
+ * comprobarlo.</p>
+ *
  * @param pedidosRegistrados        pedidos que han llegado hasta el instante
  * @param pedidosEntregados         pedidos entregados por completo
- * @param pedidosParcialmenteEntregados pedidos con alguna entrega pero no completos
+ * @param pedidosPendientes         pedidos aun sin completar y todavia dentro de plazo
+ * @param pedidosConEntregaParcial  pedidos con alguna entrega y sin completar. Es un
+ *                                  SUBCONJUNTO de pendientes e incumplidos, no una
+ *                                  categoria disjunta
  * @param unidadesEntregadas        paquetes del producto P entregados
  * @param pedidosIncumplidos        pedidos cuyo plazo vencio sin completarse
  * @param costoAcumulado            costo de operacion en soles
@@ -30,7 +41,8 @@ import java.util.Map;
 public record MetricasSimulacion(
         int pedidosRegistrados,
         int pedidosEntregados,
-        int pedidosParcialmenteEntregados,
+        int pedidosPendientes,
+        int pedidosConEntregaParcial,
         int unidadesEntregadas,
         int pedidosIncumplidos,
         double costoAcumulado,
@@ -60,6 +72,15 @@ public record MetricasSimulacion(
         entregasPorPlazo = Map.copyOf(entregasPorPlazo);
         activacionesSemaforo = List.copyOf(activacionesSemaforo);
         averiasPorTipo = Map.copyOf(averiasPorTipo);
+    }
+
+    /**
+     * Comprueba que el reparto de pedidos sea coherente, es decir que entregados, pendientes
+     * e incumplidos sumen los registrados. Los parciales quedan fuera de la suma a proposito,
+     * por ser un subconjunto. Es una invariante del motor y una buena asercion de prueba.
+     */
+    public boolean particionCoherente() {
+        return pedidosEntregados + pedidosPendientes + pedidosIncumplidos == pedidosRegistrados;
     }
 
     /** Kilometros totales recorridos por la flota. */

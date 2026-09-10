@@ -1,0 +1,122 @@
+package org.kindbox.experiments;
+
+import java.nio.file.Path;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import org.kindbox.core.construccion.AhorrosClarkeWright;
+import org.kindbox.core.io.RepositorioDatos;
+import org.kindbox.core.metaheuristica.Algoritmo;
+import org.kindbox.core.metaheuristica.alns.BusquedaAdaptativaVecindadAmplia;
+import org.kindbox.core.metaheuristica.hgs.BusquedaGeneticaHibrida;
+import org.kindbox.core.modelo.ParametrosOperacion;
+import org.kindbox.core.simulacion.ConfiguracionEscenario;
+import org.kindbox.core.simulacion.MetricasSimulacion;
+import org.kindbox.core.simulacion.ModoReloj;
+import org.kindbox.core.simulacion.MotorSimulacion;
+import org.kindbox.core.simulacion.ResultadoSimulacion;
+import org.kindbox.core.simulacion.TipoEscenario;
+
+/**
+ * Ejecuta uno de los tres escenarios del enunciado desde la linea de comandos y publica el
+ * resumen.
+ *
+ * <p>Es la via por la que la experimentacion numerica del apartado 12 del ISA obtiene el
+ * instante de colapso y los indicadores de una corrida completa, sin pasar por el modulo de
+ * servicio ni por el visualizador.</p>
+ *
+ * <p>Uso: {@code CorrerEscenario <raizDatos> <5D|COLAPSO|DIA> <primerDia> <algoritmo> <salto>
+ * [semilla] [duracionMinutosReales]}. Sin el ultimo argumento la corrida va en modo libre,
+ * es decir tan rapido como se pueda; con el, se acompasa al reloj de pared.</p>
+ */
+public final class CorrerEscenario {
+
+    private CorrerEscenario() {
+    }
+
+    public static void main(String[] argumentos) throws Exception {
+        Path raiz = Path.of(argumentos.length > 0 ? argumentos[0] : "data");
+        String escenario = argumentos.length > 1 ? argumentos[1].toUpperCase(Locale.ROOT) : "5D";
+        LocalDate primerDia = LocalDate.parse(argumentos.length > 2 ? argumentos[2] : "2026-09-01");
+        String nombreAlgoritmo = argumentos.length > 3 ? argumentos[3].toUpperCase(Locale.ROOT) : "ALNS";
+        int salto = argumentos.length > 4 ? Integer.parseInt(argumentos[4]) : 30;
+        long semilla = argumentos.length > 5 ? Long.parseLong(argumentos[5]) : 20260901L;
+        int duracionReal = argumentos.length > 6 ? Integer.parseInt(argumentos[6]) : 0;
+
+        ConfiguracionEscenario configuracion = switch (escenario) {
+            case "COLAPSO" -> ConfiguracionEscenario.colapso(primerDia, salto, nombreAlgoritmo, semilla);
+            case "DIA" -> ConfiguracionEscenario.diaADia(primerDia, salto, nombreAlgoritmo, semilla);
+            default -> ConfiguracionEscenario.simulacion5D(primerDia,
+                    duracionReal > 0 ? duracionReal : 1, salto, nombreAlgoritmo, semilla);
+        };
+        if (duracionReal <= 0) {
+            configuracion = new ConfiguracionEscenario(configuracion.tipo(), configuracion.primerDia(),
+                    configuracion.ultimoDia(), configuracion.saltoMinutos(), configuracion.factorAceleracion(),
+                    ModoReloj.LIBRE, configuracion.algoritmo(), configuracion.semilla(),
+                    configuracion.minutosEntreFotografias(), configuracion.generarAverias(),
+                    configuracion.averiasPorUnidadPorTurno());
+        }
+
+        LocalDate ultimoDia = configuracion.tipo() == TipoEscenario.COLAPSO
+                ? primerDia.plusDays(30) : configuracion.ultimoDia();
+        var datos = new RepositorioDatos(raiz).cargar(primerDia, ultimoDia);
+        Algoritmo algoritmo = "HGS".equals(nombreAlgoritmo)
+                ? new BusquedaGeneticaHibrida(new AhorrosClarkeWright())
+                : new BusquedaAdaptativaVecindadAmplia(new AhorrosClarkeWright());
+
+        System.out.printf(Locale.ROOT,
+                "Escenario %s, %s, salto %d min, K=%.1f, modo %s, semilla %d, %d pedidos cargados%n",
+                configuracion.tipo(), nombreAlgoritmo, salto, configuracion.factorAceleracion(),
+                configuracion.modoReloj(), semilla, datos.pedidos().size());
+
+        var motor = new MotorSimulacion(datos, configuracion, new ParametrosOperacion(), algoritmo, List.of());
+        ResultadoSimulacion resultado = motor.ejecutar();
+        publicar(resultado);
+    }
+
+    /** Publica el resumen y comprueba las invariantes que el visualizador dara por buenas. */
+    private static void publicar(ResultadoSimulacion r) {
+        MetricasSimulacion m = r.metricas();
+        System.out.printf(Locale.ROOT,
+                "%n%s en el minuto %d (%s), %.2f dias simulados, %d ms reales%n  %s%n",
+                r.estado(), r.minutoFinal(), r.fechaHoraFinal(), r.diasSimulados(),
+                r.milisegundosReales(), r.mensaje());
+        System.out.printf(Locale.ROOT,
+                "  pedidos: registrados=%d entregados=%d pendientes=%d incumplidos=%d (con entrega parcial=%d)%n",
+                m.pedidosRegistrados(), m.pedidosEntregados(), m.pedidosPendientes(),
+                m.pedidosIncumplidos(), m.pedidosConEntregaParcial());
+        System.out.println("  particion coherente: "
+                + (m.particionCoherente() ? "SI" : "NO -- INVARIANTE ROTA"));
+        System.out.printf(Locale.ROOT, "  paquetes=%d  costo=S/ %.2f  km=%d %s%n",
+                m.unidadesEntregadas(), m.costoAcumulado(), m.kilometrosTotales(), m.kilometrosPorTipo());
+        System.out.println("  tiempo medio de entrega por plazo (min): " + formatear(m));
+        System.out.printf(Locale.ROOT, "  planificador: %d ejecuciones, %.0f ms de media%n",
+                m.ejecucionesPlanificador(), m.milisegundosPorEjecucion());
+        System.out.println("  averias por tipo: " + m.averiasPorTipo()
+                + "   activaciones de semaforo: " + m.activacionesSemaforo().size());
+        System.out.printf(Locale.ROOT, "  colapso=%d (pedido %d)   primer incumplimiento=%d (pedido %d)%n",
+                r.minutoColapso(), r.pedidoDelColapso(),
+                r.minutoPrimerIncumplimiento(), r.pedidoDelPrimerIncumplimiento());
+        // Coherencia del costo: debe salir de los kilometros por tipo y del costo por Km.
+        double costoRecalculado = 0.0;
+        for (org.kindbox.core.modelo.TipoUnidad t : org.kindbox.core.modelo.TipoUnidad.values()) {
+            costoRecalculado += m.kilometrosPorTipo().getOrDefault(t.etiqueta(), 0) * t.costoPorKm();
+        }
+        System.out.printf(Locale.ROOT, "  costo recalculado desde los km = S/ %.2f  %s%n",
+                costoRecalculado,
+                Math.abs(costoRecalculado - m.costoAcumulado()) < 0.005 ? "coincide" : "DISCREPA");
+    }
+
+    private static String formatear(MetricasSimulacion m) {
+        StringBuilder sb = new StringBuilder();
+        for (Map.Entry<Integer, Double> e : m.minutosEntregaPorPlazo().entrySet()) {
+            if (m.entregasPorPlazo().getOrDefault(e.getKey(), 0) == 0) {
+                continue;
+            }
+            sb.append(String.format(Locale.ROOT, "%dh=%.1f(n=%d) ",
+                    e.getKey(), e.getValue(), m.entregasPorPlazo().get(e.getKey())));
+        }
+        return sb.toString().trim();
+    }
+}

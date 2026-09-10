@@ -41,9 +41,27 @@
     <build>
         <plugins>
             <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <!-- Spring resuelve por nombre los argumentos de los controladores. El
+                         proyecto no hereda de spring-boot-starter-parent, de modo que la
+                         marca -parameters hay que pedirla aqui. Las anotaciones tambien
+                         llevan el nombre explicito, que es la garantia que no depende de
+                         como se compile. -->
+                    <parameters>true</parameters>
+                </configuration>
+            </plugin>
+            <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <version>${spring.boot.version}</version>
+                <configuration>
+                    <!-- El directorio de datos por defecto es "data", que cuelga de la raiz
+                         del proyecto y no del modulo, de modo que spring-boot:run debe
+                         arrancar desde la raiz para resolverlo. -->
+                    <workingDirectory>${maven.multiModuleProjectDirectory}</workingDirectory>
+                </configuration>
                 <executions>
                     <execution><goals><goal>repackage</goal></goals></execution>
                 </executions>
