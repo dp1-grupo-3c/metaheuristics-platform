@@ -1,6 +1,7 @@
 package org.kindbox.core.construccion;
 
 import org.kindbox.core.evaluacion.ProgramadorRuta;
+import org.kindbox.core.metaheuristica.PresupuestoComputo;
 import org.kindbox.core.problema.InstanciaPlanificacion;
 import org.kindbox.core.problema.Solucion;
 import org.kindbox.core.util.Aleatorio;
@@ -35,4 +36,24 @@ public interface HeuristicaConstructiva {
      *         no pudo colocar en el banco de no atendidos
      */
     Solucion construir(InstanciaPlanificacion instancia, ProgramadorRuta programador, Aleatorio aleatorio);
+
+    /**
+     * Construye un plan sometido a un presupuesto de reloj de pared.
+     *
+     * <p>Los dos algoritmos arrancan invocando la heuristica, de modo que si esta no fuera
+     * interrumpible el reloj de pared de una ejecucion quedaria acotado por debajo por el
+     * tiempo de construccion y no por el presupuesto. En el rango de 2 a 18 segundos del
+     * apartado 2.3 eso no se nota, porque construir cuesta decenas de milisegundos, pero la
+     * verificacion de respeto del presupuesto del apartado 12.4 se enuncia sin excepciones y
+     * el escenario de colapso hace crecer la instancia sin cota.</p>
+     *
+     * <p>Una implementacion que agote el presupuesto debe devolver el mejor plan parcial que
+     * tenga, con los pedidos que no alcanzo a colocar en el banco de no atendidos, nunca una
+     * excepcion ni {@code null}. La implementacion por defecto ignora el presupuesto, de modo
+     * que una heuristica trivial no esta obligada a instrumentarse.</p>
+     */
+    default Solucion construir(InstanciaPlanificacion instancia, ProgramadorRuta programador,
+                               Aleatorio aleatorio, PresupuestoComputo presupuesto) {
+        return construir(instancia, programador, aleatorio);
+    }
 }

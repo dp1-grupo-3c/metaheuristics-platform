@@ -9,6 +9,7 @@ import org.kindbox.core.evaluacion.FuncionObjetivo;
 import org.kindbox.core.evaluacion.FuncionObjetivoJerarquica;
 import org.kindbox.core.evaluacion.Programacion;
 import org.kindbox.core.evaluacion.ProgramadorRuta;
+import org.kindbox.core.metaheuristica.PresupuestoComputo;
 import org.kindbox.core.grafo.MatrizDistancias;
 import org.kindbox.core.modelo.TipoUnidad;
 import org.kindbox.core.problema.InstanciaPlanificacion;
@@ -281,6 +282,23 @@ public final class AhorrosClarkeWright implements HeuristicaConstructiva {
     @Override
     public Solucion construir(InstanciaPlanificacion instancia, ProgramadorRuta programador,
                               Aleatorio aleatorio) {
+        return construir(instancia, programador, aleatorio, null);
+    }
+
+    /**
+     * Construccion sometida a un presupuesto de reloj de pared.
+     *
+     * <p>El presupuesto se consulta en el bucle de fusion, que es donde se concentra el
+     * trabajo y el unico tramo cuyo costo crece de forma apreciable con el tamano de la
+     * instancia. Al agotarse se interrumpe la fusion y se pasa directamente a la asignacion,
+     * de modo que lo devuelto es siempre un plan completo: en el peor caso el de las rutas
+     * unitarias de la inicializacion, que ya es valido aunque caro. Los pasos previos, que
+     * son el ordenamiento de los ahorros, no se interrumpen porque sin la lista ordenada no
+     * hay nada que fusionar.</p>
+     */
+    @Override
+    public Solucion construir(InstanciaPlanificacion instancia, ProgramadorRuta programador,
+                              Aleatorio aleatorio, PresupuestoComputo presupuesto) {
         programador.reiniciarInventarios();
         if (instancia.cantidadPedidos() == 0 || instancia.cantidadUnidades() == 0) {
             return Solucion.vacia(instancia);
@@ -298,7 +316,7 @@ public final class AhorrosClarkeWright implements HeuristicaConstructiva {
 
         inicializarRutas(instancia, programador, visitas);
         int pares = construirAhorros(instancia, visitas, aleatorio);
-        fusionar(instancia, programador, pares);
+        fusionar(instancia, programador, pares, presupuesto);
         return asignarYConfirmar(instancia, programador, visitas);
     }
 
@@ -656,9 +674,15 @@ public final class AhorrosClarkeWright implements HeuristicaConstructiva {
      * que sobrevive se programa de verdad, primero en la orientacion que respeta el sentido
      * de las dos rutas y luego en la contraria.</p>
      */
-    private void fusionar(InstanciaPlanificacion instancia, ProgramadorRuta programador, int pares) {
+    private void fusionar(InstanciaPlanificacion instancia, ProgramadorRuta programador, int pares,
+                          PresupuestoComputo presupuesto) {
         final int unidades = instancia.cantidadUnidades();
         for (int k = 0; k < pares; k++) {
+            // Consultar el reloj cuesta una llamada al sistema, de modo que se hace cada 256
+            // pares y no en cada uno. Con decenas de miles de pares la granularidad sobra.
+            if (presupuesto != null && (k & 0xFF) == 0 && presupuesto.agotado()) {
+                return;
+            }
             int par = (int) claveDePar[k];
             int i = parPrimero[par];
             int j = parSegundo[par];

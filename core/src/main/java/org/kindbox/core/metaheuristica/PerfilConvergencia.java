@@ -79,6 +79,65 @@ public final class PerfilConvergencia {
     }
 
     /**
+     * Integral primal sobre el nivel 1 del objetivo.
+     *
+     * <p>La integral primal del apartado 12.1 se define sobre el costo y solo tiene sentido
+     * entre soluciones con H igual a cero. En el escenario de colapso, y en general en todo
+     * regimen saturado, ninguna solucion alcanza H igual a cero y aquella metrica devuelve la
+     * brecha maxima en todos los hitos, con lo que deja de discriminar justo donde la
+     * comparacion importa.</p>
+     *
+     * <p>Esta metrica cubre ese tramo. Mide el area bajo la curva de H normalizada por el
+     * valor de partida, de modo que 0 significa haber vaciado el banco de inmediato y 1 no
+     * haber reducido H en ningun momento. No sustituye a la integral primal del ISA: la
+     * complementa, y ambas deben reportarse indicando cual gobierna en cada instancia.</p>
+     *
+     * @param hReferencia H de la solucion de partida, tipicamente la de la heuristica
+     *                    constructiva; si es cero la metrica devuelve 0
+     */
+    public double integralPrimalPedidosNoAtendidos(int hReferencia) {
+        if (mediciones.isEmpty()) {
+            return 1.0;
+        }
+        if (hReferencia <= 0) {
+            return 0.0;
+        }
+        double area = 0.0;
+        double fraccionPrevia = 0.0;
+        double previa = 1.0;
+        for (Medicion m : mediciones) {
+            double actual = m.valor() == null
+                    ? 1.0
+                    : Math.max(0.0, Math.min(1.0, (double) m.valor().h() / hReferencia));
+            area += (m.fraccionPresupuesto() - fraccionPrevia) * (actual + previa) / 2.0;
+            fraccionPrevia = m.fraccionPresupuesto();
+            previa = actual;
+        }
+        if (fraccionPrevia < 1.0) {
+            area += (1.0 - fraccionPrevia) * previa;
+        }
+        return area;
+    }
+
+    /**
+     * Indica si la sucesion de hitos respeta la monotonia exigida por el apartado 12.4, es
+     * decir si la mejor solucion conocida no empeora nunca en el orden lexicografico.
+     */
+    public boolean monotona() {
+        ValorObjetivo previo = null;
+        for (Medicion m : mediciones) {
+            if (m.valor() == null) {
+                continue;
+            }
+            if (previo != null && previo.mejorQue(m.valor())) {
+                return false;
+            }
+            previo = m.valor();
+        }
+        return true;
+    }
+
+    /**
      * Brecha relativa de un valor respecto de la referencia. Una solucion con H mayor
      * que cero recibe la brecha maxima, porque el nivel 1 domina al nivel 2.
      */

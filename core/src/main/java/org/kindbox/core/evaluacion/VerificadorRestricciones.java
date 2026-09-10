@@ -40,6 +40,25 @@ import org.kindbox.core.problema.TipoParada;
  * ausencia no se declara infraccion. {@link ProgramadorRuta} sostiene la misma
  * interpretacion.</p>
  *
+ * <p><b>Instante contra el que se comprueban los bloqueos.</b> Los bloqueos se activan y se
+ * desactivan a lo largo del dia, mientras que el planificador resuelve una fotografia
+ * estatica: su matriz de distancias se construye con los tramos bloqueados en el instante de
+ * la fotografia, conforme al apartado 11.2 del ISA. Una ruta que dura horas puede por tanto
+ * cruzar una calle que se bloquea despues de haberse planificado.</p>
+ *
+ * <p>Por eso el verificador comprueba la restriccion 6 <b>en el instante de la fotografia</b>
+ * y no en el de paso: juzga al planificador con el mismo conjunto de informacion que el
+ * planificador tuvo. Comprobarla en el instante de paso haria que la verificacion de
+ * factibilidad del apartado 12.4 no pudiera superarse nunca por construccion, y estaria
+ * midiendo la clarividencia del algoritmo en lugar de su correccion.</p>
+ *
+ * <p>Esa informacion no se descarta. El verificador de ejecucion que devuelve
+ * {@link #deEjecucion(RegistroBloqueos)} comprueba cada tramo en el instante real de paso y
+ * sirve de diagnostico: senala las rutas que toparan con un bloqueo sobrevenido y que, en
+ * consecuencia, necesitaran la maniobra de retorno y la penalizacion de tiempo y distancia
+ * del apartado 11.2, con el pedido reincorporandose a la siguiente ejecucion del
+ * planificador con su holgura ya reducida.</p>
+ *
  * <p>La restriccion 6, la de tramos bloqueados, necesita el registro de bloqueos del
  * escenario. Se admite {@code null}, y en ese caso esa unica comprobacion se omite en
  * silencio: es lo que corresponde en las pruebas de operadores y en los escenarios que no
@@ -49,6 +68,7 @@ import org.kindbox.core.problema.TipoParada;
 public final class VerificadorRestricciones implements VerificadorFactibilidad {
 
     private final RegistroBloqueos bloqueos;
+    private final boolean bloqueosEnInstanteDeRecorrido;
 
     /** Verificador sin registro de bloqueos: omite la restriccion de tramos bloqueados. */
     public VerificadorRestricciones() {
@@ -56,11 +76,36 @@ public final class VerificadorRestricciones implements VerificadorFactibilidad {
     }
 
     /**
+     * Verificador que comprueba los bloqueos con el mismo conjunto de informacion que tuvo
+     * el planificador, es decir con los tramos bloqueados en el instante de la fotografia.
+     *
      * @param bloqueos registro de bloqueos del escenario, o {@code null} para omitir la
      *                 comprobacion de tramos bloqueados
      */
     public VerificadorRestricciones(RegistroBloqueos bloqueos) {
+        this(bloqueos, false);
+    }
+
+    /**
+     * @param bloqueos                     registro de bloqueos, o {@code null} para omitir
+     * @param bloqueosEnInstanteDeRecorrido {@code false} comprueba cada tramo contra los
+     *        bloqueos vigentes en el instante de la fotografia, que es el conjunto de
+     *        informacion del planificador; {@code true} lo comprueba contra los vigentes en
+     *        el instante en que la unidad recorreria ese tramo. Ver el javadoc de clase.
+     */
+    public VerificadorRestricciones(RegistroBloqueos bloqueos, boolean bloqueosEnInstanteDeRecorrido) {
         this.bloqueos = bloqueos;
+        this.bloqueosEnInstanteDeRecorrido = bloqueosEnInstanteDeRecorrido;
+    }
+
+    /**
+     * Verificador de ejecucion, que comprueba los bloqueos en el instante en que cada tramo
+     * se recorre. No sirve para la verificacion de validez del apartado 12.4 sino como
+     * diagnostico: identifica las rutas que toparan con un tramo que se bloquea despues de
+     * la fotografia y que, por tanto, necesitaran la maniobra de retorno del apartado 11.2.
+     */
+    public static VerificadorRestricciones deEjecucion(RegistroBloqueos bloqueos) {
+        return new VerificadorRestricciones(bloqueos, true);
     }
 
     @Override
@@ -200,9 +245,12 @@ public final class VerificadorRestricciones implements VerificadorFactibilidad {
 
     /**
      * Recorre nodo a nodo el camino minimo del tramo y comprueba que ninguna calle este
-     * bloqueada en el instante en que se atraviesa. El instante de cada arista se obtiene del
-     * tiempo de viaje de los kilometros ya recorridos, con la misma formula que usa el
-     * planificador.
+     * bloqueada.
+     *
+     * <p>El instante contra el que se comprueba depende del modo. En el modo por defecto es
+     * el de la fotografia, que es el unico conjunto de informacion que tuvo el planificador.
+     * En el modo de ejecucion es el instante real de paso, obtenido del tiempo de viaje de
+     * los kilometros ya recorridos con la misma formula que usa el planificador.</p>
      */
     private void revisarBloqueos(InstanciaPlanificacion instancia, TipoUnidad tipo, int puntoOrigen,
                                  int puntoDestino, long minutoSalida, String codigo, int indice,
@@ -213,7 +261,9 @@ public final class VerificadorRestricciones implements VerificadorFactibilidad {
             if (RegistroBloqueos.aristaEntre(camino[j], camino[j + 1]) < 0) {
                 continue;
             }
-            long minuto = minutoSalida + parametros.minutosDeViaje(tipo, j);
+            long minuto = bloqueosEnInstanteDeRecorrido
+                    ? minutoSalida + parametros.minutosDeViaje(tipo, j)
+                    : instancia.minutoActual();
             if (bloqueos.bloqueada(camino[j], camino[j + 1], minuto)) {
                 acumulador.agregar(Infraccion.TRAMO_BLOQUEADO, codigo, indice,
                         "la calle " + Ciudad.texto(camino[j]) + "-" + Ciudad.texto(camino[j + 1])

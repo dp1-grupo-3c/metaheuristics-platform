@@ -279,7 +279,7 @@ public final class BusquedaAdaptativaVecindadAmplia implements Algoritmo {
         Solucion partida = planVigente;
         if (partida == null && constructiva != null) {
             programador.reiniciarInventarios();
-            partida = constructiva.construir(estado.instancia(), programador, aleatorio);
+            partida = constructiva.construir(estado.instancia(), programador, aleatorio, presupuesto);
         }
         // La busqueda valora las rutas con el inventario intacto; el consumo de la
         // construccion no puede arrastrarse.

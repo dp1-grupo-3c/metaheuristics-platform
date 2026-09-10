@@ -273,7 +273,7 @@ public final class BusquedaGeneticaHibrida implements Algoritmo {
             Solucion semillaConstructiva = null;
             if (heuristica != null) {
                 programador.reiniciarInventarios();
-                semillaConstructiva = heuristica.construir(instancia, programador, aleatorio);
+                semillaConstructiva = heuristica.construir(instancia, programador, aleatorio, presupuesto);
                 programador.reiniciarInventarios();
             }
             if (semillaConstructiva != null) {
