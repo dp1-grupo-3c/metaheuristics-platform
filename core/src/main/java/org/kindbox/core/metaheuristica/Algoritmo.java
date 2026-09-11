@@ -1,6 +1,7 @@
 package org.kindbox.core.metaheuristica;
 
 import org.kindbox.core.problema.InstanciaPlanificacion;
+import org.kindbox.core.problema.Solucion;
 
 /**
  * Contrato comun de los dos algoritmos seleccionados en el ISA: la busqueda genetica
@@ -51,5 +52,43 @@ public interface Algoritmo {
     default ResultadoPlanificacion resolver(InstanciaPlanificacion instancia, PresupuestoComputo presupuesto,
                                             long semilla) {
         return resolver(instancia, presupuesto);
+    }
+
+    /**
+     * Indica si el algoritmo sabe usar el plan vigente como solucion de partida en
+     * {@link #resolverDesde}. Es el segundo modo de arranque del apartado 7.3.5 del ISA, que
+     * solo describe la busqueda adaptativa de vecindad amplia: una busqueda de trayectoria
+     * parte de una solucion y puede partir de la vigente, mientras que la busqueda genetica
+     * hibrida reinicia su poblacion en cada ejecucion (apartado 11.4). El motor de simulacion
+     * lo consulta para no construir el plan de partida cuando nadie lo va a usar, y un
+     * envoltorio debe reenviarlo.
+     */
+    default boolean admiteArranqueDesdePlanVigente() {
+        return false;
+    }
+
+    /**
+     * Resuelve la instancia arrancando desde el plan vigente de la ejecucion anterior, ya
+     * adaptado a la fotografia, en lugar de construir la solucion de partida desde cero. Es la
+     * capacidad sobre la que se sostiene la hipotesis experimental de los apartados 7.3.5 y
+     * 11.4 del ISA: partir del plan vigente favorece de forma natural la estabilidad entre
+     * replanificaciones.
+     *
+     * <p>La implementacion por defecto ignora el plan y delega en
+     * {@link #resolver(InstanciaPlanificacion, PresupuestoComputo, long)}, que es lo que
+     * corresponde a un algoritmo que no admite este arranque; la busqueda adaptativa de
+     * vecindad amplia la implementa de verdad.</p>
+     *
+     * @param instancia   fotografia estatica del problema
+     * @param presupuesto control de tiempo, ya arrancado por el invocante
+     * @param semilla     semilla del generador de esta ejecucion
+     * @param planVigente plan de partida: solo pedidos que siguen pendientes y unidades que
+     *                    siguen disponibles en la fotografia; con {@code null} el arranque es
+     *                    el ordinario
+     * @return mejor solucion conocida junto con el perfil de convergencia
+     */
+    default ResultadoPlanificacion resolverDesde(InstanciaPlanificacion instancia, PresupuestoComputo presupuesto,
+                                                 long semilla, Solucion planVigente) {
+        return resolver(instancia, presupuesto, semilla);
     }
 }

@@ -1,6 +1,8 @@
 package org.kindbox.core.simulacion;
 
 import java.time.LocalDate;
+import java.util.Locale;
+import java.util.Properties;
 
 /**
  * Parametros de una corrida de simulacion.
@@ -25,6 +27,13 @@ import java.time.LocalDate;
  * @param minutosEntreFotografias cadencia de las fotografias que recibe el visualizador
  * @param generarAverias       si el motor genera averias por reglas ademas de las registradas
  * @param averiasPorUnidadPorTurno probabilidad de que una unidad se averie durante un turno
+ * @param arranqueDesdePlanVigente si cada replanificacion arranca desde el plan vigente en
+ *                             lugar de desde la heuristica constructiva. Es el segundo modo
+ *                             de arranque del apartado 7.3.5 del ISA y la hipotesis
+ *                             experimental del apartado 11.4; solo lo aprovecha el algoritmo
+ *                             que lo admite, hoy la busqueda adaptativa de vecindad amplia.
+ *                             Por defecto esta desactivado, porque el arranque de referencia
+ *                             es el constructivo
  */
 public record ConfiguracionEscenario(
         TipoEscenario tipo,
@@ -37,10 +46,17 @@ public record ConfiguracionEscenario(
         long semilla,
         int minutosEntreFotografias,
         boolean generarAverias,
-        double averiasPorUnidadPorTurno) {
+        double averiasPorUnidadPorTurno,
+        boolean arranqueDesdePlanVigente) {
 
     /** Horizonte de la simulacion de cinco dias, en minutos. */
     public static final int HORIZONTE_5D_MINUTOS = 5 * 24 * 60;
+
+    /**
+     * Propiedad de sistema con que los ejecutables y el servicio activan el arranque desde el
+     * plan vigente, sin recompilar y sin tocar la configuracion del escenario.
+     */
+    public static final String PROPIEDAD_ARRANQUE_DESDE_PLAN_VIGENTE = "arranqueDesdePlanVigente";
 
     public ConfiguracionEscenario {
         if (saltoMinutos <= 0) {
@@ -67,21 +83,53 @@ public record ConfiguracionEscenario(
                                                       int saltoMinutos, String algoritmo, long semilla) {
         double k = (double) HORIZONTE_5D_MINUTOS / duracionMinutosReales;
         return new ConfiguracionEscenario(TipoEscenario.SIMULACION_5D, primerDia, primerDia.plusDays(4),
-                saltoMinutos, k, ModoReloj.ACOMPASADO, algoritmo, semilla, 1, true, 0.02);
+                saltoMinutos, k, ModoReloj.ACOMPASADO, algoritmo, semilla, 1, true, 0.02, false);
     }
 
     /** Configuracion del escenario de colapso, que corre sin horizonte y sin acompasar. */
     public static ConfiguracionEscenario colapso(LocalDate primerDia, int saltoMinutos,
                                                  String algoritmo, long semilla) {
         return new ConfiguracionEscenario(TipoEscenario.COLAPSO, primerDia, primerDia.plusYears(1),
-                saltoMinutos, 240.0, ModoReloj.LIBRE, algoritmo, semilla, 15, true, 0.02);
+                saltoMinutos, 240.0, ModoReloj.LIBRE, algoritmo, semilla, 15, true, 0.02, false);
     }
 
     /** Configuracion de la operacion dia a dia, en la que el reloj simulado es el real. */
     public static ConfiguracionEscenario diaADia(LocalDate dia, int saltoMinutos,
                                                  String algoritmo, long semilla) {
         return new ConfiguracionEscenario(TipoEscenario.DIA_A_DIA, dia, dia,
-                saltoMinutos, 1.0, ModoReloj.ACOMPASADO, algoritmo, semilla, 1, true, 0.02);
+                saltoMinutos, 1.0, ModoReloj.ACOMPASADO, algoritmo, semilla, 1, true, 0.02, false);
+    }
+
+    /** La misma configuracion con el arranque desde el plan vigente activado o desactivado. */
+    public ConfiguracionEscenario conArranqueDesdePlanVigente(boolean activo) {
+        return activo == arranqueDesdePlanVigente ? this
+                : new ConfiguracionEscenario(tipo, primerDia, ultimoDia, saltoMinutos, factorAceleracion,
+                        modoReloj, algoritmo, semilla, minutosEntreFotografias, generarAverias,
+                        averiasPorUnidadPorTurno, activo);
+    }
+
+    /**
+     * Lee de las propiedades el indicador {@value #PROPIEDAD_ARRANQUE_DESDE_PLAN_VIGENTE}.
+     * Ausente o vacio es {@code false}, que es el arranque de referencia.
+     *
+     * @throws IllegalArgumentException si el valor no es {@code true} ni {@code false}. Caer
+     *                                  en silencio al valor por defecto haria pasar una
+     *                                  corrida por otra en la comparacion del apartado 12
+     */
+    public static boolean leerArranqueDesdePlanVigente(Properties propiedades) {
+        String texto = propiedades == null ? null : propiedades.getProperty(PROPIEDAD_ARRANQUE_DESDE_PLAN_VIGENTE);
+        if (texto == null || texto.isBlank()) {
+            return false;
+        }
+        String limpio = texto.trim().toLowerCase(Locale.ROOT);
+        if (limpio.equals("true")) {
+            return true;
+        }
+        if (limpio.equals("false")) {
+            return false;
+        }
+        throw new IllegalArgumentException("Propiedad de sistema " + PROPIEDAD_ARRANQUE_DESDE_PLAN_VIGENTE
+                + " no valida: '" + texto + "'. Debe ser true o false");
     }
 
     /** Milisegundos de reloj de pared que representa un minuto simulado. */

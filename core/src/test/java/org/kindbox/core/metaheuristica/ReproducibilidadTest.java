@@ -98,6 +98,11 @@ class ReproducibilidadTest {
         final String algoritmo = esperado.algoritmo();
         assertEquals(esperado.iteraciones(), obtenido.iteraciones(), algoritmo + ": iteraciones");
         assertEquals(esperado.semilla(), obtenido.semilla(), algoritmo + ": semilla");
+        // La capa adaptativa tambien tiene que repetirse: es estado de la busqueda, no un
+        // adorno del reporte, y los pesos deciden que operador se elige en cada iteracion.
+        assertEquals(esperado.pesosOperadores(), obtenido.pesosOperadores(), algoritmo + ": pesos de operadores");
+        assertEquals(List.copyOf(esperado.pesosOperadores().keySet()),
+                List.copyOf(obtenido.pesosOperadores().keySet()), algoritmo + ": orden de los pesos");
 
         Solucion a = esperado.solucion();
         Solucion b = obtenido.solucion();

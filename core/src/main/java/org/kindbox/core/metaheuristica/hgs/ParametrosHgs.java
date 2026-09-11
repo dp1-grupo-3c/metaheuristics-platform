@@ -101,7 +101,7 @@ public final class ParametrosHgs {
     private int pasadasEducacionMaximas = 4;
 
     private long maximoGeneraciones = 1_000_000L;
-    private long maximoGeneracionesSinMejora = 20_000L;
+    private long maximoGeneracionesSinMejora = 0L;
 
     private boolean filtroCotaInferior = false;
 
@@ -459,14 +459,27 @@ public final class ParametrosHgs {
         return this;
     }
 
-    /** Generaciones consecutivas sin mejora tras las que se detiene la busqueda. */
+    /**
+     * Generaciones consecutivas sin mejorar la mejor solucion conocida tras las cuales la
+     * busqueda se detiene, con {@code 0} para dejar que mande solo el presupuesto. Es el
+     * criterio de parada por estancamiento del apartado 6.3.4, el mismo que
+     * {@code ParametrosAlns.maximoIteracionesSinMejora} en ALNS referido a generaciones.
+     *
+     * <p>Viene desactivado por defecto, igual que en ALNS, para que la comparacion del
+     * apartado 12 sea simetrica: con el valor anterior de 20 000 la busqueda genetica podia
+     * detenerse antes de agotar el presupuesto y la de vecindad amplia no, de modo que las dos
+     * no recibian el mismo computo. Con los dos criterios apagados solo gobierna el
+     * presupuesto; el estancamiento queda como opcion, ajustable con la clave
+     * {@code hgs.maximoGeneracionesSinMejora} de {@code FabricaAlgoritmos}, para los barridos
+     * que quieran medirlo.</p>
+     */
     public long maximoGeneracionesSinMejora() {
         return maximoGeneracionesSinMejora;
     }
 
     public ParametrosHgs maximoGeneracionesSinMejora(long valor) {
-        if (valor <= 0) {
-            throw new IllegalArgumentException("Maximo de generaciones sin mejora no positivo: " + valor);
+        if (valor < 0) {
+            throw new IllegalArgumentException("Maximo de generaciones sin mejora negativo: " + valor);
         }
         this.maximoGeneracionesSinMejora = valor;
         return this;

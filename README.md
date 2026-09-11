@@ -145,8 +145,27 @@ tres escenarios. El valor por defecto es el del apartado 2.3 del ISA, que situa 
 efectivo entre 2 y 18 segundos. `RAPIDO` queda para pruebas de humo: sus resultados no miden
 la calidad del planificador en operacion. Un numero a secas acompasa la simulacion 5D al reloj
 de pared durante esos minutos reales, que es el modo de las presentaciones. Al arrancar, el
-ejecutable imprime K, el presupuesto por llamada en milisegundos y los parametros completos
-del algoritmo, y avisa si el presupuesto cae fuera del rango del ISA.
+ejecutable imprime K, el presupuesto por llamada en milisegundos, el modo de arranque y los
+parametros completos del algoritmo, y avisa si el presupuesto cae fuera del rango del ISA.
+
+### Arrancar cada replanificacion desde el plan vigente
+
+```bash
+./mvnw -q -pl experiments exec:java \
+  -Dexec.mainClass=org.kindbox.experiments.CorrerEscenario \
+  -Dexec.args="data 5D 2026-09-01 ALNS 30" \
+  -DarranqueDesdePlanVigente=true
+```
+
+Por defecto cada replanificacion construye su solucion de partida con la heuristica de ahorros.
+Con `-DarranqueDesdePlanVigente=true` parte del plan vigente de la replanificacion anterior,
+recortado a la fotografia: solo los pedidos que siguen pendientes y las unidades que siguen
+disponibles, y cada ruta recortada por su cola hasta que vuelve a ser factible. Es el segundo
+modo de arranque del apartado 7.3.5 del ISA y la hipotesis experimental del apartado 11.4:
+partir del plan vigente deberia rebajar la tasa de reasignacion de pedidos entre
+replanificaciones. Vale para `CorrerEscenario`, `MedirEstabilidad` y la API, con el mismo
+nombre de propiedad; solo lo aprovecha ALNS, y con HGS el ejecutable avisa de que el indicador
+no tiene efecto. Un valor que no sea `true` ni `false` detiene el ejecutable.
 
 ### Medir la estabilidad del plan
 
@@ -176,7 +195,13 @@ por defecto es 20260901.
 
 Publica, para la heuristica constructiva y para cada algoritmo y presupuesto, el numero de
 pedidos no atendidos, el costo, los kilometros, las iteraciones, el resultado del verificador
-de factibilidad y el perfil de convergencia.
+de factibilidad, el perfil de convergencia y, en ALNS, los pesos finales de los operadores de
+la capa adaptativa del apartado 7.3.3.
+
+Antes de medir corre una fase de calentamiento de la maquina virtual, que el apartado 13 del
+ISA exige: cada algoritmo se ejecuta 500 ms sobre la misma fotografia y su resultado se
+descarta, para que el primero de la lista no mida en frio. Se ajusta con
+`-DcalentamientoMs=<ms>` y se omite con `-DcalentamientoMs=0`.
 
 ### Ajustar los parametros de los algoritmos
 

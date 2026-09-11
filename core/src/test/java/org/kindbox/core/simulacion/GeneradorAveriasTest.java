@@ -299,7 +299,7 @@ class GeneradorAveriasTest {
 
         ConfiguracionEscenario sinAverias = new ConfiguracionEscenario(TipoEscenario.DIA_A_DIA,
                 LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 1), 15, 1.0, ModoReloj.LIBRE,
-                "ALNS", 7L, 1, false, 0.02);
+                "ALNS", 7L, 1, false, 0.02, false);
         assertFalse(GeneradorAverias.deConfiguracion(sinAverias).activo());
         assertThrows(IllegalArgumentException.class, () -> GeneradorAverias.deConfiguracion(null));
     }

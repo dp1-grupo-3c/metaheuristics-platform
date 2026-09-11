@@ -4,6 +4,7 @@ import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import org.kindbox.core.construccion.AhorrosClarkeWright;
 import org.kindbox.core.evaluacion.FuncionObjetivoJerarquica;
 import org.kindbox.core.evaluacion.ProgramadorRuta;
@@ -34,11 +35,25 @@ import org.kindbox.core.util.Aleatorio;
  * sistema {@code semilla}, por defecto {@value #SEMILLA_POR_DEFECTO}, y sus parametros se
  * ajustan con propiedades {@code -Dhgs.*} y {@code -Dalns.*}. Los presupuestos por defecto,
  * 2 y 15 segundos, caen dentro del rango de 2 a 18 segundos del apartado 2.3.</p>
+ *
+ * <p>Antes de medir nada se ejecuta una fase de calentamiento de la maquina virtual, que el
+ * apartado 13 del ISA exige de forma expresa: el compilador de optimizacion de HotSpot
+ * necesita observar un metodo muchas veces antes de compilarlo a codigo nativo, de modo que en
+ * una ejecucion de dos segundos una parte del presupuesto transcurre interpretada. En la
+ * simulacion el problema no se plantea, porque una corrida encadena cientos de ejecuciones
+ * dentro del mismo proceso, pero aqui cada algoritmo corre unas pocas veces y el primero de la
+ * lista corria en frio: la comparacion medira en parte la sensibilidad al calentamiento y no
+ * la calidad de busqueda. La fase corre cada algoritmo sobre la misma fotografia y descarta el
+ * resultado; dura {@value #CALENTAMIENTO_MS_POR_DEFECTO} ms por algoritmo, ajustables con la
+ * propiedad de sistema {@code calentamientoMs}, y con {@code 0} se omite.</p>
  */
 public final class BancoDePruebas {
 
     /** Semilla de los dos algoritmos si no se indica la propiedad de sistema {@code semilla}. */
     public static final long SEMILLA_POR_DEFECTO = 20260901L;
+
+    /** Milisegundos de calentamiento por algoritmo si no se indica {@code calentamientoMs}. */
+    public static final long CALENTAMIENTO_MS_POR_DEFECTO = 500L;
 
     private BancoDePruebas() {
     }
@@ -73,6 +88,8 @@ public final class BancoDePruebas {
         var objetivo = new FuncionObjetivoJerarquica();
         var verificador = new VerificadorRestricciones(fabrica.bloqueos());
 
+        calentar(nombres, semilla, instancia);
+
         // Heuristica constructiva, que es la linea base del criterio de cierre de la etapa 3.
         long t0 = System.nanoTime();
         Solucion base = new AhorrosClarkeWright()
@@ -102,8 +119,71 @@ public final class BancoDePruebas {
                             r.perfil().integralPrimalPedidosNoAtendidos(base.h()), base.h(),
                             monotonia(r.perfil()));
                 }
+                if (!r.pesosOperadores().isEmpty()) {
+                    System.out.println("   pesos de operadores: " + formatearPesos(r.pesosOperadores()));
+                }
             }
         }
+    }
+
+    /**
+     * Fase de calentamiento del apartado 13 del ISA: cada algoritmo corre una vez sobre la
+     * misma fotografia con un presupuesto corto y su resultado se descarta, de modo que las
+     * mediciones siguientes encuentren el codigo ya compilado por HotSpot. Se hace con la misma
+     * semilla y los mismos parametros que las mediciones, pero con instancias de algoritmo
+     * aparte, para no arrastrar a la medicion ningun estado de esta fase.
+     */
+    private static void calentar(List<String> nombres, long semilla, InstanciaPlanificacion instancia) {
+        long milisegundos = calentamientoDeSistema();
+        if (milisegundos <= 0L) {
+            System.out.println("Calentamiento de la maquina virtual omitido (calentamientoMs=0)");
+            return;
+        }
+        long inicio = System.nanoTime();
+        for (String nombre : nombres) {
+            Algoritmo algoritmo = FabricaAlgoritmos.crear(nombre, semilla);
+            algoritmo.resolver(instancia, PresupuestoComputo.deMilisegundos(milisegundos).arrancar());
+        }
+        System.out.printf(Locale.ROOT, "Calentamiento de la maquina virtual: %d ms por algoritmo, %d ms en total%n",
+                milisegundos, (System.nanoTime() - inicio) / 1_000_000L);
+    }
+
+    /**
+     * Milisegundos de calentamiento por algoritmo de la propiedad de sistema
+     * {@code calentamientoMs}. Un valor mal escrito detiene el banco, por la misma razon que
+     * en la semilla: una medicion tiene que decir con exactitud como se obtuvo.
+     */
+    private static long calentamientoDeSistema() {
+        String texto = System.getProperty("calentamientoMs");
+        if (texto == null || texto.isBlank()) {
+            return CALENTAMIENTO_MS_POR_DEFECTO;
+        }
+        try {
+            long valor = Long.parseLong(texto.trim());
+            if (valor < 0L) {
+                throw new NumberFormatException("negativo");
+            }
+            return valor;
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Propiedad de sistema calentamientoMs no valida: '" + texto
+                    + "'. Debe ser un numero entero no negativo de milisegundos", e);
+        }
+    }
+
+    /**
+     * Pesos finales de la capa adaptativa, en el orden estable en que los expone el resultado.
+     * El apartado 7.3.3 del ISA los expone para los reportes del apartado 12, porque su
+     * evolucion informa sobre que operadores trabajan en cada regimen de presupuesto.
+     */
+    private static String formatearPesos(Map<String, Double> pesos) {
+        StringBuilder texto = new StringBuilder();
+        for (Map.Entry<String, Double> peso : pesos.entrySet()) {
+            if (texto.length() > 0) {
+                texto.append("  ");
+            }
+            texto.append(String.format(Locale.ROOT, "%s=%.3f", peso.getKey(), peso.getValue()));
+        }
+        return texto.toString();
     }
 
     /**

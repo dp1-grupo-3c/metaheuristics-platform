@@ -62,6 +62,12 @@ import org.kindbox.core.simulacion.ResultadoSimulacion;
  * presupuesto por llamada: por defecto 30 minutos, K igual a 240, como pide el apartado 2.3
  * del ISA, y {@code RAPIDO} para K igual a 7 200. Los detalles estan en
  * {@link OpcionReloj}.</p>
+ *
+ * <p>Con {@code -DarranqueDesdePlanVigente=true} cada replanificacion arranca desde el plan
+ * vigente, que es justamente la hipotesis del apartado 11.4 que este medidor contrasta:
+ * corriendo dos veces con la misma semilla, una con el indicador y otra sin el, la diferencia
+ * de tasa de reasignacion es el efecto del modo de arranque. Los detalles estan en
+ * {@link OpcionArranque}.</p>
  */
 public final class MedirEstabilidad {
 
@@ -132,6 +138,26 @@ public final class MedirEstabilidad {
         public ResultadoPlanificacion resolver(InstanciaPlanificacion instancia,
                                                PresupuestoComputo presupuesto, long semilla) {
             ResultadoPlanificacion resultado = delegado.resolver(instancia, presupuesto, semilla);
+            registrar(instancia, resultado.solucion());
+            return resultado;
+        }
+
+        /**
+         * Reenvia el arranque desde el plan vigente del apartado 7.3.5 del ISA, que es
+         * justamente la variante cuya estabilidad interesa medir aqui. Sin este reenvio el
+         * espia declararia no admitirlo y la corrida con el indicador activo mediria en
+         * realidad el arranque constructivo.
+         */
+        @Override
+        public boolean admiteArranqueDesdePlanVigente() {
+            return delegado.admiteArranqueDesdePlanVigente();
+        }
+
+        @Override
+        public ResultadoPlanificacion resolverDesde(InstanciaPlanificacion instancia,
+                                                    PresupuestoComputo presupuesto, long semilla,
+                                                    Solucion planVigente) {
+            ResultadoPlanificacion resultado = delegado.resolverDesde(instancia, presupuesto, semilla, planVigente);
             registrar(instancia, resultado.solucion());
             return resultado;
         }
@@ -321,8 +347,9 @@ public final class MedirEstabilidad {
         OpcionReloj reloj = OpcionReloj.interpretar(argumentos.length > 5 ? argumentos[5] : null, ModoReloj.LIBRE);
 
         LocalDate primerDia = LocalDate.parse("2026-09-01");
-        ConfiguracionEscenario configuracion = reloj.aplicar(ConfiguracionEscenario.simulacion5D(primerDia,
-                reloj.duracionMinutos(), salto, nombreAlgoritmo, semilla));
+        ConfiguracionEscenario configuracion = OpcionArranque.aplicar(
+                reloj.aplicar(ConfiguracionEscenario.simulacion5D(primerDia,
+                        reloj.duracionMinutos(), salto, nombreAlgoritmo, semilla)));
 
         var datos = new RepositorioDatos(raiz).cargar(primerDia, configuracion.ultimoDia());
         Algoritmo interno = FabricaAlgoritmos.crear(nombreAlgoritmo, semilla);
@@ -333,6 +360,7 @@ public final class MedirEstabilidad {
                 configuracion.tipo(), nombreAlgoritmo, salto, configuracion.factorAceleracion(),
                 configuracion.modoReloj(), semilla, datos.pedidos().size());
         System.out.println(reloj.describir(configuracion));
+        System.out.println(OpcionArranque.describir(configuracion, interno));
         System.out.println("Algoritmo: " + interno);
         if (pedidoSeguido >= 0) {
             System.out.println("Traza del pedido " + pedidoSeguido + ":");

@@ -390,9 +390,14 @@ public final class ParametrosAlns {
      * Iteraciones consecutivas sin mejorar la mejor solucion tras las cuales la corrida se
      * detiene, con {@code 0} para dejar que mande solo el presupuesto. Es el criterio de
      * parada del apartado 7.3.4, identico en estructura al de la busqueda genetica hibrida
-     * pero referido a iteraciones en lugar de generaciones. Bajo el presupuesto de 2 a 18
-     * segundos del apartado 2.3 la parada efectiva es casi siempre el reloj, de modo que el
-     * valor por defecto no lo activa.
+     * ({@code ParametrosHgs.maximoGeneracionesSinMejora}) pero referido a iteraciones en lugar
+     * de generaciones. Bajo el presupuesto de 2 a 18 segundos del apartado 2.3 la parada
+     * efectiva es casi siempre el reloj, de modo que el valor por defecto no lo activa.
+     *
+     * <p>Los dos algoritmos lo traen desactivado por defecto para que la comparacion del
+     * apartado 12 sea simetrica y ambos consuman el presupuesto completo. Queda como opcion,
+     * ajustable con la clave {@code alns.maximoIteracionesSinMejora} de
+     * {@code FabricaAlgoritmos}.</p>
      */
     public long maximoIteracionesSinMejora() {
         return maximoIteracionesSinMejora;

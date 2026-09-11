@@ -4,28 +4,42 @@ package org.kindbox.core.evaluacion;
  * Evaluacion en tiempo constante de la concatenacion de secuencias, segun Vidal, Crainic,
  * Gendreau y Prins (2013) y el apartado 10 del ISA.
  *
+ * <p>El resumen de una secuencia se compone de la duracion acumulada, el desfase temporal
+ * absorbido, la ventana de instantes de arranque admisibles y la carga, la distancia y las
+ * paradas acumuladas. La concatenacion es asociativa: en general eso permite precalcular los
+ * prefijos y sufijos de una ruta y valorar un movimiento de reubicacion, intercambio o
+ * inversion combinando a lo sumo tres resumenes, que es el algoritmo 1 del Anexo E del ISA.
+ * El planificador no la usa para valorar movimientos sino solo para acotarlos, como sigue.</p>
+ *
  * <h2>Papel en el planificador: filtro de cota inferior</h2>
  * <p>El resumen <b>no</b> sustituye al decodificador. {@link ProgramadorRuta} intercala
  * abastecimientos segun la carga a bordo y el inventario, y ubica la pausa de alimentacion
  * por enumeracion; nada de eso cabe en un resumen concatenable, de modo que el valor exacto
- * de una ruta y su factibilidad los sigue decidiendo el decodificador. Lo que el resumen si
- * da en tiempo constante es una <b>cota inferior</b> del desfase que el decodificador va a
- * medir, y {@link ResumenesRuta} la usa como filtro previo: ALNS salta sin decodificar toda
- * posicion de insercion cuya cota ya es positiva, y HGS descarta todo movimiento cuya cota
- * penalizada ya no mejora. El filtro solo poda lo que el decodificador habria rechazado, de
- * modo que no cambia el resultado de ninguno de los dos algoritmos; la razon de que la cota
- * sea valida esta en {@link ResumenesRuta}.</p>
+ * de una ruta y su factibilidad los sigue decidiendo el decodificador, como establece el
+ * apartado 10. Lo que el resumen si da es una <b>cota inferior</b> del desfase que el
+ * decodificador va a medir, y {@link ResumenesRuta} la usa como filtro previo de dos
+ * maneras:</p>
+ * <ul>
+ *   <li>en ALNS, con el filtro activo por defecto, los operadores de reconstruccion
+ *       precalculan una vez por unidad los resumenes de prefijo y sufijo de su ruta, valoran
+ *       cada posicion de insercion con dos concatenaciones en tiempo constante y saltan sin
+ *       decodificar toda posicion cuya cota ya es positiva;</li>
+ *   <li>en HGS, con el filtro desactivado por defecto ({@code ParametrosHgs.filtroCotaInferior}),
+ *       la educacion acumula el resumen parada a parada sobre la secuencia que el movimiento ya
+ *       escribio para el decodificador, solo cuando la cota de kilometros no basta por si sola
+ *       para descartarlo, y descarta el movimiento si su cota penalizada ya no mejora. Ahi el
+ *       coste es lineal en las siete u ocho paradas de la ruta y no constante.</li>
+ * </ul>
+ * <p>El filtro solo poda lo que el decodificador habria rechazado, de modo que no cambia el
+ * resultado de ninguno de los dos algoritmos; la razon de que la cota sea valida esta en
+ * {@link ResumenesRuta}.</p>
  *
  * <p>La concatenacion existe en dos formas con la misma formula: la de este registro, que
  * es la especificacion legible y la que ejercitan las pruebas del apartado 14 del ISA, y
  * {@link #concatenar(long[], int, long[], int, long, long[], int)}, que opera sobre arreglos
- * primitivos en aritmetica larga para no asignar memoria en los bucles calientes.</p>
- *
- * <p>El resumen se compone de la duracion acumulada, el desfase temporal absorbido, la
- * ventana de instantes de arranque admisibles y la carga y distancia acumuladas. La
- * operacion de concatenacion es asociativa, lo que permite precalcular los prefijos y
- * sufijos de una ruta y evaluar cualquier movimiento de reubicacion, intercambio o
- * inversion combinando a lo sumo tres resumenes.</p>
+ * primitivos en aritmetica larga para no asignar memoria en los bucles calientes. La forma
+ * larga solo lleva los cuatro campos temporales, porque la carga, la distancia y las paradas
+ * no intervienen en la cota del desfase.</p>
  *
  * <p>En PaqRap las ventanas de tiempo son de un solo extremo: un pedido impone un
  * instante limite de llegada y no un instante mas temprano. El instante mas temprano de

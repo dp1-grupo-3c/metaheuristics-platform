@@ -87,6 +87,8 @@ public class ServicioSimulacion {
     private final RegistroAlgoritmos algoritmos;
     private final PublicadorDeEstado publicador;
     private final PropiedadesKindBox propiedades;
+    /** Segundo modo de arranque del apartado 7.3.5 del ISA, leido al arrancar el servicio. */
+    private final boolean arranqueDesdePlanVigente;
 
     private final Map<String, Corrida> corridas = new ConcurrentHashMap<>();
     private final List<String> orden = new ArrayList<>();
@@ -112,6 +114,10 @@ public class ServicioSimulacion {
         this.algoritmos = algoritmos;
         this.publicador = publicador;
         this.propiedades = propiedades;
+        // Se lee al construir el servicio y no en cada peticion: un valor mal escrito impide
+        // arrancar, igual que una clave hgs.* o alns.* mal escrita en RegistroAlgoritmos.
+        this.arranqueDesdePlanVigente =
+                ConfiguracionEscenario.leerArranqueDesdePlanVigente(System.getProperties());
         this.despachador.scheduleWithFixedDelay(this::despacharAveriasProgramadas,
                 CADENCIA_DESPACHO_AVERIAS_MS, CADENCIA_DESPACHO_AVERIAS_MS, TimeUnit.MILLISECONDS);
     }
@@ -132,6 +138,12 @@ public class ServicioSimulacion {
     /**
      * Arranca una corrida con la configuracion pedida, completando con los valores por
      * defecto lo que la peticion no traiga.
+     *
+     * <p>El modo de arranque de cada replanificacion, constructiva o plan vigente, no viaja en
+     * la peticion: se toma de la propiedad de sistema
+     * {@code arranqueDesdePlanVigente} con que se arranco el servicio, igual que los
+     * parametros {@code hgs.*} y {@code alns.*}. Es una variante experimental de los apartados
+     * 7.3.5 y 11.4 del ISA y no una opcion de la pantalla de configuracion.</p>
      *
      * @throws ConflictoDeEstado si ya hay una corrida en curso
      * @throws SolicitudInvalida si algun parametro no es admisible
@@ -174,7 +186,7 @@ public class ServicioSimulacion {
         ModoReloj reloj = tipo == TipoEscenario.COLAPSO ? ModoReloj.LIBRE : ModoReloj.ACOMPASADO;
         ConfiguracionEscenario configuracion = new ConfiguracionEscenario(tipo, primerDia, ultimoDia,
                 salto, factor, reloj, algoritmo, semilla, cadencia, generarAverias,
-                propiedades.getAveriasPorUnidadPorTurno());
+                propiedades.getAveriasPorUnidadPorTurno(), arranqueDesdePlanVigente);
 
         RepositorioDatos.DatosEscenario datos;
         try {

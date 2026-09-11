@@ -54,11 +54,13 @@ import org.kindbox.core.util.Aleatorio;
  * criterio con el que se alimenta la heuristica.</p>
  *
  * <h2>Criterio de parada</h2>
- * <p>Agotamiento del presupuesto, numero maximo de generaciones sin mejora o numero maximo
- * de generaciones. En operacion manda siempre la primera: el presupuesto se consulta en el
- * bucle principal y dentro de la busqueda local, de modo que la interrupcion nunca tarda mas
- * de un movimiento. En todo momento se conserva la mejor solucion factible hallada, que es
- * la que se devuelve.</p>
+ * <p>Agotamiento del presupuesto, numero maximo de generaciones o, si se activa, numero
+ * maximo de generaciones sin mejora. En operacion manda siempre la primera: el presupuesto se
+ * consulta en el bucle principal y dentro de la busqueda local, de modo que la interrupcion
+ * nunca tarda mas de un movimiento. La parada por estancamiento viene desactivada, igual que
+ * en ALNS, para que los dos algoritmos del apartado 12 consuman el mismo presupuesto; se
+ * describe en {@link ParametrosHgs#maximoGeneracionesSinMejora()}. En todo momento se conserva
+ * la mejor solucion factible hallada, que es la que se devuelve.</p>
  *
  * <h2>Reproducibilidad</h2>
  * <p>Con presupuesto por reloj dos corridas con la misma semilla completan un numero distinto
@@ -270,9 +272,11 @@ public final class BusquedaGeneticaHibrida implements Algoritmo {
 
             long generaciones = 0;
             long sinMejora = 0;
+            // Con cero el estancamiento no detiene nada y solo gobierna el presupuesto.
+            final long topeSinMejora = parametros.maximoGeneracionesSinMejora();
             while (!presupuesto.agotado()
                     && generaciones < parametros.maximoGeneraciones()
-                    && sinMejora < parametros.maximoGeneracionesSinMejora()) {
+                    && (topeSinMejora == 0L || sinMejora < topeSinMejora)) {
 
                 if (factibles.vacia() && infactibles.vacia()) {
                     break;
@@ -326,8 +330,9 @@ public final class BusquedaGeneticaHibrida implements Algoritmo {
             }
             presupuesto.cerrarPerfil(resultado.valor());
             ultimasPodasCotaInferior = educacion.podasCotaInferior();
+            // Sin capa adaptativa no hay pesos de operadores que informar (apartado 7.3.3).
             return new ResultadoPlanificacion(NOMBRE, resultado, presupuesto.perfil(),
-                    presupuesto.milisegundosTranscurridos(), presupuesto.iteraciones(), semillaCorrida);
+                    presupuesto.milisegundosTranscurridos(), presupuesto.iteraciones(), semillaCorrida, Map.of());
         }
 
         // ------------------------------------------------------ poblacion inicial

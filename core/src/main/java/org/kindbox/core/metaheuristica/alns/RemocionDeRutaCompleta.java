@@ -3,22 +3,24 @@ package org.kindbox.core.metaheuristica.alns;
 import org.kindbox.core.util.Aleatorio;
 
 /**
- * Remocion de ruta o turno completo. Es un operador propio del proyecto, previsto en el
- * apartado 7.3.2 del ISA: vacia por completo la ruta de una unidad y devuelve todos sus
- * pedidos al banco.
+ * Remocion de ruta o turno completo. Es un operador de destruccion propio del proyecto,
+ * previsto en el apartado 7.3.2 del ISA: vacia por completo la ruta de una o varias unidades,
+ * elegidas al azar entre las que tienen ruta, y devuelve todos sus pedidos al banco.
  *
- * <p>Tiene dos razones de ser. Como operador de busqueda es el unico que libera de golpe una
- * unidad entera, lo que permite que la reconstruccion decida no usarla y reparta su carga
- * entre las demas: con la funcion de costo del proyecto, que cobra por kilometro y por tipo,
- * suprimir una ruta corta de un auto y repartirla entre bicicletas cercanas puede ser una
- * mejora que ningun movimiento local alcanza.</p>
+ * <p>Es el unico operador del conjunto que libera de golpe una unidad entera, lo que permite
+ * que la reconstruccion decida no usarla y reparta su carga entre las demas: con la funcion de
+ * costo del proyecto, que cobra por kilometro y por tipo, suprimir una ruta corta de un auto y
+ * repartirla entre bicicletas cercanas puede ser una mejora que ningun movimiento local
+ * alcanza.</p>
  *
- * <p>Y como operador de operacion es el que se activa ante una averia, segun el apartado 11.3
- * del ISA: cuando una unidad deja de estar disponible, el replanificador vacia su ruta con
- * {@link #vaciarRutaDe} y deja que el resto del algoritmo recoloque sus pedidos. Que el
- * mecanismo de la averia sea un operador mas del conjunto, y no un camino aparte, es lo que
- * garantiza que la respuesta a la averia produzca un plan factible por la misma via que
- * cualquier otra iteracion.</p>
+ * <p>Es un operador de destruccion mas: compite con los otros cinco en la ruleta de la capa
+ * adaptativa del apartado 7.3.3 y no tiene ningun otro punto de entrada. En particular no es
+ * la via por la que se atiende una averia. Conforme al apartado 11.3 ninguno de los dos
+ * algoritmos recibe aviso de averias: la unidad averiada, la que esta en mantenimiento
+ * preventivo y la comprometida en un trasvase quedan fuera de la fotografia que construye el
+ * motor de simulacion, y como el plan se rehace por completo en cada ejecucion (apartado 2.2)
+ * los pedidos que no llego a servir vuelven a los pendientes y se recolocan por la misma via
+ * que cualquier otro.</p>
  */
 public final class RemocionDeRutaCompleta implements OperadorDestruccion {
 
@@ -51,15 +53,5 @@ public final class RemocionDeRutaCompleta implements OperadorDestruccion {
             retirados += estado.vaciarRuta(unidad);
         }
         return retirados;
-    }
-
-    /**
-     * Vacia la ruta de una unidad concreta. Es la entrada que usa el replanificador cuando
-     * el motor de simulacion notifica una averia (apartado 11.3 del ISA).
-     *
-     * @return numero de pedidos devueltos al banco
-     */
-    public int vaciarRutaDe(EstadoAlns estado, int unidad) {
-        return estado.vaciarRuta(unidad);
     }
 }

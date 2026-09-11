@@ -103,7 +103,8 @@ record OpcionReloj(int duracionMinutos, ModoReloj modo, boolean rapido) {
         }
         return new ConfiguracionEscenario(base.tipo(), base.primerDia(), base.ultimoDia(), base.saltoMinutos(),
                 factorAceleracion(), ModoReloj.LIBRE, base.algoritmo(), base.semilla(),
-                base.minutosEntreFotografias(), base.generarAverias(), base.averiasPorUnidadPorTurno());
+                base.minutosEntreFotografias(), base.generarAverias(), base.averiasPorUnidadPorTurno(),
+                base.arranqueDesdePlanVigente());
     }
 
     /** Presupuesto por llamada al planificador que usara el motor con esta configuracion. */

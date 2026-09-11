@@ -3,6 +3,7 @@ package org.kindbox.core.simulacion;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
@@ -37,6 +38,7 @@ import org.kindbox.core.problema.Parada;
 import org.kindbox.core.problema.Ruta;
 import org.kindbox.core.problema.Solucion;
 import org.kindbox.core.problema.TipoParada;
+import org.kindbox.core.problema.ValorObjetivo;
 import org.kindbox.core.util.Aleatorio;
 
 /**
@@ -66,7 +68,10 @@ import org.kindbox.core.util.Aleatorio;
  * cuestionario: un cambio de velocidad en caliente se aplica a partir de la iteracion
  * siguiente. La matriz de distancias se reconstruye con la mascara de bloqueos vigente en
  * ese instante, y la asignacion del plan que se abandona viaja al constructor de la
- * instancia para alimentar el termino de estabilidad del apartado 11.4.</p>
+ * instancia para alimentar el termino de estabilidad del apartado 11.4. Si la configuracion
+ * activa {@code arranqueDesdePlanVigente} y el algoritmo lo admite, ese plan viaja ademas
+ * entero, recortado a la fotografia, como solucion de partida de la busqueda: es el segundo
+ * modo de arranque del apartado 7.3.5 y la hipotesis experimental del apartado 11.4.</p>
  *
  * <p>Una unidad sorprendida a mitad de un tramo <b>no puede darse la vuelta en mitad de la
  * calle</b>. Por eso se planifica desde el proximo nodo que alcanzara, con
@@ -1027,14 +1032,22 @@ public final class MotorSimulacion {
      * como pide el apartado 10 del ISA. La derivacion mezcla con SplitMix64 y no se limita a
      * sumar el numero de orden, porque semillas que avanzan por un paso fijo darian corrientes
      * solapadas en el generador.</p>
+     *
+     * <p>Con {@code ConfiguracionEscenario.arranqueDesdePlanVigente} activo y un algoritmo que
+     * lo admite, la iteracion no arranca desde la heuristica constructiva sino desde el plan
+     * vigente adaptado a la fotografia, conforme al apartado 7.3.5 del ISA. El plan se
+     * construye solo en ese caso, y la primera replanificacion de la corrida arranca de todos
+     * modos con la constructiva, porque todavia no hay nada que heredar.</p>
      */
     private void replanificar() {
         ParametrosOperacion.Instantanea foto = parametros.instantanea();
+        boolean desdePlanVigente = configuracion.arranqueDesdePlanVigente()
+                && algoritmo.admiteArranqueDesdePlanVigente();
         Fotografia fotografia;
         candado.lock();
         try {
             parametrosVigentes = foto;
-            fotografia = construirInstancia(foto);
+            fotografia = construirInstancia(foto, desdePlanVigente);
         } finally {
             candado.unlock();
         }
@@ -1047,7 +1060,10 @@ public final class MotorSimulacion {
             presupuesto.cancelar();
         }
         long semillaIteracion = Aleatorio.derivarSemilla(configuracion.semilla(), replanificacionesLanzadas++);
-        ResultadoPlanificacion plan = algoritmo.resolver(fotografia.instancia(), presupuesto, semillaIteracion);
+        ResultadoPlanificacion plan = fotografia.planVigente() == null
+                ? algoritmo.resolver(fotografia.instancia(), presupuesto, semillaIteracion)
+                : algoritmo.resolverDesde(fotografia.instancia(), presupuesto, semillaIteracion,
+                        fotografia.planVigente());
         presupuestoVigente = null;
 
         candado.lock();
@@ -1074,13 +1090,22 @@ public final class MotorSimulacion {
      * @param instancia        fotografia estatica que consume el algoritmo
      * @param unidades         unidades planificadas, en el orden en que entraron a la instancia
      * @param nodoRedireccion  nodo desde el que se planifico cada una
+     * @param planVigente      plan de partida del apartado 7.3.5, ya recortado a la
+     *                         fotografia, o {@code null} si esta iteracion no arranca desde el
+     *                         plan vigente
      */
     private record Fotografia(InstanciaPlanificacion instancia, List<UnidadEnCurso> unidades,
-                              int[] nodoRedireccion) {
+                              int[] nodoRedireccion, Solucion planVigente) {
     }
 
-    /** Construye la fotografia estatica del problema en el instante actual. */
-    private Fotografia construirInstancia(ParametrosOperacion.Instantanea foto) {
+    /**
+     * Construye la fotografia estatica del problema en el instante actual y, cuando se pide,
+     * el plan vigente adaptado a ella.
+     *
+     * @param conPlanVigente si ademas hay que construir la solucion de partida del apartado
+     *                       7.3.5 del ISA
+     */
+    private Fotografia construirInstancia(ParametrosOperacion.Instantanea foto, boolean conPlanVigente) {
         long minuto = minutoActual;
         int[] pendientes = estado.pendientesEn(minuto);
         List<Almacen> almacenes = estado.almacenes();
@@ -1159,7 +1184,69 @@ public final class MotorSimulacion {
                 }
             }
         }
-        return new Fotografia(constructor.construir(), planificables, nodoRedireccion);
+        InstanciaPlanificacion instancia = constructor.construir();
+        Solucion plan = conPlanVigente ? planVigenteAdaptado(instancia, planificables, nodoRedireccion) : null;
+        return new Fotografia(instancia, planificables, nodoRedireccion, plan);
+    }
+
+    /**
+     * Plan vigente recortado a la fotografia, que es la solucion de partida del segundo modo
+     * de arranque del apartado 7.3.5 del ISA.
+     *
+     * <p>Se conserva la asignacion de pedido a unidad de las paradas de entrega que cada
+     * unidad planificada todavia no ha atendido, y solo eso: quedan fuera las unidades que ya
+     * no estan disponibles, porque no entran en la lista de planificables, y los pedidos que
+     * ya no estan pendientes, porque no entran en la instancia. La cantidad de cada entrega se
+     * recorta a lo que del pedido sigue pendiente, de modo que el plan nunca declare entregar
+     * mas de lo que queda. No se copian ni los abastecimientos ni la pausa de alimentacion, que
+     * el decodificador vuelve a decidir, y los instantes y kilometros que traen las paradas son
+     * los que previo el plan anterior: es una semilla, no un plan programado, y el algoritmo la
+     * reevalua ruta a ruta al cargarla, recortando por la cola lo que ya no sea factible.</p>
+     *
+     * @return el plan, o {@code null} si no queda ninguna entrega que heredar, que es el caso
+     *         de la primera replanificacion de la corrida
+     */
+    private Solucion planVigenteAdaptado(InstanciaPlanificacion instancia, List<UnidadEnCurso> planificables,
+                                         int[] nodoRedireccion) {
+        int[] asignado = new int[instancia.cantidadPedidos()];
+        List<Ruta> rutas = new ArrayList<>(planificables.size());
+        for (int i = 0; i < planificables.size(); i++) {
+            UnidadEnCurso u = planificables.get(i);
+            List<Parada> entregas = new ArrayList<>();
+            for (Parada p : paradasPendientes(u)) {
+                if (p.tipo() != TipoParada.ENTREGA) {
+                    continue;
+                }
+                int pedido = instancia.indiceDePedido(p.idPedido());
+                if (pedido < 0) {
+                    continue;
+                }
+                int cantidad = Math.min(p.cantidad(), instancia.pedidoCantidad(pedido) - asignado[pedido]);
+                if (cantidad <= 0) {
+                    continue;
+                }
+                asignado[pedido] += cantidad;
+                entregas.add(cantidad == p.cantidad() ? p
+                        : new Parada(TipoParada.ENTREGA, p.nodo(), p.idPedido(), -1, cantidad,
+                                p.minutoLlegada(), p.minutoSalida(), p.kmDesdeAnterior()));
+            }
+            if (!entregas.isEmpty()) {
+                rutas.add(new Ruta(u.codigo(), u.unidad().tipo(), nodoRedireccion[i],
+                        instancia.unidadMinutoDisponible(i), entregas));
+            }
+        }
+        if (rutas.isEmpty()) {
+            return null;
+        }
+        Map<Integer, Integer> banco = new LinkedHashMap<>();
+        for (int p = 0; p < instancia.cantidadPedidos(); p++) {
+            int falta = instancia.pedidoCantidad(p) - asignado[p];
+            if (falta > 0) {
+                banco.put(instancia.pedidoId(p), falta);
+            }
+        }
+        // El valor no se calcula: la solucion es una semilla y quien la recibe la reevalua.
+        return new Solucion(rutas, banco, ValorObjetivo.PEOR);
     }
 
     /** Paradas del itinerario vigente que la unidad todavia no ha atendido. */

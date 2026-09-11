@@ -33,6 +33,10 @@ import org.kindbox.core.simulacion.TipoEscenario;
  * {@code LIBRE:<minutos>} otro K en modo libre, y un numero de minutos a secas acompasa la
  * simulacion 5D al reloj de pared durante esos minutos, que es el modo de las
  * presentaciones. Los detalles estan en {@link OpcionReloj}.</p>
+ *
+ * <p>Con {@code -DarranqueDesdePlanVigente=true} cada replanificacion arranca desde el plan
+ * vigente en lugar de desde la heuristica constructiva, que es la hipotesis experimental de
+ * los apartados 7.3.5 y 11.4 del ISA. Los detalles estan en {@link OpcionArranque}.</p>
  */
 public final class CorrerEscenario {
 
@@ -55,7 +59,7 @@ public final class CorrerEscenario {
             default -> ConfiguracionEscenario.simulacion5D(primerDia, reloj.duracionMinutos(), salto,
                     nombreAlgoritmo, semilla);
         };
-        ConfiguracionEscenario configuracion = reloj.aplicar(base);
+        ConfiguracionEscenario configuracion = OpcionArranque.aplicar(reloj.aplicar(base));
         Algoritmo algoritmo = FabricaAlgoritmos.crear(nombreAlgoritmo, semilla);
 
         LocalDate ultimoDia = configuracion.tipo() == TipoEscenario.COLAPSO
@@ -67,6 +71,7 @@ public final class CorrerEscenario {
                 configuracion.tipo(), nombreAlgoritmo, salto, configuracion.factorAceleracion(),
                 configuracion.modoReloj(), semilla, datos.pedidos().size());
         System.out.println(reloj.describir(configuracion));
+        System.out.println(OpcionArranque.describir(configuracion, algoritmo));
         System.out.println("Algoritmo: " + algoritmo);
 
         var motor = new MotorSimulacion(datos, configuracion, new ParametrosOperacion(), algoritmo, List.of());

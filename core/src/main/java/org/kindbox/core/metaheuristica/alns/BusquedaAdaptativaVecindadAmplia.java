@@ -1,5 +1,7 @@
 package org.kindbox.core.metaheuristica.alns;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.kindbox.core.construccion.HeuristicaConstructiva;
 import org.kindbox.core.evaluacion.FuncionObjetivo;
 import org.kindbox.core.evaluacion.FuncionObjetivoJerarquica;
@@ -78,11 +80,14 @@ import org.kindbox.core.util.Aleatorio;
  *
  * <h2>Arranque desde el plan vigente</h2>
  * <p>{@link #resolverDesde} arranca desde un plan ya en ejecucion en lugar de desde la
- * heuristica constructiva. El apartado 11.4 del ISA senala que esa posibilidad favorece de
- * forma natural la estabilidad del plan entre replanificaciones, porque la busqueda parte de
- * las asignaciones vigentes y solo se aparta de ellas cuando gana algo, y constituye una
- * hipotesis experimental de interes que el banco de pruebas del apartado 12 puede contrastar
- * contra el arranque constructivo.</p>
+ * heuristica constructiva. Es el segundo modo de arranque del apartado 7.3.5 del ISA. El
+ * apartado 11.4 senala que esa posibilidad favorece de forma natural la estabilidad del plan
+ * entre replanificaciones, porque la busqueda parte de las asignaciones vigentes y solo se
+ * aparta de ellas cuando gana algo, y constituye una hipotesis experimental de interes que el
+ * banco de pruebas del apartado 12 puede contrastar contra el arranque constructivo. El motor
+ * de simulacion lo activa con el indicador {@code arranqueDesdePlanVigente} de la
+ * configuracion del escenario, y entonces le entrega en cada replanificacion el plan vigente
+ * recortado a la fotografia.</p>
  *
  * <p>Los dos mecanismos se refuerzan y no se estorban: el arranque coloca los pedidos en la
  * unidad que ya los tenia, con lo que la desviacion de partida es nula y el termino no
@@ -212,22 +217,43 @@ public final class BusquedaAdaptativaVecindadAmplia implements Algoritmo {
         return ejecutar(instancia, presupuesto, null, semillaEjecucion);
     }
 
+    /** Esta busqueda si sabe partir del plan vigente, conforme al apartado 7.3.5 del ISA. */
+    @Override
+    public boolean admiteArranqueDesdePlanVigente() {
+        return true;
+    }
+
     /**
      * Resuelve la instancia arrancando desde un plan ya vigente en lugar de desde la
-     * heuristica constructiva, conforme al apartado 11.4 del ISA.
+     * heuristica constructiva, con la semilla del constructor. Es el segundo modo de arranque
+     * del apartado 7.3.5 del ISA y la capacidad sobre la que se sostiene la hipotesis
+     * experimental del apartado 11.4.
      *
      * <p>Del plan solo se toman las asignaciones de pedido a unidad que siguen teniendo
      * sentido en la fotografia actual: se descartan las unidades que ya no estan disponibles y
      * los pedidos que ya no estan pendientes, y cada ruta se recorta hasta que resulta
      * factible con los bloqueos, los plazos y los turnos vigentes. Los pedidos que caen por
-     * ese recorte quedan en el banco y la primera reconstruccion los recoloca.</p>
+     * ese recorte quedan en el banco y la primera reconstruccion los recoloca. El motor de
+     * simulacion entrega el plan ya filtrado; un plan que traiga unidades o pedidos ajenos a
+     * la fotografia no rompe nada, porque {@link EstadoAlns#cargarDesde} los ignora.</p>
      *
-     * @param planVigente plan de la iteracion anterior; con {@code null} se comporta como
-     *                    {@link #resolver}
+     * @param planVigente plan de la iteracion anterior; con {@code null}, o con un plan sin
+     *                    ninguna entrega, se comporta como {@link #resolver}
      */
     public ResultadoPlanificacion resolverDesde(InstanciaPlanificacion instancia,
                                                 PresupuestoComputo presupuesto, Solucion planVigente) {
         return ejecutar(instancia, presupuesto, planVigente, semilla);
+    }
+
+    /**
+     * Igual que {@link #resolverDesde(InstanciaPlanificacion, PresupuestoComputo, Solucion)}
+     * con la semilla indicada por el invocante, que es como lo llama el motor de simulacion
+     * cuando la configuracion del escenario activa el arranque desde el plan vigente.
+     */
+    @Override
+    public ResultadoPlanificacion resolverDesde(InstanciaPlanificacion instancia, PresupuestoComputo presupuesto,
+                                                long semillaEjecucion, Solucion planVigente) {
+        return ejecutar(instancia, presupuesto, planVigente, semillaEjecucion);
     }
 
     // ----------------------------------------------------------------- internos
@@ -349,7 +375,34 @@ public final class BusquedaAdaptativaVecindadAmplia implements Algoritmo {
         presupuesto.cerrarPerfil(valorFinal);
         ultimasPodasCotaInferior = motor.podasCotaInferior();
         return new ResultadoPlanificacion(NOMBRE, solucion.conValor(valorFinal), presupuesto.perfil(),
-                presupuesto.milisegundosTranscurridos(), presupuesto.iteraciones(), semillaCorrida);
+                presupuesto.milisegundosTranscurridos(), presupuesto.iteraciones(), semillaCorrida,
+                pesosFinales(capa, destruccion, reconstruccion));
+    }
+
+    /**
+     * Pesos vigentes de la capa adaptativa al cerrar la ejecucion, por nombre de operador, que
+     * el apartado 7.3.3 del ISA expone para los reportes del apartado 12. Primero van los de
+     * destruccion y despues los de reconstruccion, en el orden en que {@link #ejecutar} los
+     * declara, de modo que el orden es el mismo en todas las ejecuciones. Se construye una
+     * sola vez por ejecucion, fuera del bucle de busqueda.
+     */
+    private static Map<String, Double> pesosFinales(CapaAdaptativa capa, OperadorDestruccion[] destruccion,
+                                                    OperadorReconstruccion[] reconstruccion) {
+        Map<String, Double> pesos = new LinkedHashMap<>();
+        for (int i = 0; i < destruccion.length; i++) {
+            anotarPeso(pesos, destruccion[i].nombre(), capa.pesoDestruccion(i));
+        }
+        for (int i = 0; i < reconstruccion.length; i++) {
+            anotarPeso(pesos, reconstruccion[i].nombre(), capa.pesoReconstruccion(i));
+        }
+        return pesos;
+    }
+
+    /** Anota un peso y rechaza un nombre repetido, que haria perder la entrada de otro operador. */
+    private static void anotarPeso(Map<String, Double> pesos, String nombre, double peso) {
+        if (pesos.put(nombre, peso) != null) {
+            throw new IllegalStateException("Dos operadores comparten el nombre " + nombre);
+        }
     }
 
     /**
@@ -360,11 +413,16 @@ public final class BusquedaAdaptativaVecindadAmplia implements Algoritmo {
      * Si no se proporciona ninguna, o si la que se proporciona deja pedidos sin colocar, la
      * propia insercion voraz del conjunto de operadores produce la solucion inicial: el
      * algoritmo no depende de una implementacion concreta para arrancar.</p>
+     *
+     * <p>Un plan vigente sin ninguna entrega equivale a no tener plan y se descarta, de modo
+     * que la primera replanificacion de una corrida, en la que ninguna unidad lleva todavia
+     * ruta, arranca con la heuristica constructiva aunque el arranque desde el plan vigente
+     * este activado.</p>
      */
     private void arrancar(EstadoAlns estado, Solucion planVigente, ProgramadorRuta programador,
                           Aleatorio aleatorio, PresupuestoComputo presupuesto,
                           OperadorReconstruccion voraz) {
-        Solucion partida = planVigente;
+        Solucion partida = planVigente != null && !planVigente.rutasConEntregas().isEmpty() ? planVigente : null;
         if (partida == null && constructiva != null) {
             programador.reiniciarInventarios();
             partida = constructiva.construir(estado.instancia(), programador, aleatorio, presupuesto);
@@ -440,7 +498,8 @@ public final class BusquedaAdaptativaVecindadAmplia implements Algoritmo {
         Solucion vacia = Solucion.vacia(instancia);
         ValorObjetivo valor = objetivo.evaluar(instancia, vacia);
         presupuesto.cerrarPerfil(valor);
+        // Sin busqueda no hay capa adaptativa que informar: no se llego a construir ninguna.
         return new ResultadoPlanificacion(NOMBRE, vacia.conValor(valor), presupuesto.perfil(),
-                presupuesto.milisegundosTranscurridos(), presupuesto.iteraciones(), semillaCorrida);
+                presupuesto.milisegundosTranscurridos(), presupuesto.iteraciones(), semillaCorrida, Map.of());
     }
 }
