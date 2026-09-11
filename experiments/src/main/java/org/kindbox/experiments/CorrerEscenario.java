@@ -105,7 +105,7 @@ public final class CorrerEscenario {
         // Coherencia del costo: debe salir de los kilometros por tipo y del costo por Km.
         double costoRecalculado = 0.0;
         for (org.kindbox.core.modelo.TipoUnidad t : org.kindbox.core.modelo.TipoUnidad.values()) {
-            costoRecalculado += m.kilometrosPorTipo().getOrDefault(t.etiqueta(), 0) * t.costoPorKm();
+            costoRecalculado += m.kilometrosPorTipo().getOrDefault(t.name(), 0) * t.costoPorKm();
         }
         System.out.printf(Locale.ROOT, "  costo recalculado desde los km = S/ %.2f  %s%n",
                 costoRecalculado,

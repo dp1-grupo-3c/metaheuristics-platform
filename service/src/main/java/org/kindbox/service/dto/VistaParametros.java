@@ -1,5 +1,7 @@
 package org.kindbox.service.dto;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -57,8 +59,14 @@ public record VistaParametros(
             double costoPorKm) {
     }
 
+    /**
+     * Copia defensiva que conserva el orden del mapa recibido, que es el del enumerado de
+     * tipos, en lugar del orden que {@code Map.copyOf} sortea en cada arranque de la maquina
+     * virtual. La pantalla de configuracion lista asi siempre las mismas filas en el mismo
+     * sitio.
+     */
     public VistaParametros {
-        velocidades = Map.copyOf(velocidades);
+        velocidades = Collections.unmodifiableMap(new LinkedHashMap<>(velocidades));
         tipos = List.copyOf(tipos);
     }
 }

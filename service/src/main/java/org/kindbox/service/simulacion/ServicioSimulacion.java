@@ -24,6 +24,7 @@ import org.kindbox.core.io.RepositorioDatos;
 import org.kindbox.core.metaheuristica.Algoritmo;
 import org.kindbox.core.modelo.Almacen;
 import org.kindbox.core.modelo.Ciudad;
+import org.kindbox.core.modelo.EstadoUnidad;
 import org.kindbox.core.modelo.ParametrosOperacion;
 import org.kindbox.core.modelo.Pedido;
 import org.kindbox.core.modelo.TipoAveria;
@@ -32,6 +33,7 @@ import org.kindbox.core.modelo.UnidadTransporte;
 import org.kindbox.core.simulacion.ColorSemaforo;
 import org.kindbox.core.simulacion.ConfiguracionEscenario;
 import org.kindbox.core.simulacion.EstadoCorrida;
+import org.kindbox.core.simulacion.EstadoSimulacion;
 import org.kindbox.core.simulacion.InstantaneaSimulacion;
 import org.kindbox.core.simulacion.MetricasSimulacion;
 import org.kindbox.core.simulacion.ModoReloj;
@@ -39,6 +41,7 @@ import org.kindbox.core.simulacion.MotorSimulacion;
 import org.kindbox.core.simulacion.ObservadorSimulacion;
 import org.kindbox.core.simulacion.ResultadoSimulacion;
 import org.kindbox.core.simulacion.TipoEscenario;
+import org.kindbox.core.simulacion.UnidadEnCurso;
 import org.kindbox.core.simulacion.VistaAlmacen;
 import org.kindbox.service.configuracion.PropiedadesKindBox;
 import org.kindbox.service.dto.DetalleCorrida;
@@ -341,6 +344,7 @@ public class ServicioSimulacion {
         long minuto = minutoSimulado(corrida);
         ParametrosOperacion.Instantanea vigentes = parametros.instantanea();
         Set<Integer> entregados = corrida.entregados();
+        EstadoSimulacion mundo = corrida.motor() == null ? null : corrida.motor().estado();
 
         List<FilaPedido> filtradas = new ArrayList<>();
         for (Pedido pedido : corrida.datos().pedidos()) {
@@ -356,7 +360,7 @@ public class ServicioSimulacion {
             }
             long holgura = pedido.holgura(minuto);
             filtradas.add(new FilaPedido(pedido.id(), pedido.idCliente(), pedido.cantidad(),
-                    entregado ? 0 : pedido.cantidad(), pedido.x(), pedido.y(), pedido.plazoHoras(),
+                    pendientesDe(mundo, pedido, entregado), pedido.x(), pedido.y(), pedido.plazoHoras(),
                     corrida.datos().calendario().aFecha(pedido.minutoRegistro()),
                     corrida.datos().calendario().aFecha(pedido.minutoLimite()),
                     holgura, entregado,
@@ -411,7 +415,13 @@ public class ServicioSimulacion {
 
     // -------------------------------------------------------------- averias
 
-    /** Registro individual de una averia, tal como llega del panel lateral del visualizador. */
+    /**
+     * Registro individual de una averia, tal como llega del panel lateral del visualizador.
+     *
+     * @throws ConflictoDeEstado si la corrida ya termino, o si la unidad esta averiada o en
+     *                           mantenimiento y por tanto el motor descartaria la averia
+     * @throws SolicitudInvalida si la placa no pertenece a la flota o el tipo no es 1, 2 ni 3
+     */
     public RespuestaAveria registrarAveria(String id, String placa, Integer tipoPedido) {
         Corrida corrida = requerir(id);
         exigirEnCurso(corrida);
@@ -427,6 +437,10 @@ public class ServicioSimulacion {
             tipo = TipoAveria.porCodigo(tipoPedido);
         } catch (IllegalArgumentException e) {
             throw new SolicitudInvalida("Tipo de averia invalido: " + tipoPedido + ". Debe ser 1, 2 o 3", e);
+        }
+        String conflicto = conflictoDeUnidad(corrida.motor().estado(), codigo);
+        if (conflicto != null) {
+            throw new ConflictoDeEstado(conflicto);
         }
         try {
             corrida.motor().registrarAveria(codigo, tipo);
@@ -481,6 +495,12 @@ public class ServicioSimulacion {
         List<String> avisos = new ArrayList<>(lectura.avisos());
         for (LectorAverias.AveriaProgramada averia : lectura.averias()) {
             if (averia.minutoAveria() <= minuto) {
+                String conflicto = conflictoDeUnidad(corrida.motor().estado(), averia.codigoUnidad());
+                if (conflicto != null) {
+                    // El motor la descartaria en silencio; el operador debe saber por que.
+                    avisos.add(conflicto);
+                    continue;
+                }
                 try {
                     corrida.motor().registrarAveria(averia.codigoUnidad(), averia.tipo());
                     aplicadas++;
@@ -563,6 +583,57 @@ public class ServicioSimulacion {
             throw new ConflictoDeEstado("La corrida " + corrida.id()
                     + " ya termino con estado " + corrida.estado() + "; no admite mas averias");
         }
+    }
+
+    /**
+     * Unidades del producto P que al pedido aun le faltan, que es lo que muestra la columna
+     * de pendientes de la tabla del panel lateral.
+     *
+     * <p>No basta con mirar si el pedido esta entregado: un pedido puede repartirse entre
+     * varias unidades, de modo que uno a medias ya tiene una parte entregada y otra por
+     * entregar, y contarlo entero como pendiente exagera lo que falta por hacer. La cifra
+     * buena la lleva el estado del mundo simulado, que descuenta cada entrega parcial. Solo
+     * mientras la corrida no tiene motor se cae en la cantidad pedida, que es lo unico que se
+     * conoce en ese momento.</p>
+     */
+    static int pendientesDe(EstadoSimulacion mundo, Pedido pedido, boolean entregado) {
+        if (entregado) {
+            return 0;
+        }
+        if (mundo == null) {
+            return pedido.cantidad();
+        }
+        int indice = mundo.indiceDePedido(pedido.id());
+        return indice < 0 ? pedido.cantidad() : mundo.noEntregadoDe(indice);
+    }
+
+    /**
+     * Motivo por el que la unidad no admite una averia nueva, o {@code null} si la admite.
+     *
+     * <p>El motor descarta en silencio la averia que cae sobre una unidad ya averiada o en
+     * mantenimiento preventivo. Sin esta consulta previa el visualizador recibia un 200 con un
+     * mensaje que anunciaba una inmovilizacion que nunca llego a ocurrir.</p>
+     *
+     * <p>La lectura se hace sin tomar el candado del motor, que es lo correcto para una
+     * consulta de cortesia como esta: sirve para dar un 409 en el caso claro, y la decision
+     * ultima sobre si la averia se aplica sigue siendo del motor.</p>
+     */
+    static String conflictoDeUnidad(EstadoSimulacion mundo, String codigo) {
+        int indice = mundo == null ? -1 : mundo.indiceDeUnidad(codigo);
+        return indice < 0 ? null : conflictoDeUnidad(mundo.unidad(indice));
+    }
+
+    /** Motivo por el que la unidad no admite una averia nueva, o {@code null} si la admite. */
+    static String conflictoDeUnidad(UnidadEnCurso unidad) {
+        if (unidad.averia() != null) {
+            return "La unidad " + unidad.codigo() + " ya esta inmovilizada por una averia de tipo "
+                    + unidad.averia().codigo() + ". Espere a que se reincorpore para registrar otra.";
+        }
+        if (unidad.unidad().estado() == EstadoUnidad.EN_MANTENIMIENTO) {
+            return "La unidad " + unidad.codigo() + " esta en mantenimiento preventivo y no circula, "
+                    + "de modo que no puede averiarse.";
+        }
+        return null;
     }
 
     private static Set<String> codigosDeFlota(Corrida corrida) {

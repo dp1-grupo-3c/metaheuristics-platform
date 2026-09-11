@@ -249,6 +249,20 @@ public final class EstadoSimulacion {
         return completado[indice] || incumplido[indice] ? 0 : pendiente[indice];
     }
 
+    /**
+     * Unidades del producto P que del pedido no se han entregado, este abierto o cerrado.
+     *
+     * <p>Se diferencia de {@link #pendienteDe(int)} en los dos extremos del ciclo de vida, y
+     * por eso es la cifra que muestra la tabla de pedidos del visualizador. De un pedido
+     * incumplido dice lo que se quedo sin entregar, y no cero, porque el operador necesita ver
+     * el faltante; de uno que aun no ha llegado dice su cantidad entera, y no cero, porque la
+     * reserva del contador solo se hace al procesar su llegada y la tabla puede consultarse en
+     * ese mismo minuto simulado.</p>
+     */
+    public int noEntregadoDe(int indice) {
+        return registrado[indice] ? pendiente[indice] : pedidos.get(indice).cantidad();
+    }
+
     /** Registra la llegada de un pedido y lo incorpora al conjunto de pendientes. */
     public void registrarPedido(int indice) {
         if (registrado[indice]) {
@@ -409,7 +423,8 @@ public final class EstadoSimulacion {
     public MetricasSimulacion metricas() {
         Map<String, Integer> kilometros = new LinkedHashMap<>();
         for (TipoUnidad t : TipoUnidad.values()) {
-            kilometros.put(t.etiqueta(), kilometrosPorTipo[t.ordinal()]);
+            // La clave es el nombre del enumerado, el mismo que usa el resto de la API.
+            kilometros.put(t.name(), kilometrosPorTipo[t.ordinal()]);
         }
         Map<Integer, Double> promedios = new TreeMap<>();
         Map<Integer, Integer> conteos = new TreeMap<>();

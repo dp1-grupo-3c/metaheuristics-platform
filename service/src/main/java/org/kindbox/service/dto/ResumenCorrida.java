@@ -2,6 +2,8 @@ package org.kindbox.service.dto;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.kindbox.core.simulacion.EstadoCorrida;
@@ -61,8 +63,14 @@ public record ResumenCorrida(
         String motor,
         List<String> avisos) {
 
+    /**
+     * Copia defensiva que conserva el orden del mapa recibido, que es el del enumerado de
+     * tipos. Con {@code Map.copyOf} el orden lo decide una semilla que la maquina virtual
+     * sortea en cada arranque, y el conteo de la barra superior cambiaba de columnas entre dos
+     * ejecuciones del servicio.
+     */
     public ResumenCorrida {
-        unidadesActivasPorTipo = Map.copyOf(unidadesActivasPorTipo);
+        unidadesActivasPorTipo = Collections.unmodifiableMap(new LinkedHashMap<>(unidadesActivasPorTipo));
         avisos = List.copyOf(avisos);
     }
 

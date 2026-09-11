@@ -2,6 +2,8 @@ package org.kindbox.core.simulacion;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import org.kindbox.core.modelo.EstadoUnidad;
+import org.kindbox.core.modelo.TipoUnidad;
 
 /**
  * Fotografia completa del estado de la simulacion en un instante, que es lo que viaja al
@@ -39,15 +41,28 @@ public record InstantaneaSimulacion(
         bloqueosVigentes = List.copyOf(bloqueosVigentes);
     }
 
-    /** Unidades activas por tipo, que es el conteo de la barra superior del prototipo. */
-    public int unidadesActivasDeTipo(org.kindbox.core.modelo.TipoUnidad tipo) {
+    /**
+     * Unidades activas por tipo, que es el conteo de la barra superior del prototipo.
+     *
+     * <p>Activa quiere decir en operacion. Quedan fuera las tres situaciones en que la unidad
+     * no esta trabajando: la que espera en un almacen sin ruta asignada, la inmovilizada por
+     * una averia y la que esta en mantenimiento preventivo, que el enunciado retira de la
+     * flota durante todo el dia programado.</p>
+     */
+    public int unidadesActivasDeTipo(TipoUnidad tipo) {
         int n = 0;
         for (VistaUnidad u : unidades) {
-            if (u.tipo() == tipo && u.estado() != org.kindbox.core.modelo.EstadoUnidad.DISPONIBLE
-                    && !u.averiada()) {
+            if (u.tipo() == tipo && activa(u)) {
                 n++;
             }
         }
         return n;
+    }
+
+    /** Indica si la unidad esta en operacion y por tanto cuenta como activa. */
+    private static boolean activa(VistaUnidad u) {
+        EstadoUnidad estado = u.estado();
+        return estado != EstadoUnidad.DISPONIBLE && estado != EstadoUnidad.AVERIADA
+                && estado != EstadoUnidad.EN_MANTENIMIENTO && !u.averiada();
     }
 }

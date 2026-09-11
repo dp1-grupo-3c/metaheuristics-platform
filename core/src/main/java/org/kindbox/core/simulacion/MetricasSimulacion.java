@@ -1,5 +1,7 @@
 package org.kindbox.core.simulacion;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -30,7 +32,8 @@ import java.util.Map;
  * @param unidadesEntregadas        paquetes del producto P entregados
  * @param pedidosIncumplidos        pedidos cuyo plazo vencio sin completarse
  * @param costoAcumulado            costo de operacion en soles
- * @param kilometrosPorTipo         kilometros recorridos por tipo de unidad
+ * @param kilometrosPorTipo         kilometros recorridos por tipo de unidad, con el nombre del
+ *                                  enumerado como clave: AUTO, MOTO y BICICLETA
  * @param minutosEntregaPorPlazo    tiempo de entrega promedio en minutos, por plazo comprometido
  * @param entregasPorPlazo          numero de entregas computadas en cada plazo
  * @param activacionesSemaforo      registro cronologico de cambios a ambar o rojo
@@ -66,12 +69,25 @@ public record MetricasSimulacion(
     public record ActivacionSemaforo(long minuto, String nombreAlmacen, ColorSemaforo color, int disponible) {
     }
 
+    /**
+     * Copia defensiva que conserva el orden de recorrido del mapa recibido.
+     *
+     * <p>{@code Map.copyOf} no vale aqui: su orden de iteracion depende de una semilla que la
+     * maquina virtual sortea en cada arranque, de modo que el JSON del visualizador cambiaba
+     * de orden entre dos ejecuciones del servicio con los mismos numeros. Quien construye
+     * estas metricas las entrega ya ordenadas, por tipo de unidad en el orden del enumerado y
+     * por plazo y tipo de averia en orden creciente, y ese es el orden que llega al cliente.</p>
+     */
     public MetricasSimulacion {
-        kilometrosPorTipo = Map.copyOf(kilometrosPorTipo);
-        minutosEntregaPorPlazo = Map.copyOf(minutosEntregaPorPlazo);
-        entregasPorPlazo = Map.copyOf(entregasPorPlazo);
+        kilometrosPorTipo = mapaEstable(kilometrosPorTipo);
+        minutosEntregaPorPlazo = mapaEstable(minutosEntregaPorPlazo);
+        entregasPorPlazo = mapaEstable(entregasPorPlazo);
         activacionesSemaforo = List.copyOf(activacionesSemaforo);
-        averiasPorTipo = Map.copyOf(averiasPorTipo);
+        averiasPorTipo = mapaEstable(averiasPorTipo);
+    }
+
+    private static <C, V> Map<C, V> mapaEstable(Map<C, V> mapa) {
+        return Collections.unmodifiableMap(new LinkedHashMap<>(mapa));
     }
 
     /**

@@ -1,5 +1,6 @@
 package org.kindbox.core.simulacion;
 
+import org.kindbox.core.modelo.Almacen;
 import org.kindbox.core.modelo.ParametrosOperacion;
 
 /**
@@ -32,7 +33,13 @@ public enum ColorSemaforo {
     /**
      * Color de la holgura de un pedido, expresada como fraccion del plazo comprometido que
      * aun queda. Se usan las mismas proporciones que los umbrales de inventario, referidas a
-     * su capacidad maxima, de modo que un solo juego de parametros gobierne ambos usos.
+     * la capacidad de un almacen intermedio, de modo que un solo juego de parametros gobierne
+     * ambos usos: con los valores por defecto, 500 y 250 sobre una capacidad de 1000, el corte
+     * verde queda en la mitad del plazo y el ambar en la cuarta parte.
+     *
+     * <p>Los dos cortes se acotan a {@code [0,1]} y el ambar nunca supera al verde, de modo
+     * que un juego de umbrales por encima de la capacidad deja el corte verde en el plazo
+     * entero en lugar de invertir el orden de los colores.</p>
      *
      * @param holguraMinutos minutos que faltan hasta el instante limite; puede ser negativo
      * @param plazoMinutos   plazo total comprometido del pedido
@@ -43,11 +50,9 @@ public enum ColorSemaforo {
             return ROJO;
         }
         double fraccion = (double) holguraMinutos / plazoMinutos;
-        double capacidad = Math.max(1.0, parametros.umbralSemaforoVerde()
-                / Math.max(1.0, (double) org.kindbox.core.modelo.Almacen.CAPACIDAD_INTERMEDIO));
-        double corteVerde = Math.min(1.0, capacidad);
-        double corteAmbar = corteVerde * parametros.umbralSemaforoAmbar()
-                / Math.max(1.0, (double) parametros.umbralSemaforoVerde());
+        double capacidad = Almacen.CAPACIDAD_INTERMEDIO;
+        double corteVerde = Math.min(1.0, parametros.umbralSemaforoVerde() / capacidad);
+        double corteAmbar = Math.min(corteVerde, parametros.umbralSemaforoAmbar() / capacidad);
         if (fraccion >= corteVerde) {
             return VERDE;
         }

@@ -28,6 +28,10 @@ import org.springframework.stereotype.Component;
  * y sustituye por si sola a todas las anteriores, de modo que perder una intermedia no deja
  * al visualizador en un estado incoherente, mientras que frenar la simulacion por un cliente
  * lento si arruinaria la corrida.</p>
+ *
+ * <p>Por la misma razon, la cabecera de una corrida recien arrancada vacia la cola: las
+ * fotografias de la corrida anterior que aun no se hubieran retransmitido ya no describen
+ * nada vigente y solo servirian para pintar en el visualizador un estado que no existe.</p>
  */
 @Component
 public class DifusorInstantaneas implements PublicadorDeEstado {
@@ -74,6 +78,11 @@ public class DifusorInstantaneas implements PublicadorDeEstado {
     /** Encola un mensaje arbitrario, por ejemplo la cabecera de una corrida recien arrancada. */
     @Override
     public void publicar(String tipo, String idCorrida, Object carga) {
+        if (MensajeVisualizador.TIPO_CORRIDA.equals(tipo)) {
+            // Arranca una corrida nueva: lo que quede en la cola es de la anterior y ya no
+            // describe nada vigente, de modo que se descarta antes de anunciar la nueva.
+            cola.clear();
+        }
         encolar(new MensajeVisualizador(tipo, idCorrida, carga));
     }
 
@@ -89,7 +98,7 @@ public class DifusorInstantaneas implements PublicadorDeEstado {
         while (activo) {
             try {
                 MensajeVisualizador mensaje = cola.take();
-                manejador.difundir(mapeador.writeValueAsString(mensaje));
+                manejador.difundir(mensaje.tipo(), mensaje.corrida(), mapeador.writeValueAsString(mensaje));
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 return;

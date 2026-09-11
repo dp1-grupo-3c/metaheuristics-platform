@@ -248,6 +248,19 @@ Expone en el puerto 8080 los extremos REST de configuracion, arranque y monitore
 simulaciones, registro de averias y cambio en caliente de parametros, y un canal WebSocket en
 `/ws/simulacion` que difunde el estado completo de la simulacion en curso.
 
+Toda respuesta de error, la levante el servicio o el contenedor, trae el mismo cuerpo JSON con
+`codigo`, `error`, `mensaje` en espanol, `ruta` e `instante`. Los codigos son 400 para una
+peticion mal formada o una carga que no es multipart, 404 para una corrida o una ruta que no
+existen, 405 para un metodo no mapeado en esa ruta, 409 para una operacion que choca con el
+estado (arrancar con una corrida ya en curso, o averiar una unidad ya averiada o en
+mantenimiento), 413 para un archivo de averias por encima del limite y 415 para un tipo de
+contenido que el extremo no sabe leer.
+
+Al conectarse al canal, un cliente recibe de inmediato la cabecera `corrida` y la ultima
+`instantanea` (o el `resultado` final) de la corrida activa o, si no hay ninguna activa, de la
+ultima que se ejecuto. Al arrancar una corrida nueva se descarta lo que quedaba de la anterior,
+de modo que nadie recibe como estado del momento la fotografia de una corrida vieja.
+
 ## Escenarios
 
 | Escenario | Descripcion |
@@ -262,8 +275,12 @@ es la configuracion del reloj y la condicion de parada.
 ## Pruebas
 
 ```bash
-./mvnw -pl core test
+./mvnw test
 ```
+
+Corre las pruebas de los tres modulos: las del nucleo y las del servicio, que cubren los
+codigos de error de la API y el estado inicial del canal WebSocket. Para pasar solo las del
+nucleo, `./mvnw -pl core test`.
 
 ## Licencia
 
