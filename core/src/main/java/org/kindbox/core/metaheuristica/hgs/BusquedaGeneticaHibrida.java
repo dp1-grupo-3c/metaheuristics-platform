@@ -111,6 +111,8 @@ public final class BusquedaGeneticaHibrida implements Algoritmo {
     private final ParametrosHgs parametros;
     private final FuncionObjetivo funcionObjetivo;
     private final long semilla;
+    /** Podas del filtro de cota inferior en la ultima ejecucion completada. */
+    private volatile long ultimasPodasCotaInferior;
 
     /** Busqueda con los parametros del apartado 6.4 y la semilla por defecto. */
     public BusquedaGeneticaHibrida(HeuristicaConstructiva heuristica) {
@@ -146,6 +148,15 @@ public final class BusquedaGeneticaHibrida implements Algoritmo {
     /** Semilla del constructor, la que usa {@link #resolver(InstanciaPlanificacion, PresupuestoComputo)}. */
     public long semilla() {
         return semilla;
+    }
+
+    /**
+     * Movimientos de la educacion que el filtro de cota inferior descarto sin decodificar en la
+     * ultima ejecucion completada por esta instancia, o cero si el filtro esta desactivado.
+     * Es una medida de diagnostico y no forma parte del resultado.
+     */
+    public long podasCotaInferior() {
+        return ultimasPodasCotaInferior;
     }
 
     /** Nombre, semilla y parametros completos, para dejar trazada la configuracion de una corrida. */
@@ -314,6 +325,7 @@ public final class BusquedaGeneticaHibrida implements Algoritmo {
                 resultado = vacia.conValor(funcionObjetivo.evaluar(instancia, vacia));
             }
             presupuesto.cerrarPerfil(resultado.valor());
+            ultimasPodasCotaInferior = educacion.podasCotaInferior();
             return new ResultadoPlanificacion(NOMBRE, resultado, presupuesto.perfil(),
                     presupuesto.milisegundosTranscurridos(), presupuesto.iteraciones(), semillaCorrida);
         }

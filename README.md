@@ -205,6 +205,11 @@ silencio. La lista completa de claves sale de `FabricaAlgoritmos.clavesHgs()` y
 `clavesAlns()`, y coincide con la traza `Algoritmo: ...` que cada ejecutable imprime al
 arrancar.
 
+Los dos algoritmos acotan cada movimiento con la concatenacion de resumenes de
+`DatosSecuencia` antes de llamar al decodificador y descartan lo que la cota ya condena. El
+filtro no cambia el resultado, solo lo que cuesta alcanzarlo, y se apaga con
+`-Dhgs.filtroCotaInferior=false` y `-Dalns.filtroCotaInferior=false` para medir su efecto.
+
 ### Levantar la API
 
 ```bash

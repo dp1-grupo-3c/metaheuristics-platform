@@ -148,6 +148,8 @@ class FabricaAlgoritmosTest {
             {"alns.tasaReaccion", "0,3"},
             {"alns.tasaReaccion", "NaN"},
             {"alns.ordenArrepentimientoMinimo", "1"},
+            {"hgs.filtroCotaInferior", "quizas"},
+            {"alns.filtroCotaInferior", "1"},
         };
         for (String[] caso : casos) {
             IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
@@ -199,8 +201,8 @@ class FabricaAlgoritmosTest {
     /**
      * Para cada clave, fija un valor distinto del vigente y valido y exige que la traza
      * resultante difiera de la de por defecto exactamente en esa entrada. Los enteros se
-     * incrementan en uno y los reales se multiplican por 0.9, que cae dentro del dominio de
-     * todos los parametros vigentes.
+     * incrementan en uno, los reales se multiplican por 0.9, que cae dentro del dominio de
+     * todos los parametros vigentes, y los booleanos se invierten.
      */
     private static void comprobarCadaClave(String prefijo, List<String> claves, String trazaPorDefecto,
                                            Function<Properties, String> traza) {
@@ -212,9 +214,14 @@ class FabricaAlgoritmosTest {
             String entrada = entradas.get(i);
             assertTrue(entrada.startsWith(nombre + "="), "traza fuera de orden en " + entrada);
             String vigente = entrada.substring(nombre.length() + 1);
-            String nuevo = vigente.contains(".")
-                    ? Double.toString(Double.parseDouble(vigente) * 0.9)
-                    : Long.toString(Long.parseLong(vigente) + 1L);
+            String nuevo;
+            if (vigente.equals("true") || vigente.equals("false")) {
+                nuevo = Boolean.toString(!Boolean.parseBoolean(vigente));
+            } else if (vigente.contains(".")) {
+                nuevo = Double.toString(Double.parseDouble(vigente) * 0.9);
+            } else {
+                nuevo = Long.toString(Long.parseLong(vigente) + 1L);
+            }
             String esperada = trazaPorDefecto.replace(" " + entrada + " ", " " + nombre + "=" + nuevo + " ")
                     .replace("[" + entrada + " ", "[" + nombre + "=" + nuevo + " ")
                     .replace(" " + entrada + "]", " " + nombre + "=" + nuevo + "]");

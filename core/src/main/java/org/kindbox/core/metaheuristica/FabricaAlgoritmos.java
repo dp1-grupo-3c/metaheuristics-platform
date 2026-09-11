@@ -40,7 +40,8 @@ import org.kindbox.core.metaheuristica.hgs.ParametrosHgs;
  * con el mismo nombre que su accesor; {@link #clavesHgs()} y {@link #clavesAlns()} dan la
  * lista completa y el {@code toString} de cada clase de parametros usa esos mismos nombres,
  * de modo que la traza de una corrida se puede copiar de vuelta como propiedades. Los valores
- * se escriben con punto decimal. Varios parametros de ALNS se validan en pareja o en trio,
+ * se escriben con punto decimal, y los booleanos, como {@code filtroCotaInferior}, con
+ * {@code true} o {@code false}. Varios parametros de ALNS se validan en pareja o en trio,
  * como el rango de destruccion o las temperaturas, y su asignacion es agrupada: cada
  * componente tiene su propia clave y el grupo se aplica una sola vez, con las componentes que
  * no se indicaron en su valor vigente. Asi fijar a la vez el minimo y el maximo de un rango no
@@ -164,7 +165,8 @@ public final class FabricaAlgoritmos {
                 .real("holguraProporcionFactibles", ParametrosHgs::holguraProporcionFactibles)
                 .real("esfuerzoElite", ParametrosHgs::esfuerzoElite)
                 .largo("maximoGeneraciones", ParametrosHgs::maximoGeneraciones)
-                .largo("maximoGeneracionesSinMejora", ParametrosHgs::maximoGeneracionesSinMejora);
+                .largo("maximoGeneracionesSinMejora", ParametrosHgs::maximoGeneracionesSinMejora)
+                .booleano("filtroCotaInferior", ParametrosHgs::filtroCotaInferior);
     }
 
     private static Tabla<ParametrosAlns> tablaAlns() {
@@ -206,7 +208,8 @@ public final class FabricaAlgoritmos {
                 .real("factorPenalizacionBanco", ParametrosAlns::factorPenalizacionBanco)
                 .real("factorPenalizacionEstabilidad", ParametrosAlns::factorPenalizacionEstabilidad)
                 .largo("maximoIteracionesSinMejora", ParametrosAlns::maximoIteracionesSinMejora)
-                .largo("iteracionesParaReinicio", ParametrosAlns::iteracionesParaReinicio);
+                .largo("iteracionesParaReinicio", ParametrosAlns::iteracionesParaReinicio)
+                .booleano("filtroCotaInferior", ParametrosAlns::filtroCotaInferior);
     }
 
     // ------------------------------------------------------------- lectura
@@ -260,13 +263,20 @@ public final class FabricaAlgoritmos {
     private enum Tipo {
         ENTERO("un numero entero"),
         LARGO("un numero entero"),
-        REAL("un numero real finito escrito con punto decimal");
+        REAL("un numero real finito escrito con punto decimal"),
+        BOOLEANO("true ni false");
 
         private final String descripcion;
 
         Tipo(String descripcion) {
             this.descripcion = descripcion;
         }
+    }
+
+    /** Asigna un parametro booleano sin pasar por un objeto envoltorio. */
+    @FunctionalInterface
+    private interface AsignacionBooleana<P> {
+        void aplicar(P parametros, boolean valor);
     }
 
     /** Asigna sobre los parametros las componentes de un ajuste, leidas de los valores. */
@@ -319,6 +329,12 @@ public final class FabricaAlgoritmos {
             return valor == null ? vigente : valor.doubleValue();
         }
 
+        /** Los booleanos se guardan como uno o cero para compartir el mapa de valores. */
+        boolean booleano(String nombre, boolean vigente) {
+            Number valor = numeros.get(nombre);
+            return valor == null ? vigente : valor.intValue() != 0;
+        }
+
         /** Las claves presentes del ajuste con su valor tal como se escribio. */
         String describir(String[] nombres) {
             StringBuilder texto = new StringBuilder();
@@ -341,6 +357,15 @@ public final class FabricaAlgoritmos {
                 }
                 if (tipo == Tipo.LARGO) {
                     return Long.valueOf(Long.parseLong(limpio));
+                }
+                if (tipo == Tipo.BOOLEANO) {
+                    if (limpio.equalsIgnoreCase("true")) {
+                        return Integer.valueOf(1);
+                    }
+                    if (limpio.equalsIgnoreCase("false")) {
+                        return Integer.valueOf(0);
+                    }
+                    throw new NumberFormatException("valor no booleano");
                 }
                 double valor = Double.parseDouble(limpio);
                 if (!Double.isFinite(valor)) {
@@ -379,6 +404,10 @@ public final class FabricaAlgoritmos {
 
         Tabla<P> real(String nombre, ObjDoubleConsumer<P> asignar) {
             return grupo(Tipo.REAL, (p, v) -> asignar.accept(p, v.real(nombre, 0.0)), nombre);
+        }
+
+        Tabla<P> booleano(String nombre, AsignacionBooleana<P> asignar) {
+            return grupo(Tipo.BOOLEANO, (p, v) -> asignar.aplicar(p, v.booleano(nombre, false)), nombre);
         }
 
         /** Registra un ajuste de una o varias componentes del mismo tipo. */

@@ -49,6 +49,8 @@ public final class ParametrosAlns {
     private double pesoAfinidadPlazo = 0.3;
     private double pesoAfinidadUnidad = 0.1;
 
+    private boolean filtroCotaInferior = true;
+
     /** Parametros con los valores iniciales del apartado 7.4 del ISA. */
     public static ParametrosAlns porDefecto() {
         return new ParametrosAlns();
@@ -215,6 +217,24 @@ public final class ParametrosAlns {
         this.pesoAfinidadDistancia = distancia;
         this.pesoAfinidadPlazo = plazo;
         this.pesoAfinidadUnidad = unidad;
+        return this;
+    }
+
+    /**
+     * Si los operadores de reconstruccion saltan, sin llamar al decodificador, las posiciones
+     * de insercion cuya cota inferior de desfase ya es positiva. La cota se obtiene en tiempo
+     * constante concatenando los resumenes de prefijo y sufijo de la ruta con los de la visita
+     * (apartado 10 del ISA), y como la reconstruccion solo acepta posiciones factibles, el
+     * filtro no descarta nada que el decodificador fuese a aceptar. Con {@code false} se
+     * decodifica cada posicion, que es lo que permite medir el efecto y comprobar la
+     * equivalencia.
+     */
+    public boolean filtroCotaInferior() {
+        return filtroCotaInferior;
+    }
+
+    public ParametrosAlns filtroCotaInferior(boolean valor) {
+        this.filtroCotaInferior = valor;
         return this;
     }
 
@@ -442,6 +462,7 @@ public final class ParametrosAlns {
                 + " factorPenalizacionBanco=" + factorPenalizacionBanco
                 + " factorPenalizacionEstabilidad=" + factorPenalizacionEstabilidad
                 + " maximoIteracionesSinMejora=" + maximoIteracionesSinMejora
-                + " iteracionesParaReinicio=" + iteracionesParaReinicio + "]";
+                + " iteracionesParaReinicio=" + iteracionesParaReinicio
+                + " filtroCotaInferior=" + filtroCotaInferior + "]";
     }
 }

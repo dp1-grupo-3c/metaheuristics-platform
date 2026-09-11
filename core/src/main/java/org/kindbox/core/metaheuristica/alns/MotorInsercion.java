@@ -1,6 +1,7 @@
 package org.kindbox.core.metaheuristica.alns;
 
 import org.kindbox.core.evaluacion.ProgramadorRuta;
+import org.kindbox.core.evaluacion.ResumenesRuta;
 import org.kindbox.core.grafo.MatrizDistancias;
 import org.kindbox.core.metaheuristica.PresupuestoComputo;
 import org.kindbox.core.problema.InstanciaPlanificacion;
@@ -32,6 +33,16 @@ import org.kindbox.core.util.Aleatorio;
  * cercanos, mas todas las de ruta vacia, que es la granularidad del vecindario del apartado 10
  * del ISA. Si esa restriccion no encontrase ninguna posicion factible se recurre al recorrido
  * completo de la flota, de modo que la granularidad nunca puede aumentar la H del nivel 1.</p>
+ *
+ * <h2>Filtro de cota inferior</h2>
+ * <p>Antes de decodificar una posicion candidata se consulta {@link ResumenesRuta}: los
+ * resumenes de prefijo y sufijo de la ruta se precalculan una vez por unidad valorada y cada
+ * posicion se acota con {@code concatenar(prefijo, visita, sufijo)} en tiempo constante, que es
+ * la evaluacion del apartado 10 del ISA. Si la cota del desfase ya es positiva, el
+ * decodificador declararia la ruta infactible y la posicion se salta sin llamarlo. La cota
+ * nunca declara factible nada, de modo que la decision sigue siendo del decodificador y el
+ * resultado es el mismo con el filtro que sin el; el parametro
+ * {@link ParametrosAlns#filtroCotaInferior()} lo desactiva para comprobarlo.</p>
  */
 public final class MotorInsercion {
 
@@ -74,6 +85,13 @@ public final class MotorInsercion {
     private int[] secuencia;
     private int[] cantidades;
 
+    /** Si se acota el desfase de cada posicion antes de decodificarla. */
+    private final boolean filtroCotaInferior;
+    /** Resumenes de prefijo y sufijo de la ruta que se esta valorando. */
+    private final ResumenesRuta resumenes;
+    /** Posiciones que el filtro salto y que sin el se habrian decodificado. */
+    private long podasCotaInferior;
+
     /**
      * @param instancia  fotografia del problema
      * @param parametros parametros calibrables del apartado 7.4
@@ -110,6 +128,17 @@ public final class MotorInsercion {
         this.pendientes = new int[Math.max(1, cantidadTareas)];
         this.secuencia = new int[16];
         this.cantidades = new int[16];
+        this.filtroCotaInferior = parametros.filtroCotaInferior();
+        this.resumenes = new ResumenesRuta(instancia);
+    }
+
+    /**
+     * Posiciones de insercion que el filtro de cota inferior salto sin decodificar desde que
+     * se creo el motor. Cada una es una llamada al decodificador ahorrada respecto de la
+     * misma corrida sin filtro.
+     */
+    public long podasCotaInferior() {
+        return podasCotaInferior;
     }
 
     /**
@@ -325,8 +354,12 @@ public final class MotorInsercion {
         final int puntoTarea = tareas.punto(tarea);
         System.arraycopy(fila, 0, secuencia, 0, longitud);
         System.arraycopy(estado.filaCantidades(unidad), 0, cantidades, 0, longitud);
-        secuencia[longitud] = tareas.pedido(tarea);
+        final int pedidoTarea = tareas.pedido(tarea);
+        secuencia[longitud] = pedidoTarea;
         cantidades[longitud] = tareas.unidades(tarea);
+        if (filtroCotaInferior) {
+            resumenes.preparar(unidad, fila, longitud);
+        }
 
         double mejorCosto = INFINITO;
         int mejorPosicion = -1;
@@ -341,6 +374,13 @@ public final class MotorInsercion {
                     && costoPorKm * incrementoDirecto(unidad, fila, longitud, i, puntoTarea)
                         >= mejorCosto - costoActual) {
                 saltar = true;
+            }
+            // Filtro de cota inferior: con desfase minimo positivo la ruta resultante no puede
+            // ser factible, y la reconstruccion solo acepta posiciones factibles. Va despues del
+            // parpadeo para no alterar la sucesion de numeros aleatorios.
+            if (!saltar && filtroCotaInferior && resumenes.desfaseInsertando(i, pedidoTarea) > 0L) {
+                saltar = true;
+                podasCotaInferior++;
             }
             if (!saltar
                     && programador.evaluar(unidad, secuencia, cantidades, longitud + 1)

@@ -123,6 +123,8 @@ public final class BusquedaAdaptativaVecindadAmplia implements Algoritmo {
     private final ParametrosAlns parametros;
     private final FuncionObjetivo objetivo;
     private final long semilla;
+    /** Podas del filtro de cota inferior en la ultima ejecucion completada. */
+    private volatile long ultimasPodasCotaInferior;
 
     /**
      * @param constructiva heuristica que produce la solucion de partida; puede ser
@@ -176,6 +178,15 @@ public final class BusquedaAdaptativaVecindadAmplia implements Algoritmo {
      */
     public long semilla() {
         return semilla;
+    }
+
+    /**
+     * Posiciones de insercion que el filtro de cota inferior salto sin decodificar en la
+     * ultima ejecucion completada por esta instancia, o cero si el filtro esta desactivado.
+     * Es una medida de diagnostico y no forma parte del resultado.
+     */
+    public long podasCotaInferior() {
+        return ultimasPodasCotaInferior;
     }
 
     /** Nombre, semilla y parametros completos, para dejar trazada la configuracion de una corrida. */
@@ -336,6 +347,7 @@ public final class BusquedaAdaptativaVecindadAmplia implements Algoritmo {
         final Solucion solucion = mejor.materializar();
         final ValorObjetivo valorFinal = objetivo.evaluar(instancia, solucion);
         presupuesto.cerrarPerfil(valorFinal);
+        ultimasPodasCotaInferior = motor.podasCotaInferior();
         return new ResultadoPlanificacion(NOMBRE, solucion.conValor(valorFinal), presupuesto.perfil(),
                 presupuesto.milisegundosTranscurridos(), presupuesto.iteraciones(), semillaCorrida);
     }

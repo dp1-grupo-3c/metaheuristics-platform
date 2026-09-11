@@ -4,11 +4,22 @@ package org.kindbox.core.evaluacion;
  * Evaluacion en tiempo constante de la concatenacion de secuencias, segun Vidal, Crainic,
  * Gendreau y Prins (2013) y el apartado 10 del ISA.
  *
- * <p>Recalcular el valor completo de una ruta tras cada movimiento tiene costo lineal en
- * el numero de paradas. Con un presupuesto de entre 2 y 18 segundos y decenas de miles de
- * evaluaciones por ejecucion, esa diferencia decide si el algoritmo alcanza a mejorar la
- * solucion constructiva. Por eso cada subsecuencia guarda un resumen que permite evaluar
- * la concatenacion de dos subsecuencias en tiempo constante.</p>
+ * <h2>Papel en el planificador: filtro de cota inferior</h2>
+ * <p>El resumen <b>no</b> sustituye al decodificador. {@link ProgramadorRuta} intercala
+ * abastecimientos segun la carga a bordo y el inventario, y ubica la pausa de alimentacion
+ * por enumeracion; nada de eso cabe en un resumen concatenable, de modo que el valor exacto
+ * de una ruta y su factibilidad los sigue decidiendo el decodificador. Lo que el resumen si
+ * da en tiempo constante es una <b>cota inferior</b> del desfase que el decodificador va a
+ * medir, y {@link ResumenesRuta} la usa como filtro previo: ALNS salta sin decodificar toda
+ * posicion de insercion cuya cota ya es positiva, y HGS descarta todo movimiento cuya cota
+ * penalizada ya no mejora. El filtro solo poda lo que el decodificador habria rechazado, de
+ * modo que no cambia el resultado de ninguno de los dos algoritmos; la razon de que la cota
+ * sea valida esta en {@link ResumenesRuta}.</p>
+ *
+ * <p>La concatenacion existe en dos formas con la misma formula: la de este registro, que
+ * es la especificacion legible y la que ejercitan las pruebas del apartado 14 del ISA, y
+ * {@link #concatenar(long[], int, long[], int, long, long[], int)}, que opera sobre arreglos
+ * primitivos en aritmetica larga para no asignar memoria en los bucles calientes.</p>
  *
  * <p>El resumen se compone de la duracion acumulada, el desfase temporal absorbido, la
  * ventana de instantes de arranque admisibles y la carga y distancia acumuladas. La
@@ -91,6 +102,70 @@ public record DatosSecuencia(
         return new DatosSecuencia(duracion, desfase, inicioMasTemprano, inicioMasTardio,
                 a.carga + b.carga, a.kilometros + b.kilometros + kilometrosTramo,
                 a.paradas + b.paradas);
+    }
+
+    // ------------------------------------------------ forma sobre arreglos primitivos
+
+    /** Campos temporales de un resumen en los arreglos primitivos. */
+    public static final int CAMPOS = 4;
+    /** Desplazamiento de la duracion dentro de un resumen en arreglo. */
+    public static final int DURACION = 0;
+    /** Desplazamiento del desfase dentro de un resumen en arreglo. */
+    public static final int DESFASE = 1;
+    /** Desplazamiento del instante mas temprano de arranque dentro de un resumen en arreglo. */
+    public static final int TEMPRANO = 2;
+    /** Desplazamiento del instante mas tardio de arranque dentro de un resumen en arreglo. */
+    public static final int TARDIO = 3;
+    /**
+     * Instante mas tardio de una secuencia sin restriccion en la forma larga. Es un octavo del
+     * maximo para que ninguna suma o resta de la concatenacion desborde.
+     */
+    public static final long SIN_LIMITE_LARGO = Long.MAX_VALUE / 8;
+    /** Instante mas temprano de una parada que nunca obliga a esperar, en la forma larga. */
+    public static final long SIN_ESPERA_LARGO = -SIN_LIMITE_LARGO;
+
+    /**
+     * Misma operacion que {@link #concatenar(DatosSecuencia, DatosSecuencia, int, int)} sobre
+     * los campos temporales de dos resumenes guardados en arreglos, a razon de {@link #CAMPOS}
+     * valores por resumen. No asigna memoria y admite que el destino coincida con uno de los
+     * operandos, porque lee todos los valores antes de escribir.
+     *
+     * @param a              arreglo del resumen previo
+     * @param ia             posicion del primer campo del resumen previo
+     * @param b              arreglo del resumen posterior
+     * @param ib             posicion del primer campo del resumen posterior
+     * @param minutosDeViaje duracion del tramo entre el fin de {@code a} y el inicio de {@code b}
+     * @param destino        arreglo donde se escribe el resumen concatenado
+     * @param id             posicion del primer campo del resumen concatenado
+     */
+    public static void concatenar(long[] a, int ia, long[] b, int ib, long minutosDeViaje,
+                                  long[] destino, int id) {
+        final long aDuracion = a[ia + DURACION];
+        final long aDesfase = a[ia + DESFASE];
+        final long aTemprano = a[ia + TEMPRANO];
+        final long aTardio = a[ia + TARDIO];
+        final long bDuracion = b[ib + DURACION];
+        final long bDesfase = b[ib + DESFASE];
+        final long bTemprano = b[ib + TEMPRANO];
+        final long bTardio = b[ib + TARDIO];
+
+        final long delta = aDuracion - aDesfase + minutosDeViaje;
+        final long esperaExtra = Math.max(0L, bTemprano - delta - aTardio);
+        final long desfaseExtra = Math.max(0L, aTemprano + delta - bTardio);
+
+        destino[id + DURACION] = aDuracion + bDuracion + minutosDeViaje + esperaExtra;
+        destino[id + DESFASE] = aDesfase + bDesfase + desfaseExtra;
+        destino[id + TEMPRANO] = Math.max(bTemprano - delta, aTemprano) - esperaExtra;
+        destino[id + TARDIO] = Math.min(bTardio - delta, aTardio) + desfaseExtra;
+    }
+
+    /** Escribe en el arreglo el resumen de una parada aislada, en la forma larga. */
+    public static void fijar(long[] destino, int id, long duracion, long instanteMasTemprano,
+                             long instanteLimite) {
+        destino[id + DURACION] = duracion;
+        destino[id + DESFASE] = 0L;
+        destino[id + TEMPRANO] = instanteMasTemprano;
+        destino[id + TARDIO] = instanteLimite;
     }
 
     /** Concatena tres secuencias, patron habitual al evaluar un movimiento de reubicacion. */

@@ -129,6 +129,36 @@ public final class InstanciasDePrueba {
         return fotografia(INICIO_MANANA, pedidosVariados(cantidadPedidos), unidades, FIN_MANANA, parametros());
     }
 
+    /**
+     * Fotografia con plazos ajustados: pedidos registrados en las cuatro horas previas a la
+     * fotografia con plazos de cuatro a ocho horas, repartidos por toda la ciudad, y una flota
+     * mixta de cinco unidades. Con una hora de acondicionamiento por visita, la mayoria de las
+     * posiciones de insercion llegan tarde a algun pedido, de modo que es la instancia en que
+     * el filtro de cota inferior del apartado 10 del ISA tiene que podar de verdad. La
+     * consumen las pruebas de equivalencia de ese filtro.
+     *
+     * @param cantidadPedidos numero de pedidos a generar
+     */
+    public static InstanciaPlanificacion instanciaPlazosAjustados(int cantidadPedidos) {
+        int[] equis = {6, 64, 30, 18, 52, 36, 10, 46, 24, 68, 4, 40, 58, 14, 28, 50, 62, 22};
+        int[] yes = {40, 8, 30, 14, 44, 20, 6, 46, 16, 30, 12, 34, 18, 48, 42, 26, 36, 4};
+        int[] plazos = {4, 6, 5, 8, 4, 5, 6, 4, 8, 5};
+        List<Pedido> pedidos = new ArrayList<>(cantidadPedidos);
+        for (int i = 0; i < cantidadPedidos; i++) {
+            int j = i % equis.length;
+            int cantidad = 1 + (i % 4);
+            long registro = INICIO_MANANA - 60L * (i % 5);
+            pedidos.add(pedido(i, equis[j], yes[j], cantidad, registro, plazos[i % plazos.length]));
+        }
+        List<UnidadTransporte> unidades = List.of(
+                unidad("TA01", INICIO_MANANA),
+                unidad("TA02", INICIO_MANANA + 60L),
+                unidad("TM01", INICIO_MANANA),
+                unidadEn("TM02", 40, 30, INICIO_MANANA),
+                unidadEn("TB01", 20, 20, INICIO_MANANA + 30L));
+        return fotografia(INICIO_MANANA, pedidos, unidades, FIN_MANANA, parametros());
+    }
+
     /** Pedidos repartidos por la ciudad con plazos mezclados, siempre los mismos para el mismo numero. */
     private static List<Pedido> pedidosVariados(int cantidadPedidos) {
         // Coordenadas y plazos elegidos a mano para que la instancia sea reproducible y para

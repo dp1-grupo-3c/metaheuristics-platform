@@ -103,6 +103,8 @@ public final class ParametrosHgs {
     private long maximoGeneraciones = 1_000_000L;
     private long maximoGeneracionesSinMejora = 20_000L;
 
+    private boolean filtroCotaInferior = true;
+
     /** Parametros con los valores iniciales del apartado 6.4 del ISA. */
     public static ParametrosHgs porDefecto() {
         return new ParametrosHgs();
@@ -229,6 +231,24 @@ public final class ParametrosHgs {
             throw new IllegalArgumentException("Factor de reparacion menor que uno: " + valor);
         }
         this.factorPenalizacionReparacion = valor;
+        return this;
+    }
+
+    /**
+     * Si la educacion descarta con la cota inferior de {@code ResumenesRuta} los movimientos
+     * que ya no pueden mejorar, antes de llamar al decodificador. La cota suma al costo de los
+     * arcos la penalizacion de un desfase minimo calculado por concatenacion de resumenes
+     * (apartado 10 del ISA), y el descarte usa la misma regla de aceptacion y el mismo margen
+     * que el movimiento, de modo que el filtro no cambia el resultado sino lo que cuesta
+     * alcanzarlo. Con {@code false} la educacion vuelve a la cota de solo kilometros, que es
+     * lo que permite medir el efecto y comprobar la equivalencia.
+     */
+    public boolean filtroCotaInferior() {
+        return filtroCotaInferior;
+    }
+
+    public ParametrosHgs filtroCotaInferior(boolean valor) {
+        this.filtroCotaInferior = valor;
         return this;
     }
 
@@ -499,6 +519,7 @@ public final class ParametrosHgs {
                 + " holguraProporcionFactibles=" + holguraProporcionFactibles
                 + " esfuerzoElite=" + esfuerzoElite
                 + " maximoGeneraciones=" + maximoGeneraciones
-                + " maximoGeneracionesSinMejora=" + maximoGeneracionesSinMejora + "]";
+                + " maximoGeneracionesSinMejora=" + maximoGeneracionesSinMejora
+                + " filtroCotaInferior=" + filtroCotaInferior + "]";
     }
 }
