@@ -37,6 +37,7 @@ import org.kindbox.core.problema.Parada;
 import org.kindbox.core.problema.Ruta;
 import org.kindbox.core.problema.Solucion;
 import org.kindbox.core.problema.TipoParada;
+import org.kindbox.core.util.Aleatorio;
 
 /**
  * Motor de simulacion dirigido por eventos de PaqRap.
@@ -146,6 +147,11 @@ public final class MotorSimulacion {
     private long minutoPrimerIncumplimiento = -1L;
     private int pedidoDelPrimerIncumplimiento = -1;
     private long minutoReplanificacionPorBloqueo = Long.MIN_VALUE;
+    /**
+     * Replanificaciones lanzadas en la corrida. Es el numero de orden del que se deriva la
+     * semilla de cada iteracion del planificador; solo lo toca el hilo de la simulacion.
+     */
+    private long replanificacionesLanzadas;
 
     private int[] caminoTrabajo = new int[512];
     private int longitudTrabajo;
@@ -1010,6 +1016,17 @@ public final class MotorSimulacion {
      * de la iteracion, de modo que el visualizador pueda seguir pidiendo fotografias. El
      * algoritmo opera sobre una {@link InstanciaPlanificacion} inmutable, de modo que no ve
      * el estado del mundo cambiar bajo sus pies.</p>
+     *
+     * <p>Cada replanificacion recibe su propia semilla, derivada con
+     * {@link Aleatorio#derivarSemilla(long, long)} de la semilla de la configuracion y del
+     * numero de orden de la replanificacion dentro de la corrida, contado desde cero. Con la
+     * semilla fija del algoritmo todas las iteraciones repetian la misma secuencia aleatoria
+     * sobre fotografias muy parecidas, de modo que los mismos sesgos de la busqueda se
+     * repetian una y otra vez; con una semilla por iteracion cada una explora por su cuenta y
+     * la corrida entera sigue siendo reproducible a partir de la semilla de la configuracion,
+     * como pide el apartado 10 del ISA. La derivacion mezcla con SplitMix64 y no se limita a
+     * sumar el numero de orden, porque semillas que avanzan por un paso fijo darian corrientes
+     * solapadas en el generador.</p>
      */
     private void replanificar() {
         ParametrosOperacion.Instantanea foto = parametros.instantanea();
@@ -1029,7 +1046,8 @@ public final class MotorSimulacion {
         if (cancelado) {
             presupuesto.cancelar();
         }
-        ResultadoPlanificacion plan = algoritmo.resolver(fotografia.instancia(), presupuesto);
+        long semillaIteracion = Aleatorio.derivarSemilla(configuracion.semilla(), replanificacionesLanzadas++);
+        ResultadoPlanificacion plan = algoritmo.resolver(fotografia.instancia(), presupuesto, semillaIteracion);
         presupuestoVigente = null;
 
         candado.lock();

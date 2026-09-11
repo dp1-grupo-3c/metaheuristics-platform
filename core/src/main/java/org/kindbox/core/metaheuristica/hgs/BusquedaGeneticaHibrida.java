@@ -60,6 +60,20 @@ import org.kindbox.core.util.Aleatorio;
  * de un movimiento. En todo momento se conserva la mejor solucion factible hallada, que es
  * la que se devuelve.</p>
  *
+ * <h2>Reproducibilidad</h2>
+ * <p>Con presupuesto por reloj dos corridas con la misma semilla completan un numero distinto
+ * de generaciones y ademas reparten de otro modo el reloj entre la fase de elite y la
+ * poblacion inicial, de modo que la reproduccion es solo estadistica. Con presupuesto por
+ * iteraciones, {@code PresupuestoComputo.deIteraciones(n)}, cada decision pasa a ser funcion
+ * del contador y la corrida se repite bit a bit: el bucle principal se detiene exactamente
+ * tras {@code n} generaciones, salvo que antes lo haga uno de los otros dos criterios, que ya
+ * son por conteo; la educacion no ve cambiar {@code agotado()} dentro de una generacion,
+ * porque el contador solo avanza al cerrarla; y las dos fases previas al bucle, que corren con
+ * el contador en cero, se acotan por conteo como documentan {@code construirElite} y
+ * {@code completarPoblacionInicial}. La semilla es la del constructor, salvo que el invocante
+ * fije otra con {@link #resolver(InstanciaPlanificacion, PresupuestoComputo, long)}, como hace
+ * el motor de simulacion para dar a cada replanificacion su propia corriente aleatoria.</p>
+ *
  * <h2>Solucion devuelta</h2>
  * <p>La solucion se materializa con el decodificador comun y con el consumo real del
  * inventario de los almacenes intermedios. A una ruta que no resulte factible al
@@ -124,9 +138,21 @@ public final class BusquedaGeneticaHibrida implements Algoritmo {
         return NOMBRE;
     }
 
+    /** Resuelve con la semilla con que se construyo la busqueda. */
     @Override
     public ResultadoPlanificacion resolver(InstanciaPlanificacion instancia, PresupuestoComputo presupuesto) {
-        return new Corrida(instancia, presupuesto).ejecutar();
+        return resolver(instancia, presupuesto, semilla);
+    }
+
+    /**
+     * Resuelve con la semilla indicada, que sustituye a la del constructor solo en esta
+     * ejecucion. Es la via por la que el motor de simulacion da a cada replanificacion su
+     * propia corriente aleatoria; el resultado informa la semilla efectivamente usada.
+     */
+    @Override
+    public ResultadoPlanificacion resolver(InstanciaPlanificacion instancia, PresupuestoComputo presupuesto,
+                                           long semillaEjecucion) {
+        return new Corrida(instancia, presupuesto, semillaEjecucion).ejecutar();
     }
 
     /**
@@ -138,6 +164,8 @@ public final class BusquedaGeneticaHibrida implements Algoritmo {
 
         private final InstanciaPlanificacion instancia;
         private final PresupuestoComputo presupuesto;
+        /** Semilla de esta ejecucion, la del constructor o la que fijo el invocante. */
+        private final long semillaCorrida;
         private final Aleatorio aleatorio;
         private final ProgramadorRuta programador;
         private final TareasEntrega tareas;
@@ -173,10 +201,11 @@ public final class BusquedaGeneticaHibrida implements Algoritmo {
         private int descendientesRecientes;
         private int factiblesRecientes;
 
-        Corrida(InstanciaPlanificacion instancia, PresupuestoComputo presupuesto) {
+        Corrida(InstanciaPlanificacion instancia, PresupuestoComputo presupuesto, long semillaCorrida) {
             this.instancia = instancia;
             this.presupuesto = presupuesto;
-            this.aleatorio = new Aleatorio(semilla);
+            this.semillaCorrida = semillaCorrida;
+            this.aleatorio = new Aleatorio(semillaCorrida);
             this.programador = new ProgramadorRuta(instancia);
             this.tareas = new TareasEntrega(instancia, parametros.granularidadVecindario());
             // El plan vigente se resuelve una sola vez, al arrancar la corrida, a arreglos
@@ -270,7 +299,7 @@ public final class BusquedaGeneticaHibrida implements Algoritmo {
             }
             presupuesto.cerrarPerfil(resultado.valor());
             return new ResultadoPlanificacion(NOMBRE, resultado, presupuesto.perfil(),
-                    presupuesto.milisegundosTranscurridos(), presupuesto.iteraciones(), semilla);
+                    presupuesto.milisegundosTranscurridos(), presupuesto.iteraciones(), semillaCorrida);
         }
 
         // ------------------------------------------------------ poblacion inicial
@@ -280,6 +309,15 @@ public final class BusquedaGeneticaHibrida implements Algoritmo {
          * ordenacion por holgura creciente si no hay heuristica, decodificado y educado de
          * forma repetida mientras siga mejorando y no se agote la fraccion de presupuesto
          * reservada para esta fase.
+         *
+         * <p>Con presupuesto por iteraciones esta fase precede al bucle principal y el contador
+         * todavia no avanza, de modo que la fraccion consumida vale cero y no puede servir de
+         * tope. En su lugar el numero de rondas de educacion repetida se acota por conteo, en
+         * {@code ceil(esfuerzoElite * n)} para un presupuesto de {@code n} generaciones: una
+         * ronda es una educacion, que es el paso dominante de una generacion, de modo que el
+         * tope es la misma fraccion del presupuesto medida en generaciones. En la practica la
+         * fase termina antes, en cuanto una ronda deja de mejorar. Con presupuesto por reloj el
+         * tope por conteo no existe y la fase se comporta como siempre.</p>
          */
         private void construirElite() {
             Solucion semillaConstructiva = null;
@@ -299,7 +337,13 @@ public final class BusquedaGeneticaHibrida implements Algoritmo {
             registrarMejor(elite);
 
             double anterior = elite.costoInterno(pesoDesfase, parametros.pesoEstabilidad());
-            while (!presupuesto.agotado() && presupuesto.fraccionConsumida() < parametros.esfuerzoElite()) {
+            final long topeRondas = presupuesto.porIteraciones()
+                    ? Math.max(1L, (long) Math.ceil(parametros.esfuerzoElite() * presupuesto.limiteIteraciones()))
+                    : Long.MAX_VALUE;
+            long rondas = 0L;
+            while (!presupuesto.agotado() && presupuesto.fraccionConsumida() < parametros.esfuerzoElite()
+                    && rondas < topeRondas) {
+                rondas++;
                 educacion.educar(elite, pesoDesfase);
                 double actual = elite.costoInterno(pesoDesfase, parametros.pesoEstabilidad());
                 if (actual >= anterior - 1e-7) {
@@ -312,7 +356,15 @@ public final class BusquedaGeneticaHibrida implements Algoritmo {
             insertar(elite);
         }
 
-        /** Rellena las dos subpoblaciones con individuos aleatorios hasta el tamano minimo. */
+        /**
+         * Rellena las dos subpoblaciones con individuos aleatorios hasta el tamano minimo.
+         *
+         * <p>Con presupuesto por reloj la fase se corta al consumir la mitad del presupuesto.
+         * Con presupuesto por iteraciones la fase precede al bucle principal y la fraccion
+         * consumida vale cero, de modo que ese corte no actua y manda el tope por conteo que la
+         * fase ya tenia, {@code 2 * tamanoMinimoPoblacion} intentos: la poblacion inicial es
+         * funcion determinista de la instancia y del generador.</p>
+         */
         private void completarPoblacionInicial() {
             final int objetivo = parametros.tamanoMinimoPoblacion();
             int intentos = 0;

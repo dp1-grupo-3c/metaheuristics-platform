@@ -115,6 +115,12 @@ public final class MotorInsercion {
     /**
      * Coloca en las rutas cuantos pedidos del banco admitan posicion factible.
      *
+     * <p>El presupuesto se consulta antes de cada colocacion. Con un presupuesto por
+     * iteraciones el contador solo avanza al cerrar cada iteracion de la busqueda, de modo
+     * que {@code agotado()} no cambia de valor durante una reconstruccion: salvo cancelacion,
+     * la reconstruccion coloca todo lo que admite posicion factible y su resultado es funcion
+     * determinista del estado y del generador.</p>
+     *
      * @param ordenArrepentimiento orden k del arrepentimiento; con valor menor que dos la
      *                             seleccion es puramente voraz
      * @param parpadeo             probabilidad de descartar cada posicion candidata

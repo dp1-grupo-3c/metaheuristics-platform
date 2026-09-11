@@ -30,6 +30,27 @@ public final class Aleatorio {
         this.s3 = splitMix64(x + 0x9E3779B97F4A7C15L);
     }
 
+    /**
+     * Semilla del flujo numero {@code flujo} de una semilla maestra, para repartir una corrida
+     * en corrientes aleatorias independientes, como una por replanificacion.
+     *
+     * <p>No basta con sumar el indice a la semilla. El constructor siembra el estado recorriendo
+     * una sucesion de Weyl de paso {@code 0x9E3779B97F4A7C15}, de modo que dos semillas que
+     * difieren en un multiplo pequeno de ese paso comparten palabras de estado desplazadas y
+     * dan corrientes solapadas. Aqui la semilla maestra se mezcla primero con SplitMix64, se
+     * avanza su propia sucesion de Weyl hasta el flujo pedido y el resultado se vuelve a
+     * mezclar: es el valor numero {@code flujo} de un generador SplitMix64 sembrado con la
+     * maestra mezclada. Flujos consecutivos quedan asi a una distancia pseudoaleatoria y no
+     * estructurada, y ninguno coincide con la sucesion que usa la propia maestra.</p>
+     *
+     * @param semillaMaestra semilla de la corrida
+     * @param flujo          indice del flujo, por ejemplo el numero de replanificacion
+     */
+    public static long derivarSemilla(long semillaMaestra, long flujo) {
+        long z = splitMix64(semillaMaestra) + (flujo + 1L) * 0x9E3779B97F4A7C15L;
+        return splitMix64(z);
+    }
+
     private static long splitMix64(long z) {
         z = (z ^ (z >>> 30)) * 0xBF58476D1CE4E5B9L;
         z = (z ^ (z >>> 27)) * 0x94D049BB133111EBL;

@@ -29,4 +29,27 @@ public interface Algoritmo {
      * @return mejor solucion conocida junto con el perfil de convergencia
      */
     ResultadoPlanificacion resolver(InstanciaPlanificacion instancia, PresupuestoComputo presupuesto);
+
+    /**
+     * Resuelve la instancia con una semilla fijada por el invocante en lugar de la semilla
+     * con que se construyo el algoritmo.
+     *
+     * <p>Existe para el motor de simulacion: cada replanificacion recibe una semilla propia,
+     * derivada de la semilla de la configuracion y del numero de replanificacion, de modo que
+     * las iteraciones sucesivas no repitan la misma secuencia aleatoria y la corrida entera
+     * siga siendo reproducible a partir de una sola semilla, como pide el apartado 10 del
+     * ISA. La implementacion por defecto ignora la semilla y delega en
+     * {@link #resolver(InstanciaPlanificacion, PresupuestoComputo)}, para no obligar a
+     * reescribir a quien ya implementa la interfaz; los dos algoritmos del proyecto la
+     * implementan de verdad.</p>
+     *
+     * @param instancia   fotografia estatica del problema
+     * @param presupuesto control de tiempo, ya arrancado por el invocante
+     * @param semilla     semilla del generador de esta ejecucion
+     * @return mejor solucion conocida junto con el perfil de convergencia
+     */
+    default ResultadoPlanificacion resolver(InstanciaPlanificacion instancia, PresupuestoComputo presupuesto,
+                                            long semilla) {
+        return resolver(instancia, presupuesto);
+    }
 }

@@ -106,6 +106,31 @@ public final class InstanciasDePrueba {
      * @param cantidadPedidos numero de pedidos a generar
      */
     public static InstanciaPlanificacion instanciaVariada(int cantidadPedidos) {
+        return fotografia(INICIO_MANANA, pedidosVariados(cantidadPedidos), List.of(unidad("TA01", INICIO_MANANA)),
+                FIN_MANANA, parametros());
+    }
+
+    /**
+     * Fotografia con el mismo juego de pedidos de {@link #instanciaVariada(int)} y una flota
+     * mixta de autos, motos y una bicicleta, repartida entre el almacen central y dos puntos
+     * de la ciudad. Con varias unidades de tipos distintos entran en juego el vector de tipos
+     * y la reasignacion de unidades de la busqueda genetica hibrida y los operadores de ruta
+     * completa de ALNS, que la instancia de una sola unidad no ejercita. La consumen las
+     * pruebas de reproducibilidad del presupuesto por iteraciones.
+     *
+     * @param cantidadPedidos numero de pedidos a generar
+     */
+    public static InstanciaPlanificacion instanciaFlotaMixta(int cantidadPedidos) {
+        List<UnidadTransporte> unidades = List.of(
+                unidad("TA01", INICIO_MANANA),
+                unidad("TM01", INICIO_MANANA),
+                unidadEn("TM02", 40, 30, INICIO_MANANA),
+                unidadEn("TB01", 20, 20, INICIO_MANANA + 30L));
+        return fotografia(INICIO_MANANA, pedidosVariados(cantidadPedidos), unidades, FIN_MANANA, parametros());
+    }
+
+    /** Pedidos repartidos por la ciudad con plazos mezclados, siempre los mismos para el mismo numero. */
+    private static List<Pedido> pedidosVariados(int cantidadPedidos) {
         // Coordenadas y plazos elegidos a mano para que la instancia sea reproducible y para
         // que convivan pedidos holgados con pedidos que ninguna secuencia alcanza a cumplir,
         // de modo que la evaluacion recorra tanto el camino con espera como el de desfase.
@@ -119,7 +144,6 @@ public final class InstanciasDePrueba {
             long registro = 60L * (i % 7);
             pedidos.add(pedido(i, equis[j], yes[j], cantidad, registro, plazos[j]));
         }
-        return fotografia(INICIO_MANANA, pedidos, List.of(unidad("TA01", INICIO_MANANA)),
-                FIN_MANANA, parametros());
+        return pedidos;
     }
 }

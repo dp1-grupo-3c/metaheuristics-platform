@@ -295,6 +295,13 @@ public final class AhorrosClarkeWright implements HeuristicaConstructiva {
      * unitarias de la inicializacion, que ya es valido aunque caro. Los pasos previos, que
      * son el ordenamiento de los ahorros, no se interrumpen porque sin la lista ordenada no
      * hay nada que fusionar.</p>
+     *
+     * <p>Con un presupuesto por iteraciones el contador no avanza durante la construccion,
+     * que precede al bucle principal de los dos algoritmos, de modo que {@code agotado()}
+     * solo se vuelve cierto por cancelacion y la fusion recorre la lista entera. El tope es
+     * entonces por conteo, el numero de pares de la lista, y el plan construido es funcion
+     * determinista de la instancia y del generador. La consulta cada 256 pares se conserva
+     * para que una cancelacion siga cortando la fusion de inmediato.</p>
      */
     @Override
     public Solucion construir(InstanciaPlanificacion instancia, ProgramadorRuta programador,

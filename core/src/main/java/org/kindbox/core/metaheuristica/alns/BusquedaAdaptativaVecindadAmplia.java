@@ -50,6 +50,15 @@ import org.kindbox.core.util.Aleatorio;
  * {@code presupuesto.fraccionConsumida()} y no contra el contador de iteraciones, por la razon
  * que documenta {@link CriterioAceptacion}.</p>
  *
+ * <p>Con un presupuesto por iteraciones de {@code PresupuestoComputo.deIteraciones(n)} cada
+ * decision anterior pasa a ser funcion del contador: el bucle se detiene exactamente tras
+ * {@code n} iteraciones, la temperatura es la de la iteracion {@code k} de {@code n} y los
+ * operadores de reconstruccion no ven cambiar {@code agotado()} dentro de una iteracion,
+ * porque el contador solo avanza al cerrarla. El arranque, que precede al bucle, se hace con
+ * el contador en cero: la heuristica constructiva y la insercion voraz que cierra su banco
+ * corren hasta el final, acotadas por su propio numero de pares y de tareas, y solo una
+ * cancelacion puede cortarlas.</p>
+ *
  * <h2>Estabilidad del plan entre replanificaciones</h2>
  * <p>La restriccion blanda del apartado 11.4 del ISA entra en la busqueda como un termino de
  * penalizacion de bajo peso sobre el numero de pedidos que cambian de unidad respecto del plan
@@ -86,15 +95,22 @@ import org.kindbox.core.util.Aleatorio;
  * <h2>Reproducibilidad</h2>
  * <p>Cada corrida construye su propio decodificador, sus propios operadores y su propio
  * generador aleatorio a partir de la semilla, y todos los recorridos son por indice, de modo
- * que ninguna tabla asociativa influye en el resultado. La reproduccion es, aun asi,
- * <b>estadistica y no bit a bit</b>: el criterio de aceptacion se enfria contra el reloj y no
- * contra el contador de iteraciones, de modo que dos corridas con la misma semilla en maquinas
- * o cargas distintas completan un numero distinto de iteraciones y toman decisiones de
- * aceptacion distintas. Es el precio deliberado de que el comportamiento sea comparable entre
- * las tres configuraciones de presupuesto del apartado 2.3, y por eso el apartado 12.3 pide
- * corridas repetidas y compara medias en lugar de valores unicos. Fijar
+ * que ninguna tabla asociativa influye en el resultado. Con presupuesto por reloj la
+ * reproduccion es, aun asi, <b>estadistica y no bit a bit</b>: el criterio de aceptacion se
+ * enfria contra el reloj y no contra el contador de iteraciones, de modo que dos corridas con
+ * la misma semilla en maquinas o cargas distintas completan un numero distinto de iteraciones
+ * y toman decisiones de aceptacion distintas. Es el precio deliberado de que el comportamiento
+ * sea comparable entre las tres configuraciones de presupuesto del apartado 2.3, y por eso el
+ * apartado 12.3 pide corridas repetidas y compara medias en lugar de valores unicos. Fijar
  * {@code maximoIteracionesSinMejora} y un presupuesto holgado tampoco vuelve la corrida
  * determinista, por la misma razon.</p>
+ *
+ * <p>Con presupuesto por iteraciones la reproduccion si es <b>bit a bit</b>: la misma semilla
+ * y la misma instancia dan el mismo plan, con las mismas paradas en el mismo orden y el mismo
+ * costo hasta el ultimo bit, que es lo que exigen las pruebas de regresion. La semilla es la
+ * del constructor, salvo que el invocante fije otra con
+ * {@link #resolver(InstanciaPlanificacion, PresupuestoComputo, long)}, como hace el motor de
+ * simulacion para dar a cada replanificacion su propia corriente aleatoria.</p>
  *
  * <p>La clase es reentrante entre corridas pero no segura para uso concurrente.</p>
  */
@@ -154,14 +170,29 @@ public final class BusquedaAdaptativaVecindadAmplia implements Algoritmo {
         return parametros;
     }
 
-    /** Semilla del generador de la corrida. */
+    /**
+     * Semilla del constructor, la que usan {@link #resolver(InstanciaPlanificacion, PresupuestoComputo)}
+     * y {@link #resolverDesde}.
+     */
     public long semilla() {
         return semilla;
     }
 
+    /** Resuelve con la semilla con que se construyo la busqueda. */
     @Override
     public ResultadoPlanificacion resolver(InstanciaPlanificacion instancia, PresupuestoComputo presupuesto) {
-        return ejecutar(instancia, presupuesto, null);
+        return ejecutar(instancia, presupuesto, null, semilla);
+    }
+
+    /**
+     * Resuelve con la semilla indicada, que sustituye a la del constructor solo en esta
+     * ejecucion. Es la via por la que el motor de simulacion da a cada replanificacion su
+     * propia corriente aleatoria; el resultado informa la semilla efectivamente usada.
+     */
+    @Override
+    public ResultadoPlanificacion resolver(InstanciaPlanificacion instancia, PresupuestoComputo presupuesto,
+                                           long semillaEjecucion) {
+        return ejecutar(instancia, presupuesto, null, semillaEjecucion);
     }
 
     /**
@@ -179,18 +210,18 @@ public final class BusquedaAdaptativaVecindadAmplia implements Algoritmo {
      */
     public ResultadoPlanificacion resolverDesde(InstanciaPlanificacion instancia,
                                                 PresupuestoComputo presupuesto, Solucion planVigente) {
-        return ejecutar(instancia, presupuesto, planVigente);
+        return ejecutar(instancia, presupuesto, planVigente, semilla);
     }
 
     // ----------------------------------------------------------------- internos
 
     private ResultadoPlanificacion ejecutar(InstanciaPlanificacion instancia, PresupuestoComputo presupuesto,
-                                            Solucion planVigente) {
+                                            Solucion planVigente, long semillaCorrida) {
         if (instancia.cantidadPedidos() == 0 || instancia.cantidadUnidades() == 0) {
-            return sinBusqueda(instancia, presupuesto);
+            return sinBusqueda(instancia, presupuesto, semillaCorrida);
         }
 
-        final Aleatorio aleatorio = new Aleatorio(semilla);
+        final Aleatorio aleatorio = new Aleatorio(semillaCorrida);
         final ProgramadorRuta programador = new ProgramadorRuta(instancia);
         // Los pedidos se descomponen una sola vez en tareas de entrega. Un pedido que supera
         // la capacidad de la unidad mas grande de la flota no cabe en ninguna ruta como visita
@@ -300,7 +331,7 @@ public final class BusquedaAdaptativaVecindadAmplia implements Algoritmo {
         final ValorObjetivo valorFinal = objetivo.evaluar(instancia, solucion);
         presupuesto.cerrarPerfil(valorFinal);
         return new ResultadoPlanificacion(NOMBRE, solucion.conValor(valorFinal), presupuesto.perfil(),
-                presupuesto.milisegundosTranscurridos(), presupuesto.iteraciones(), semilla);
+                presupuesto.milisegundosTranscurridos(), presupuesto.iteraciones(), semillaCorrida);
     }
 
     /**
@@ -387,11 +418,11 @@ public final class BusquedaAdaptativaVecindadAmplia implements Algoritmo {
 
     /** Salida inmediata para una fotografia sin pedidos pendientes o sin unidades disponibles. */
     private ResultadoPlanificacion sinBusqueda(InstanciaPlanificacion instancia,
-                                               PresupuestoComputo presupuesto) {
+                                               PresupuestoComputo presupuesto, long semillaCorrida) {
         Solucion vacia = Solucion.vacia(instancia);
         ValorObjetivo valor = objetivo.evaluar(instancia, vacia);
         presupuesto.cerrarPerfil(valor);
         return new ResultadoPlanificacion(NOMBRE, vacia.conValor(valor), presupuesto.perfil(),
-                presupuesto.milisegundosTranscurridos(), presupuesto.iteraciones(), semilla);
+                presupuesto.milisegundosTranscurridos(), presupuesto.iteraciones(), semillaCorrida);
     }
 }

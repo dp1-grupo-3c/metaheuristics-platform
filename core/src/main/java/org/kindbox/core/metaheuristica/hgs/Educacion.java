@@ -160,6 +160,13 @@ public final class Educacion {
      * que cierra el ciclo de la busqueda genetica hibrida: lo que aprende la busqueda local
      * pasa al material genetico y por tanto es heredable.
      *
+     * <p>El presupuesto se consulta entre pasadas y dentro de los recorridos, para cortar la
+     * educacion en cuanto se agota el reloj. Con un presupuesto por iteraciones el contador
+     * solo avanza al cerrar cada generacion, de modo que {@code agotado()} no cambia de valor
+     * durante una educacion: salvo cancelacion, la educacion corre hasta su optimo local o
+     * hasta {@code pasadasEducacionMaximas}, y su resultado es funcion determinista del
+     * individuo y del generador.</p>
+     *
      * @param individuo   individuo ya decodificado por el Split
      * @param pesoDesfase penalizacion vigente de cada minuto de violacion temporal
      */

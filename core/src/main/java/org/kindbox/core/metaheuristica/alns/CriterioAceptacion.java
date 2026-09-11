@@ -33,6 +33,17 @@ import org.kindbox.core.util.Aleatorio;
  * corran, y toda corrida termina igual de fria. El numero de iteraciones deja de ser un
  * parametro implicito del criterio de aceptacion y pasa a ser lo unico que distingue a una
  * configuracion de otra, que es lo que se quiere medir.</p>
+ *
+ * <h2>Modo por iteraciones</h2>
+ * <p>Con un presupuesto de {@code PresupuestoComputo.deIteraciones(n)} la fraccion consumida
+ * vale {@code k / n} tras {@code k} iteraciones y el reloj no interviene, de modo que la
+ * temperatura de cada iteracion es una funcion pura del contador:
+ * {@code T(k) = T0 * (Tf / T0)^(k/n)}. Es exactamente el enfriamiento geometrico clasico
+ * {@code T <- alfa * T} con {@code alfa = (Tf / T0)^(1/n)}, calibrado para terminar igual de
+ * frio que la corrida por reloj, y con la misma semilla dos corridas aceptan y rechazan los
+ * mismos candidatos. La reproduccion bit a bit se garantiza sobre la misma maquina virtual y
+ * la misma plataforma: {@code Math.pow} y {@code Math.exp} admiten un error de un ulp que
+ * puede variar entre plataformas, y en un caso limite ese ulp decide una aceptacion.</p>
  */
 public final class CriterioAceptacion {
 

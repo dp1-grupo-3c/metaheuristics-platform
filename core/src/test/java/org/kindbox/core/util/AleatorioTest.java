@@ -59,6 +59,39 @@ class AleatorioTest {
     }
 
     @Test
+    @DisplayName("La semilla derivada es determinista y separa flujos consecutivos")
+    void semillaDerivadaSeparaFlujos() {
+        final long maestra = 20260901L;
+        final long pasoWeyl = 0x9E3779B97F4A7C15L;
+        assertEquals(Aleatorio.derivarSemilla(maestra, 3L), Aleatorio.derivarSemilla(maestra, 3L));
+
+        long[] semillas = new long[1000];
+        long bitsDistintos = 0L;
+        long primeroAnterior = 0L;
+        for (int k = 0; k < semillas.length; k++) {
+            semillas[k] = Aleatorio.derivarSemilla(maestra, k);
+            assertNotEquals(maestra, semillas[k]);
+            long primero = new Aleatorio(semillas[k]).siguienteLong();
+            if (k > 0) {
+                // Sin la mezcla, flujos consecutivos quedarian a un paso de Weyl y sus
+                // generadores compartirian palabras de estado desplazadas.
+                assertNotEquals(pasoWeyl, semillas[k] - semillas[k - 1]);
+                bitsDistintos += Long.bitCount(primero ^ primeroAnterior);
+            }
+            primeroAnterior = primero;
+        }
+        long[] ordenadas = semillas.clone();
+        Arrays.sort(ordenadas);
+        for (int k = 1; k < ordenadas.length; k++) {
+            assertNotEquals(ordenadas[k - 1], ordenadas[k], "dos flujos con la misma semilla");
+        }
+        // Los primeros valores de flujos consecutivos difieren en la mitad de los bits, en media.
+        double media = (double) bitsDistintos / (semillas.length - 1);
+        assertTrue(media > 30.0 && media < 34.0, "media de bits distintos: " + media);
+        assertNotEquals(Aleatorio.derivarSemilla(maestra, 0L), Aleatorio.derivarSemilla(maestra + 1L, 0L));
+    }
+
+    @Test
     @DisplayName("siguienteEntero respeta su cota y no la alcanza nunca")
     void enteroDentroDeLaCota() {
         Aleatorio aleatorio = new Aleatorio(31L);

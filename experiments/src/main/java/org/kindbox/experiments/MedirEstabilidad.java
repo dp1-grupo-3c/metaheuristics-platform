@@ -119,6 +119,19 @@ public final class MedirEstabilidad {
             return resultado;
         }
 
+        /**
+         * Reenvia tambien la variante con semilla, que es la que invoca el motor de simulacion
+         * en cada replanificacion. Sin este reenvio el espia caeria en la implementacion por
+         * defecto de la interfaz y el algoritmo envuelto perderia la semilla de cada iteracion.
+         */
+        @Override
+        public ResultadoPlanificacion resolver(InstanciaPlanificacion instancia,
+                                               PresupuestoComputo presupuesto, long semilla) {
+            ResultadoPlanificacion resultado = delegado.resolver(instancia, presupuesto, semilla);
+            registrar(instancia, resultado.solucion());
+            return resultado;
+        }
+
         /** Contrasta una solucion contra el plan vigente de su instancia y acumula los contadores. */
         public void registrar(InstanciaPlanificacion instancia, Solucion solucion) {
             Map<Integer, List<String>> nuevo = unidadesPorPedido(solucion);
