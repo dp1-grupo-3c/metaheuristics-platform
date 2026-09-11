@@ -289,6 +289,14 @@ su carga. Las verificaciones de validez del apartado 12.4 del ISA (factibilidad 
 equivalencia del valor objetivo declarado con el recalculado y monotonia del perfil de
 convergencia) estan en `ValidezDeAlgoritmosTest`.
 
+`PresupuestoComputo` tiene dos modos. En operacion manda el reloj: cada llamada al
+planificador gasta los milisegundos que le concede el factor K, y es el modo de los tres
+ejecutables y de la API. El modo por iteraciones corta en un numero exacto de generaciones o
+de iteraciones y no lo expone ninguna linea de comandos: existe para que dos corridas con la
+misma semilla y el mismo numero devuelvan el mismo plan parada a parada, que es lo que
+comprueba `ReproducibilidadTest`. La reproduccion bit a bit esta garantizada sobre la misma
+maquina virtual y plataforma.
+
 ### Cobertura
 
 ```bash
