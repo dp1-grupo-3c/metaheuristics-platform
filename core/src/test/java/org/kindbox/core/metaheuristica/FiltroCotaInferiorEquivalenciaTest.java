@@ -52,7 +52,7 @@ class FiltroCotaInferiorEquivalenciaTest {
         long maximoPodas = 0L;
         for (InstanciaPlanificacion instancia : instancias()) {
             BusquedaGeneticaHibrida conFiltro = new BusquedaGeneticaHibrida(new AhorrosClarkeWright(),
-                    ParametrosHgs.porDefecto(), SEMILLA);
+                    ParametrosHgs.porDefecto().filtroCotaInferior(true), SEMILLA);
             BusquedaGeneticaHibrida sinFiltro = new BusquedaGeneticaHibrida(new AhorrosClarkeWright(),
                     ParametrosHgs.porDefecto().filtroCotaInferior(false), SEMILLA);
 
@@ -73,7 +73,7 @@ class FiltroCotaInferiorEquivalenciaTest {
         long maximoPodas = 0L;
         for (InstanciaPlanificacion instancia : instancias()) {
             BusquedaAdaptativaVecindadAmplia conFiltro = new BusquedaAdaptativaVecindadAmplia(
-                    new AhorrosClarkeWright(), ParametrosAlns.porDefecto(), SEMILLA);
+                    new AhorrosClarkeWright(), ParametrosAlns.porDefecto().filtroCotaInferior(true), SEMILLA);
             BusquedaAdaptativaVecindadAmplia sinFiltro = new BusquedaAdaptativaVecindadAmplia(
                     new AhorrosClarkeWright(), ParametrosAlns.porDefecto().filtroCotaInferior(false), SEMILLA);
 

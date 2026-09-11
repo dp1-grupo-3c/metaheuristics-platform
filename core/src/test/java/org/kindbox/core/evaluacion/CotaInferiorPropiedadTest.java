@@ -241,7 +241,7 @@ class CotaInferiorPropiedadTest {
         int indice = 0;
 
         for (InstanciaPlanificacion instancia : instancias()) {
-            ParametrosHgs parametros = ParametrosHgs.porDefecto();
+            ParametrosHgs parametros = ParametrosHgs.porDefecto().filtroCotaInferior(true);
             TareasEntrega tareas = new TareasEntrega(instancia, parametros.granularidadVecindario());
             EstabilidadPlan estabilidad = new EstabilidadPlan(instancia, tareas,
                     pesosEstabilidad[indice++ % pesosEstabilidad.length]);

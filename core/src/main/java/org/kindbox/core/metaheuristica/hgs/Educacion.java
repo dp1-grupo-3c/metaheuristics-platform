@@ -59,9 +59,11 @@ import org.kindbox.core.util.Aleatorio;
  * Solo se poda lo que el decodificador habria rechazado, de modo que el resultado de la
  * educacion no cambia; lo que cambia es cuantas llamadas al decodificador cuesta. La
  * secuencia de cada movimiento ya se escribe en un arreglo de trabajo porque el decodificador
- * la necesita, de modo que su resumen se acumula parada a parada en la misma pasada que la cota
- * de kilometros, sobre rutas de siete u ocho paradas. El filtro se desactiva con
- * {@link ParametrosHgs#filtroCotaInferior()}.</p>
+ * la necesita, de modo que su resumen se acumula parada a parada sobre ese arreglo, en rutas de
+ * siete u ocho paradas, y solo cuando la cota de kilometros, mucho mas barata, no basta por si
+ * sola para descartar el movimiento. Aun asi el filtro viene desactivado por defecto: en la
+ * educacion la cota de kilometros ya poda casi todo y la concatenacion cuesta mas de lo que
+ * ahorra en llamadas al decodificador. Se activa con {@link ParametrosHgs#filtroCotaInferior()}.</p>
  *
  * <p>La clase mantiene todos sus arreglos de trabajo como campos de instancia y no asigna
  * memoria por movimiento evaluado. No es segura para uso concurrente.</p>
@@ -656,7 +658,8 @@ public final class Educacion {
         int largoNuevo = copiarQuitando(r, posicionDeTarea[u], 1, bufferA);
         // Si ni la cota de la ruta sin la tarea compensa el peso de dejarla sin atender, el
         // valor exacto, que no es menor, tampoco lo hara.
-        if (filtroCotaInferior && cotaDeSecuencia(unidad[r], bufferA, largoNuevo, peso)
+        if (filtroCotaInferior && cotaDeSecuencia(unidad[r], bufferA, largoNuevo, peso,
+                valor(r, peso) - EPSILON - ParametrosHgs.PENALIZACION_TAREA_NO_ATENDIDA)
                 + ParametrosHgs.PENALIZACION_TAREA_NO_ATENDIDA >= valor(r, peso) - EPSILON) {
             podasCotaInferior++;
             return false;
@@ -707,7 +710,8 @@ public final class Educacion {
                     int largoNuevo = copiarInsertando(ruta[r], largo[r], posicion, 1, false, bufferA);
                     // Misma regla de aceptacion que abajo, aplicada a la cota: si la cota ya no
                     // mejora la mejor insercion, el valor exacto tampoco.
-                    if (filtroCotaInferior && cotaDeSecuencia(unidad[r], bufferA, largoNuevo, peso)
+                    if (filtroCotaInferior && cotaDeSecuencia(unidad[r], bufferA, largoNuevo, peso,
+                            mejorIncremento - EPSILON + valor(r, peso))
                             - valor(r, peso) >= mejorIncremento - EPSILON) {
                         podasCotaInferior++;
                         continue;
@@ -740,8 +744,8 @@ public final class Educacion {
                 marcaTipo[tipoUnidad] = sello;
                 segmento[0] = w;
                 int largoNuevo = copiarInsertando(ruta[r], 0, 0, 1, false, bufferA);
-                if (filtroCotaInferior && cotaDeSecuencia(unidad[r], bufferA, largoNuevo, peso)
-                        >= mejorIncremento - EPSILON) {
+                if (filtroCotaInferior && cotaDeSecuencia(unidad[r], bufferA, largoNuevo, peso,
+                        mejorIncremento - EPSILON) >= mejorIncremento - EPSILON) {
                     podasCotaInferior++;
                     continue;
                 }
@@ -801,7 +805,8 @@ public final class Educacion {
             double mejorCosto = 0.0;
             int mejorDesfase = 0;
             for (int c = 0; c < cantidad; c++) {
-                if (cotaDeSecuencia(candidatos[c], ruta[r], largo[r], peso) >= mejorValor - EPSILON) {
+                if (cotaDeSecuencia(candidatos[c], ruta[r], largo[r], peso, mejorValor - EPSILON)
+                        >= mejorValor - EPSILON) {
                     if (cotaSinDesfase < mejorValor - EPSILON) {
                         podasCotaInferior++;
                     }
@@ -910,7 +915,8 @@ public final class Educacion {
     /**
      * Cota inferior del valor penalizado de una secuencia atendida por una unidad, sin el
      * termino de desfase: el costo de sus arcos sin resolver los abastecimientos, mas el
-     * termino de estabilidad, que si es exacto. Es cota inferior porque las distancias de la matriz son caminos minimos sobre la
+     * termino de estabilidad, que si es exacto. Es cota inferior porque las distancias de la
+     * matriz son caminos minimos sobre la
      * reticula y cumplen la desigualdad triangular, de modo que intercalar una parada de
      * abastecimiento nunca acorta el recorrido, y porque el desfase nunca es negativo.
      *
@@ -970,6 +976,27 @@ public final class Educacion {
     }
 
     /**
+     * La misma cota, calculada solo hasta donde la poda que la consulta lo necesita. La cota
+     * de kilometros es mucho mas barata que la concatenacion de resumenes y descarta por si sola
+     * la mayoria de los movimientos, de modo que se calcula primero y, si ya alcanza el umbral
+     * de la poda, se devuelve sin concatenar. No altera ninguna decision de la busqueda: la
+     * cota de kilometros no supera a la completa, que le suma un termino no negativo en el mismo
+     * orden, y ambas son cotas inferiores del valor exacto, de modo que la poda que resulte solo
+     * descarta movimientos que el valor exacto tampoco aceptaria. Deja en
+     * {@link #cotaSinDesfase} la cota sin el termino de desfase, como la version completa.
+     */
+    private double cotaDeSecuencia(int unidadRuta, int[] secuencia, int longitud, double peso, double umbral) {
+        if (filtroCotaInferior && longitud > 0) {
+            final double distancia = cotaDeDistancia(unidadRuta, secuencia, longitud);
+            if (distancia >= umbral) {
+                cotaSinDesfase = distancia;
+                return distancia;
+            }
+        }
+        return cotaDeSecuencia(unidadRuta, secuencia, longitud, peso);
+    }
+
+    /**
      * Poda exacta de un movimiento que solo toca una ruta. La cota de la ruta resultante no
      * supera su valor penalizado, porque el costo real solo puede crecer con los desvios de
      * abastecimiento y el desfase real no baja del minimo que da la concatenacion. Si esa cota
@@ -979,7 +1006,7 @@ public final class Educacion {
      */
     private boolean descartablePorDistancia(int r, int[] secuencia, int longitud, double peso) {
         final double actual = valor(r, peso) - EPSILON;
-        if (cotaDeSecuencia(unidad[r], secuencia, longitud, peso) >= actual) {
+        if (cotaDeSecuencia(unidad[r], secuencia, longitud, peso, actual) >= actual) {
             if (cotaSinDesfase < actual) {
                 podasCotaInferior++;
             }
@@ -996,7 +1023,7 @@ public final class Educacion {
     private boolean descartablePorDistancia(int r1, int[] secuencia1, int longitud1,
                                             int r2, int[] secuencia2, int longitud2, double peso) {
         final double actual = valor(r1, peso) + valor(r2, peso) - EPSILON;
-        double cota = cotaDeSecuencia(unidad[r1], secuencia1, longitud1, peso);
+        double cota = cotaDeSecuencia(unidad[r1], secuencia1, longitud1, peso, actual);
         double cotaPrevia = cotaSinDesfase;
         if (cota >= actual) {
             if (filtroCotaInferior && cotaPrevia < actual
@@ -1005,7 +1032,7 @@ public final class Educacion {
             }
             return true;
         }
-        cota += cotaDeSecuencia(unidad[r2], secuencia2, longitud2, peso);
+        cota += cotaDeSecuencia(unidad[r2], secuencia2, longitud2, peso, actual - cota);
         cotaPrevia += cotaSinDesfase;
         if (cota >= actual) {
             if (cotaPrevia < actual) {

@@ -205,10 +205,13 @@ silencio. La lista completa de claves sale de `FabricaAlgoritmos.clavesHgs()` y
 `clavesAlns()`, y coincide con la traza `Algoritmo: ...` que cada ejecutable imprime al
 arrancar.
 
-Los dos algoritmos acotan cada movimiento con la concatenacion de resumenes de
-`DatosSecuencia` antes de llamar al decodificador y descartan lo que la cota ya condena. El
-filtro no cambia el resultado, solo lo que cuesta alcanzarlo, y se apaga con
-`-Dhgs.filtroCotaInferior=false` y `-Dalns.filtroCotaInferior=false` para medir su efecto.
+Los dos algoritmos pueden acotar cada movimiento con la concatenacion de resumenes de
+`DatosSecuencia` antes de llamar al decodificador y descartar lo que la cota ya condena. El
+filtro no cambia el resultado, solo lo que cuesta alcanzarlo. En ALNS viene activo, porque
+cada posicion de insercion se acota en tiempo constante y ahorra llamadas al decodificador;
+se apaga con `-Dalns.filtroCotaInferior=false`. En HGS viene apagado, porque la cota de
+kilometros ya descarta casi todos los movimientos de la educacion y la concatenacion cuesta
+mas de lo que ahorra; se enciende con `-Dhgs.filtroCotaInferior=true`.
 
 ### Levantar la API
 

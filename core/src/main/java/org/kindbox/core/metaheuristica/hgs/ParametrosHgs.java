@@ -103,7 +103,7 @@ public final class ParametrosHgs {
     private long maximoGeneraciones = 1_000_000L;
     private long maximoGeneracionesSinMejora = 20_000L;
 
-    private boolean filtroCotaInferior = true;
+    private boolean filtroCotaInferior = false;
 
     /** Parametros con los valores iniciales del apartado 6.4 del ISA. */
     public static ParametrosHgs porDefecto() {
@@ -242,6 +242,13 @@ public final class ParametrosHgs {
      * que el movimiento, de modo que el filtro no cambia el resultado sino lo que cuesta
      * alcanzarlo. Con {@code false} la educacion vuelve a la cota de solo kilometros, que es
      * lo que permite medir el efecto y comprobar la equivalencia.
+     *
+     * <p>Viene desactivado por defecto, a diferencia del de ALNS. En la educacion la cota de
+     * kilometros ya descarta la gran mayoria de los movimientos, y los que sobreviven no se
+     * valoran en tiempo constante sino recorriendo la secuencia, porque los movimientos entre
+     * rutas de unidades de tipo distinto cambian los minutos de viaje. Medido con el mismo
+     * numero de generaciones sobre las fotografias reales de los minutos 540 y 5700, el filtro
+     * deja el mismo plan pero tarda entre un 6 y un 16 por ciento mas.</p>
      */
     public boolean filtroCotaInferior() {
         return filtroCotaInferior;
