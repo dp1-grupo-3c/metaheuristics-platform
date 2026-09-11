@@ -178,6 +178,12 @@ public final class BusquedaAdaptativaVecindadAmplia implements Algoritmo {
         return semilla;
     }
 
+    /** Nombre, semilla y parametros completos, para dejar trazada la configuracion de una corrida. */
+    @Override
+    public String toString() {
+        return NOMBRE + "[semilla=" + semilla + " " + parametros + "]";
+    }
+
     /** Resuelve con la semilla con que se construyo la busqueda. */
     @Override
     public ResultadoPlanificacion resolver(InstanciaPlanificacion instancia, PresupuestoComputo presupuesto) {

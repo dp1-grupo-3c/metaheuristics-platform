@@ -10,11 +10,10 @@ import org.kindbox.core.evaluacion.ProgramadorRuta;
 import org.kindbox.core.evaluacion.VerificadorRestricciones;
 import org.kindbox.core.io.RepositorioDatos;
 import org.kindbox.core.metaheuristica.Algoritmo;
+import org.kindbox.core.metaheuristica.FabricaAlgoritmos;
 import org.kindbox.core.metaheuristica.PerfilConvergencia;
 import org.kindbox.core.metaheuristica.PresupuestoComputo;
 import org.kindbox.core.metaheuristica.ResultadoPlanificacion;
-import org.kindbox.core.metaheuristica.alns.BusquedaAdaptativaVecindadAmplia;
-import org.kindbox.core.metaheuristica.hgs.BusquedaGeneticaHibrida;
 import org.kindbox.core.modelo.ParametrosOperacion;
 import org.kindbox.core.problema.InstanciaPlanificacion;
 import org.kindbox.core.problema.Solucion;
@@ -30,9 +29,16 @@ import org.kindbox.core.util.Aleatorio;
  * ambos algoritmos y respeto del presupuesto de reloj de pared. La cuarta, la monotonia,
  * se lee del perfil de convergencia que devuelve cada ejecucion.</p>
  *
- * <p>Uso: {@code BancoDePruebas <raizDatos> <primerDia> <ultimoDia> <minuto> [msPresupuesto...]}</p>
+ * <p>Uso: {@code BancoDePruebas <raizDatos> <primerDia> <ultimoDia> <minuto> [msPresupuesto...]}.
+ * Los dos algoritmos se crean con {@link FabricaAlgoritmos} con la semilla de la propiedad de
+ * sistema {@code semilla}, por defecto {@value #SEMILLA_POR_DEFECTO}, y sus parametros se
+ * ajustan con propiedades {@code -Dhgs.*} y {@code -Dalns.*}. Los presupuestos por defecto,
+ * 2 y 15 segundos, caen dentro del rango de 2 a 18 segundos del apartado 2.3.</p>
  */
 public final class BancoDePruebas {
+
+    /** Semilla de los dos algoritmos si no se indica la propiedad de sistema {@code semilla}. */
+    public static final long SEMILLA_POR_DEFECTO = 20260901L;
 
     private BancoDePruebas() {
     }
@@ -45,6 +51,14 @@ public final class BancoDePruebas {
         long[] presupuestos = argumentos.length > 4
                 ? java.util.Arrays.stream(argumentos, 4, argumentos.length).mapToLong(Long::parseLong).toArray()
                 : new long[]{2000L, 15000L};
+        long semilla = semillaDeSistema();
+        // Se crean antes de cargar datos para que una clave -D mal escrita falle al instante.
+        List<String> nombres = FabricaAlgoritmos.nombres();
+        for (String nombre : nombres) {
+            System.out.println("Algoritmo: " + FabricaAlgoritmos.crear(nombre, semilla));
+        }
+        System.out.println("Presupuestos por llamada (ms): "
+                + java.util.Arrays.toString(presupuestos) + ", semilla " + semilla);
 
         var datos = new RepositorioDatos(raiz).cargar(primerDia, ultimoDia);
         var fabrica = new FabricaInstancias(datos);
@@ -68,9 +82,8 @@ public final class BancoDePruebas {
         double referencia = base.valor().costo();
 
         for (long ms : presupuestos) {
-            for (Algoritmo algoritmo : List.<Algoritmo>of(
-                    new BusquedaGeneticaHibrida(new AhorrosClarkeWright()),
-                    new BusquedaAdaptativaVecindadAmplia(new AhorrosClarkeWright()))) {
+            for (String nombre : nombres) {
+                Algoritmo algoritmo = FabricaAlgoritmos.crear(nombre, semilla);
                 var presupuesto = PresupuestoComputo.deMilisegundosConPerfil(ms).arrancar();
                 long inicio = System.nanoTime();
                 ResultadoPlanificacion r = algoritmo.resolver(instancia, presupuesto);
@@ -90,6 +103,23 @@ public final class BancoDePruebas {
                             monotonia(r.perfil()));
                 }
             }
+        }
+    }
+
+    /**
+     * Semilla de la propiedad de sistema {@code semilla}. Un valor mal escrito detiene el
+     * banco: caer en silencio a la semilla por defecto haria pasar una corrida por otra.
+     */
+    private static long semillaDeSistema() {
+        String texto = System.getProperty("semilla");
+        if (texto == null || texto.isBlank()) {
+            return SEMILLA_POR_DEFECTO;
+        }
+        try {
+            return Long.parseLong(texto.trim());
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Propiedad de sistema semilla no valida: '" + texto
+                    + "'. Debe ser un numero entero", e);
         }
     }
 

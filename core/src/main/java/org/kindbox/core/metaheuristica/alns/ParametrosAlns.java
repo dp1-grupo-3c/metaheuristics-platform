@@ -409,13 +409,39 @@ public final class ParametrosAlns {
         }
     }
 
+    /**
+     * Todos los parametros, con el nombre de su accesor, que es tambien el de su clave
+     * {@code alns.<parametro>} en {@code FabricaAlgoritmos}; los grupos se listan componente a
+     * componente. Cada corrida queda asi trazable y su configuracion se puede reproducir
+     * copiando la traza como propiedades.
+     */
     @Override
     public String toString() {
-        return "ParametrosAlns[q=" + fraccionMinimaDestruccion + ".." + fraccionMaximaDestruccion
-                + " tope=" + maximoAbsolutoDestruccion + " cadena=" + longitudMaximaCadena
-                + " parpadeo=" + parpadeoMinimo + ".." + parpadeoMaximo
-                + " k=" + ordenArrepentimientoMinimo + ".." + ordenArrepentimientoMaximo
-                + " segmento=" + longitudSegmento + " reaccion=" + tasaReaccion
-                + " estabilidad=" + factorPenalizacionEstabilidad + "]";
+        return "ParametrosAlns[fraccionMinimaDestruccion=" + fraccionMinimaDestruccion
+                + " fraccionMaximaDestruccion=" + fraccionMaximaDestruccion
+                + " maximoAbsolutoDestruccion=" + maximoAbsolutoDestruccion
+                + " longitudMaximaCadena=" + longitudMaximaCadena
+                + " parpadeoMinimo=" + parpadeoMinimo
+                + " parpadeoMaximo=" + parpadeoMaximo
+                + " ordenArrepentimientoMinimo=" + ordenArrepentimientoMinimo
+                + " ordenArrepentimientoMaximo=" + ordenArrepentimientoMaximo
+                + " determinismoSeleccion=" + determinismoSeleccion
+                + " ventanaVecindad=" + ventanaVecindad
+                + " maximoUnidadesCandidatas=" + maximoUnidadesCandidatas
+                + " pesoAfinidadDistancia=" + pesoAfinidadDistancia
+                + " pesoAfinidadPlazo=" + pesoAfinidadPlazo
+                + " pesoAfinidadUnidad=" + pesoAfinidadUnidad
+                + " longitudSegmento=" + longitudSegmento
+                + " tasaReaccion=" + tasaReaccion
+                + " puntajeNuevaMejor=" + puntajeNuevaMejor
+                + " puntajeMejora=" + puntajeMejora
+                + " puntajeAceptada=" + puntajeAceptada
+                + " pesoMinimoOperador=" + pesoMinimoOperador
+                + " fraccionTemperaturaInicial=" + fraccionTemperaturaInicial
+                + " fraccionTemperaturaFinal=" + fraccionTemperaturaFinal
+                + " factorPenalizacionBanco=" + factorPenalizacionBanco
+                + " factorPenalizacionEstabilidad=" + factorPenalizacionEstabilidad
+                + " maximoIteracionesSinMejora=" + maximoIteracionesSinMejora
+                + " iteracionesParaReinicio=" + iteracionesParaReinicio + "]";
     }
 }

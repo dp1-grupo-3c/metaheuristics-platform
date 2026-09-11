@@ -5,11 +5,9 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import org.kindbox.core.construccion.AhorrosClarkeWright;
 import org.kindbox.core.io.RepositorioDatos;
 import org.kindbox.core.metaheuristica.Algoritmo;
-import org.kindbox.core.metaheuristica.alns.BusquedaAdaptativaVecindadAmplia;
-import org.kindbox.core.metaheuristica.hgs.BusquedaGeneticaHibrida;
+import org.kindbox.core.metaheuristica.FabricaAlgoritmos;
 import org.kindbox.core.modelo.ParametrosOperacion;
 import org.kindbox.core.simulacion.ConfiguracionEscenario;
 import org.kindbox.core.simulacion.MetricasSimulacion;
@@ -27,8 +25,14 @@ import org.kindbox.core.simulacion.TipoEscenario;
  * servicio ni por el visualizador.</p>
  *
  * <p>Uso: {@code CorrerEscenario <raizDatos> <5D|COLAPSO|DIA> <primerDia> <algoritmo> <salto>
- * [semilla] [duracionMinutosReales]}. Sin el ultimo argumento la corrida va en modo libre,
- * es decir tan rapido como se pueda; con el, se acompasa al reloj de pared.</p>
+ * [semilla] [duracion]}. La semilla llega al algoritmo, que se crea con
+ * {@link FabricaAlgoritmos} y admite ajustar sus parametros con propiedades de sistema
+ * {@code -Dhgs.*} y {@code -Dalns.*}. Sin el ultimo argumento la corrida va en modo libre, es
+ * decir tan rapido como se pueda, con el factor K de la corrida de 30 minutos que fija el
+ * apartado 2.3 del ISA; {@code RAPIDO} pide K igual a 7 200 para pruebas de humo,
+ * {@code LIBRE:<minutos>} otro K en modo libre, y un numero de minutos a secas acompasa la
+ * simulacion 5D al reloj de pared durante esos minutos, que es el modo de las
+ * presentaciones. Los detalles estan en {@link OpcionReloj}.</p>
  */
 public final class CorrerEscenario {
 
@@ -39,36 +43,31 @@ public final class CorrerEscenario {
         Path raiz = Path.of(argumentos.length > 0 ? argumentos[0] : "data");
         String escenario = argumentos.length > 1 ? argumentos[1].toUpperCase(Locale.ROOT) : "5D";
         LocalDate primerDia = LocalDate.parse(argumentos.length > 2 ? argumentos[2] : "2026-09-01");
-        String nombreAlgoritmo = argumentos.length > 3 ? argumentos[3].toUpperCase(Locale.ROOT) : "ALNS";
+        String nombreAlgoritmo = FabricaAlgoritmos.canonico(argumentos.length > 3 ? argumentos[3] : "ALNS");
         int salto = argumentos.length > 4 ? Integer.parseInt(argumentos[4]) : 30;
         long semilla = argumentos.length > 5 ? Long.parseLong(argumentos[5]) : 20260901L;
-        int duracionReal = argumentos.length > 6 ? Integer.parseInt(argumentos[6]) : 0;
+        OpcionReloj reloj = OpcionReloj.interpretar(argumentos.length > 6 ? argumentos[6] : null,
+                ModoReloj.ACOMPASADO);
 
-        ConfiguracionEscenario configuracion = switch (escenario) {
+        ConfiguracionEscenario base = switch (escenario) {
             case "COLAPSO" -> ConfiguracionEscenario.colapso(primerDia, salto, nombreAlgoritmo, semilla);
             case "DIA" -> ConfiguracionEscenario.diaADia(primerDia, salto, nombreAlgoritmo, semilla);
-            default -> ConfiguracionEscenario.simulacion5D(primerDia,
-                    duracionReal > 0 ? duracionReal : 1, salto, nombreAlgoritmo, semilla);
+            default -> ConfiguracionEscenario.simulacion5D(primerDia, reloj.duracionMinutos(), salto,
+                    nombreAlgoritmo, semilla);
         };
-        if (duracionReal <= 0) {
-            configuracion = new ConfiguracionEscenario(configuracion.tipo(), configuracion.primerDia(),
-                    configuracion.ultimoDia(), configuracion.saltoMinutos(), configuracion.factorAceleracion(),
-                    ModoReloj.LIBRE, configuracion.algoritmo(), configuracion.semilla(),
-                    configuracion.minutosEntreFotografias(), configuracion.generarAverias(),
-                    configuracion.averiasPorUnidadPorTurno());
-        }
+        ConfiguracionEscenario configuracion = reloj.aplicar(base);
+        Algoritmo algoritmo = FabricaAlgoritmos.crear(nombreAlgoritmo, semilla);
 
         LocalDate ultimoDia = configuracion.tipo() == TipoEscenario.COLAPSO
                 ? primerDia.plusDays(30) : configuracion.ultimoDia();
         var datos = new RepositorioDatos(raiz).cargar(primerDia, ultimoDia);
-        Algoritmo algoritmo = "HGS".equals(nombreAlgoritmo)
-                ? new BusquedaGeneticaHibrida(new AhorrosClarkeWright())
-                : new BusquedaAdaptativaVecindadAmplia(new AhorrosClarkeWright());
 
         System.out.printf(Locale.ROOT,
                 "Escenario %s, %s, salto %d min, K=%.1f, modo %s, semilla %d, %d pedidos cargados%n",
                 configuracion.tipo(), nombreAlgoritmo, salto, configuracion.factorAceleracion(),
                 configuracion.modoReloj(), semilla, datos.pedidos().size());
+        System.out.println(reloj.describir(configuracion));
+        System.out.println("Algoritmo: " + algoritmo);
 
         var motor = new MotorSimulacion(datos, configuracion, new ParametrosOperacion(), algoritmo, List.of());
         ResultadoSimulacion resultado = motor.ejecutar();

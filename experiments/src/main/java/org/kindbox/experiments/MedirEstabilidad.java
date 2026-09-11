@@ -7,13 +7,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import org.kindbox.core.construccion.AhorrosClarkeWright;
 import org.kindbox.core.io.RepositorioDatos;
 import org.kindbox.core.metaheuristica.Algoritmo;
+import org.kindbox.core.metaheuristica.FabricaAlgoritmos;
 import org.kindbox.core.metaheuristica.PresupuestoComputo;
 import org.kindbox.core.metaheuristica.ResultadoPlanificacion;
-import org.kindbox.core.metaheuristica.alns.BusquedaAdaptativaVecindadAmplia;
-import org.kindbox.core.metaheuristica.hgs.BusquedaGeneticaHibrida;
 import org.kindbox.core.modelo.Ciudad;
 import org.kindbox.core.modelo.ParametrosOperacion;
 import org.kindbox.core.problema.InstanciaPlanificacion;
@@ -55,9 +53,15 @@ import org.kindbox.core.simulacion.ResultadoSimulacion;
  * funcion objetivo, y por eso es independiente del orden de las rutas.</p>
  *
  * <p>Uso: {@code MedirEstabilidad <raizDatos> <algoritmo> <salto> [semilla] [pedidoSeguido]
- * [duracionMinutosReales]}. Ejecuta la simulacion 5D en modo LIBRE desde el 2026-09-01. Con
+ * [duracion]}. Ejecuta la simulacion 5D en modo LIBRE desde el 2026-09-01. Con
  * {@code pedidoSeguido} se imprime, replanificacion a replanificacion, la unidad asignada a
- * ese pedido, que es la traza con la que se documenta el defecto de rotacion de unidad.</p>
+ * ese pedido, que es la traza con la que se documenta el defecto de rotacion de unidad; con
+ * {@code -1} no se sigue ninguno. La semilla llega al algoritmo, que se crea con
+ * {@link FabricaAlgoritmos} y admite ajustes {@code -Dhgs.*} y {@code -Dalns.*}. La duracion,
+ * en minutos reales de la corrida 5D equivalente, solo fija el factor K y con el el
+ * presupuesto por llamada: por defecto 30 minutos, K igual a 240, como pide el apartado 2.3
+ * del ISA, y {@code RAPIDO} para K igual a 7 200. Los detalles estan en
+ * {@link OpcionReloj}.</p>
  */
 public final class MedirEstabilidad {
 
@@ -307,32 +311,29 @@ public final class MedirEstabilidad {
 
     public static void main(String[] argumentos) throws Exception {
         Path raiz = Path.of(argumentos.length > 0 ? argumentos[0] : "data");
-        String nombreAlgoritmo = argumentos.length > 1 ? argumentos[1].toUpperCase(Locale.ROOT) : "ALNS";
+        String nombreAlgoritmo = FabricaAlgoritmos.canonico(argumentos.length > 1 ? argumentos[1] : "ALNS");
         int salto = argumentos.length > 2 ? Integer.parseInt(argumentos[2]) : 30;
         long semilla = argumentos.length > 3 ? Long.parseLong(argumentos[3]) : 20260901L;
         int pedidoSeguido = argumentos.length > 4 ? Integer.parseInt(argumentos[4]) : -1;
-        int duracionReal = argumentos.length > 5 ? Integer.parseInt(argumentos[5]) : 1;
+        // Un numero de minutos a secas conserva aqui su sentido de siempre: modo LIBRE con el
+        // factor K de esa duracion. La corrida no se acompasa al reloj de pared, pero el
+        // presupuesto por ejecucion sigue saliendo de K, igual que en CorrerEscenario.
+        OpcionReloj reloj = OpcionReloj.interpretar(argumentos.length > 5 ? argumentos[5] : null, ModoReloj.LIBRE);
 
         LocalDate primerDia = LocalDate.parse("2026-09-01");
-        ConfiguracionEscenario base =
-                ConfiguracionEscenario.simulacion5D(primerDia, duracionReal, salto, nombreAlgoritmo, semilla);
-        // Modo LIBRE: la corrida no se acompasa al reloj de pared, pero el presupuesto por
-        // ejecucion sigue saliendo del factor K, igual que en CorrerEscenario.
-        ConfiguracionEscenario configuracion = new ConfiguracionEscenario(base.tipo(), base.primerDia(),
-                base.ultimoDia(), base.saltoMinutos(), base.factorAceleracion(), ModoReloj.LIBRE,
-                base.algoritmo(), base.semilla(), base.minutosEntreFotografias(), base.generarAverias(),
-                base.averiasPorUnidadPorTurno());
+        ConfiguracionEscenario configuracion = reloj.aplicar(ConfiguracionEscenario.simulacion5D(primerDia,
+                reloj.duracionMinutos(), salto, nombreAlgoritmo, semilla));
 
         var datos = new RepositorioDatos(raiz).cargar(primerDia, configuracion.ultimoDia());
-        Algoritmo interno = "HGS".equals(nombreAlgoritmo)
-                ? new BusquedaGeneticaHibrida(new AhorrosClarkeWright())
-                : new BusquedaAdaptativaVecindadAmplia(new AhorrosClarkeWright());
+        Algoritmo interno = FabricaAlgoritmos.crear(nombreAlgoritmo, semilla);
         Espia espia = new Espia(interno).seguirPedido(pedidoSeguido);
 
         System.out.printf(Locale.ROOT,
                 "Estabilidad, escenario %s, %s, salto %d min, K=%.1f, modo %s, semilla %d, %d pedidos cargados%n",
                 configuracion.tipo(), nombreAlgoritmo, salto, configuracion.factorAceleracion(),
                 configuracion.modoReloj(), semilla, datos.pedidos().size());
+        System.out.println(reloj.describir(configuracion));
+        System.out.println("Algoritmo: " + interno);
         if (pedidoSeguido >= 0) {
             System.out.println("Traza del pedido " + pedidoSeguido + ":");
         }

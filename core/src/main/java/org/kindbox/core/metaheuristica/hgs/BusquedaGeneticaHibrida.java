@@ -138,6 +138,22 @@ public final class BusquedaGeneticaHibrida implements Algoritmo {
         return NOMBRE;
     }
 
+    /** Parametros con que corre esta instancia. */
+    public ParametrosHgs parametros() {
+        return parametros;
+    }
+
+    /** Semilla del constructor, la que usa {@link #resolver(InstanciaPlanificacion, PresupuestoComputo)}. */
+    public long semilla() {
+        return semilla;
+    }
+
+    /** Nombre, semilla y parametros completos, para dejar trazada la configuracion de una corrida. */
+    @Override
+    public String toString() {
+        return NOMBRE + "[semilla=" + semilla + " " + parametros + "]";
+    }
+
     /** Resuelve con la semilla con que se construyo la busqueda. */
     @Override
     public ResultadoPlanificacion resolver(InstanciaPlanificacion instancia, PresupuestoComputo presupuesto) {

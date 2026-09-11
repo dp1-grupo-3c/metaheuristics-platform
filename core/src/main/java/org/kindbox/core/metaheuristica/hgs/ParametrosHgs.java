@@ -468,12 +468,37 @@ public final class ParametrosHgs {
         return valor;
     }
 
+    /**
+     * Todos los parametros, con el nombre de su accesor, que es tambien el de su clave
+     * {@code hgs.<parametro>} en {@code FabricaAlgoritmos}. Cada corrida queda asi trazable y
+     * su configuracion se puede reproducir copiando la traza como propiedades.
+     */
     @Override
     public String toString() {
-        return "ParametrosHgs[mu=" + tamanoMinimoPoblacion + " lambda=" + tamanoGeneracion
-                + " elite=" + individuosElite + " granularidad=" + granularidadVecindario
-                + " objetivoFactibles=" + proporcionObjetivoFactibles
+        return "ParametrosHgs[tamanoMinimoPoblacion=" + tamanoMinimoPoblacion
+                + " tamanoGeneracion=" + tamanoGeneracion
+                + " individuosElite=" + individuosElite
+                + " vecinosProximosDiversidad=" + vecinosProximosDiversidad
+                + " proporcionObjetivoFactibles=" + proporcionObjetivoFactibles
+                + " granularidadVecindario=" + granularidadVecindario
+                + " pasadasEducacionMaximas=" + pasadasEducacionMaximas
+                + " frecuenciaMaterializacion=" + frecuenciaMaterializacion
+                + " probabilidadReparacion=" + probabilidadReparacion
+                + " factorPenalizacionReparacion=" + factorPenalizacionReparacion
+                + " longitudMaximaArco=" + longitudMaximaArco
+                + " iteracionesLagrangiana=" + iteracionesLagrangiana
+                + " candidatosUnidadPorRuta=" + candidatosUnidadPorRuta
+                + " desfaseMaximoDeArco=" + desfaseMaximoDeArco
+                + " penalizacionDesfaseInicial=" + penalizacionDesfaseInicial
+                + " penalizacionDesfaseMinima=" + penalizacionDesfaseMinima
+                + " penalizacionDesfaseMaxima=" + penalizacionDesfaseMaxima
+                + " frecuenciaAjustePenalizacion=" + frecuenciaAjustePenalizacion
                 + " pesoEstabilidad=" + pesoEstabilidad
-                + " esfuerzoElite=" + esfuerzoElite + "]";
+                + " factorAumentoPenalizacion=" + factorAumentoPenalizacion
+                + " factorReduccionPenalizacion=" + factorReduccionPenalizacion
+                + " holguraProporcionFactibles=" + holguraProporcionFactibles
+                + " esfuerzoElite=" + esfuerzoElite
+                + " maximoGeneraciones=" + maximoGeneraciones
+                + " maximoGeneracionesSinMejora=" + maximoGeneracionesSinMejora + "]";
     }
 }

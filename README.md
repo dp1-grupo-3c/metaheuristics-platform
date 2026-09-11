@@ -125,8 +125,42 @@ Los perfiles de demanda disponibles son `ESTABLE`, `CRECIENTE` y `LIGERO`.
   -Dexec.args="data COLAPSO 2026-09-01 HGS 30"
 ```
 
-Con un septimo argumento, la corrida se acompasa al reloj de pared y dura esos minutos
-reales, que es el modo de las presentaciones.
+Argumentos: `<raizDatos> <5D|COLAPSO|DIA> <primerDia> <algoritmo> <salto> [semilla] [duracion]`.
+El algoritmo es `HGS` o `ALNS`, o uno de sus alias (`GENETICA`, `VECINDAD`), sin distinguir
+mayusculas. La semilla, 20260901 por defecto, fija la corrida entera: llega al algoritmo y de
+ella se deriva la de cada replanificacion.
+
+El ultimo argumento decide el factor de aceleracion K y, con el, el presupuesto de cada
+llamada al planificador, que es el 60 por ciento de `salto / K`:
+
+| `duracion` | Modo | K | Presupuesto por llamada con salto 30 |
+|---|---|---|---|
+| ausente o `LIBRE` | libre | 240, la corrida de 30 minutos | 4 500 ms |
+| `LIBRE:60` | libre | 120, la corrida de 60 minutos | 9 000 ms |
+| `RAPIDO` | libre | 7 200, la corrida de 1 minuto | 150 ms |
+| un numero de minutos | acompasado al reloj de pared en 5D | 7 200 / minutos | segun K |
+
+El modo libre corre tan rapido como puede y K solo fija el presupuesto; se aplica igual a los
+tres escenarios. El valor por defecto es el del apartado 2.3 del ISA, que situa el presupuesto
+efectivo entre 2 y 18 segundos. `RAPIDO` queda para pruebas de humo: sus resultados no miden
+la calidad del planificador en operacion. Un numero a secas acompasa la simulacion 5D al reloj
+de pared durante esos minutos reales, que es el modo de las presentaciones. Al arrancar, el
+ejecutable imprime K, el presupuesto por llamada en milisegundos y los parametros completos
+del algoritmo, y avisa si el presupuesto cae fuera del rango del ISA.
+
+### Medir la estabilidad del plan
+
+```bash
+./mvnw -q -pl experiments exec:java \
+  -Dexec.mainClass=org.kindbox.experiments.MedirEstabilidad \
+  -Dexec.args="data ALNS 30 20260901"
+```
+
+Argumentos: `<raizDatos> <algoritmo> <salto> [semilla] [pedidoSeguido] [duracion]`. Corre la
+simulacion 5D en modo libre y publica la tasa de reasignacion de pedidos entre
+replanificaciones. `pedidoSeguido` imprime la unidad asignada a ese pedido en cada
+replanificacion; con `-1` no se sigue ninguno. La duracion admite `RAPIDO`, `LIBRE`,
+`LIBRE:<minutos>` o un numero de minutos, que aqui tambien es modo libre; por defecto, 30.
 
 ### Comparar los dos algoritmos sobre una misma fotografia
 
@@ -136,9 +170,40 @@ reales, que es el modo de las presentaciones.
   -Dexec.args="data 2026-09-01 2026-09-07 5700 2000 15000"
 ```
 
+Argumentos: `<raizDatos> <primerDia> <ultimoDia> <minuto> [msPresupuesto...]`. La semilla de
+los dos algoritmos se fija con la propiedad de sistema `semilla`, por ejemplo `-Dsemilla=7`;
+por defecto es 20260901.
+
 Publica, para la heuristica constructiva y para cada algoritmo y presupuesto, el numero de
 pedidos no atendidos, el costo, los kilometros, las iteraciones, el resultado del verificador
 de factibilidad y el perfil de convergencia.
+
+### Ajustar los parametros de los algoritmos
+
+Cada parametro de `ParametrosHgs` y de `ParametrosAlns` se ajusta sin recompilar con una
+propiedad de sistema `hgs.<parametro>` o `alns.<parametro>`, con el mismo nombre que su
+accesor. Vale para los tres ejecutables y para la API. Por ejemplo, para subir el peso del
+termino de estabilidad de ALNS y ampliar el rango de destruccion:
+
+```bash
+./mvnw -q -pl experiments exec:java \
+  -Dexec.mainClass=org.kindbox.experiments.CorrerEscenario \
+  -Dexec.args="data 5D 2026-09-01 ALNS 30" \
+  -Dalns.factorPenalizacionEstabilidad=0.5 \
+  -Dalns.fraccionMinimaDestruccion=0.10 -Dalns.fraccionMaximaDestruccion=0.50
+```
+
+Y para la busqueda genetica hibrida, `-Dhgs.pesoEstabilidad=50 -Dhgs.tamanoGeneracion=30`.
+Con `java -cp` las propiedades van antes de la clase:
+`java -Dhgs.pesoEstabilidad=50 -cp core/target/classes:experiments/target/classes
+org.kindbox.experiments.BancoDePruebas data`.
+
+Los valores usan punto decimal. Una clave con prefijo `hgs.` o `alns.` que no exista, o un
+valor mal escrito o fuera de rango, detiene el ejecutable con un mensaje que indica la clave,
+el valor y la lista de claves validas, de modo que un error de tipeo no invalida un barrido en
+silencio. La lista completa de claves sale de `FabricaAlgoritmos.clavesHgs()` y
+`clavesAlns()`, y coincide con la traza `Algoritmo: ...` que cada ejecutable imprime al
+arrancar.
 
 ### Levantar la API
 
