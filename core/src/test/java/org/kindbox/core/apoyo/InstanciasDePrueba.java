@@ -26,6 +26,8 @@ public final class InstanciasDePrueba {
     public static final long INICIO_MANANA = 420L;
     /** Instante de cierre del turno de manana, 15:00 del primer dia. */
     public static final long FIN_MANANA = 900L;
+    /** Inventario que deja cada almacen intermedio en su capacidad plena. */
+    public static final int INVENTARIO_PLENO = -1;
 
     private InstanciasDePrueba() {
     }
@@ -68,6 +70,23 @@ public final class InstanciasDePrueba {
     public static InstanciaPlanificacion fotografia(long minutoActual, List<Pedido> pedidos,
                                                     List<UnidadTransporte> unidades, long finHorizonte,
                                                     ParametrosOperacion parametros) {
+        return fotografia(minutoActual, pedidos, unidades, finHorizonte, parametros, INVENTARIO_PLENO);
+    }
+
+    /**
+     * La misma fotografia con el inventario de los dos almacenes intermedios fijado a mano.
+     *
+     * <p>El almacen central conserva su inventario ilimitado, porque asi lo define el
+     * apartado 2 del contexto de dominio. Un inventario intermedio escaso es lo que ejercita
+     * la restriccion 5 del apartado 2.6 del ISA, que con la capacidad plena de mil unidades no
+     * llega a activarse nunca en una fotografia de prueba.</p>
+     *
+     * @param inventarioIntermedio unidades disponibles en cada almacen intermedio, o
+     *                             {@link #INVENTARIO_PLENO} para su capacidad
+     */
+    public static InstanciaPlanificacion fotografia(long minutoActual, List<Pedido> pedidos,
+                                                    List<UnidadTransporte> unidades, long finHorizonte,
+                                                    ParametrosOperacion parametros, int inventarioIntermedio) {
         List<Almacen> almacenes = Almacen.todos();
         int[] nodos = new int[almacenes.size() + pedidos.size() + unidades.size()];
         int k = 0;
@@ -87,7 +106,8 @@ public final class InstanciasDePrueba {
                 .parametros(parametros.instantanea())
                 .matriz(matriz);
         for (Almacen a : almacenes) {
-            constructor.almacen(a, a.central() ? Integer.MAX_VALUE : a.capacidad());
+            int inventario = inventarioIntermedio == INVENTARIO_PLENO ? a.capacidad() : inventarioIntermedio;
+            constructor.almacen(a, a.central() ? Integer.MAX_VALUE : inventario);
         }
         for (Pedido p : pedidos) {
             constructor.pedido(p, p.cantidad());

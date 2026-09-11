@@ -282,6 +282,23 @@ Corre las pruebas de los tres modulos: las del nucleo y las del servicio, que cu
 codigos de error de la API y el estado inicial del canal WebSocket. Para pasar solo las del
 nucleo, `./mvnw -pl core test`.
 
+Las pruebas de los dos algoritmos y del motor de simulacion no dependen de `data` ni del
+reloj: las fotografias se arman en memoria y las corridas usan
+`PresupuestoComputo.deIteraciones`, de modo que el resultado no cambia con la maquina ni con
+su carga. Las verificaciones de validez del apartado 12.4 del ISA (factibilidad del plan,
+equivalencia del valor objetivo declarado con el recalculado y monotonia del perfil de
+convergencia) estan en `ValidezDeAlgoritmosTest`.
+
+### Cobertura
+
+```bash
+./mvnw verify
+```
+
+Deja el informe de JaCoCo en `<modulo>/target/site/jacoco/index.html`, con las variantes
+`jacoco.xml` y `jacoco.csv` en el mismo directorio para procesarlo desde un script. No hay
+ninguna regla que haga fallar la construccion por cobertura insuficiente.
+
 ## Licencia
 
 Proyecto academico del curso 1INF54, Pontificia Universidad Catolica del Peru.

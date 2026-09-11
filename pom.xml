@@ -26,6 +26,7 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <junit.version>5.11.3</junit.version>
         <spring.boot.version>3.3.5</spring.boot.version>
+        <jacoco.version>0.8.12</jacoco.version>
     </properties>
 
     <dependencyManagement>
@@ -80,5 +81,33 @@
                 </plugin>
             </plugins>
         </pluginManagement>
+
+        <plugins>
+            <!-- Cobertura de la bateria de pruebas. El agente se engancha a surefire en la
+                 fase de pruebas y el informe se escribe en <modulo>/target/site/jacoco al
+                 llegar a verify, de modo que  ./mvnw verify  deja los tres informes. No hay
+                 todavia ninguna regla que haga fallar la construccion por cobertura: primero
+                 hay que medir de donde se parte. -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.version}</version>
+                <executions>
+                    <execution>
+                        <id>preparar-agente</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>informe</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
     </build>
 </project>
