@@ -117,6 +117,7 @@ public class ServicioSimulacion {
         this.algoritmos = algoritmos;
         this.publicador = publicador;
         this.propiedades = propiedades;
+        this.propiedades.validar();
         // Se lee al construir el servicio y no en cada peticion: un valor mal escrito impide
         // arrancar, igual que una clave hgs.* o alns.* mal escrita en RegistroAlgoritmos.
         this.arranqueDesdePlanVigente =
@@ -173,6 +174,9 @@ public class ServicioSimulacion {
                     + " es posterior a " + ultimoDia);
         }
         int dias = (int) ChronoUnit.DAYS.between(primerDia, ultimoDia) + 1;
+        if (dias <= 0) {
+            throw new SolicitudInvalida("El rango debe cubrir al menos un dia");
+        }
         int duracion = valorPositivo(peticion.duracionMinutosReales(),
                 propiedades.getDuracionMinutosPorDefecto(), "la duracion en minutos reales");
         int salto = valorPositivo(peticion.saltoMinutos(),
@@ -184,6 +188,12 @@ public class ServicioSimulacion {
         long semilla = peticion.semilla() == null ? propiedades.getSemillaPorDefecto() : peticion.semilla();
         boolean generarAverias = peticion.generarAverias() == null
                 ? propiedades.isGenerarAveriasPorDefecto() : peticion.generarAverias();
+        if (tipo == TipoEscenario.DIA_A_DIA && dias != 1) {
+            throw new SolicitudInvalida("El escenario DIA debe cubrir exactamente un dia");
+        }
+        if (tipo == TipoEscenario.SIMULACION_5D && dias != 5) {
+            throw new SolicitudInvalida("El escenario 5D debe cubrir exactamente cinco dias");
+        }
 
         double factor = tipo == TipoEscenario.DIA_A_DIA ? 1.0 : (double) dias * 1440.0 / duracion;
         ModoReloj reloj = tipo == TipoEscenario.COLAPSO ? ModoReloj.LIBRE : ModoReloj.ACOMPASADO;
@@ -235,6 +245,8 @@ public class ServicioSimulacion {
                     resultado.estado(), resultado.minutoFinal(), resultado.mensaje());
         } catch (RuntimeException e) {
             corrida.estado(EstadoCorrida.FALLIDA);
+            corrida.error("La corrida fallo: " + (e.getMessage() == null ? e.getClass().getSimpleName()
+                    : e.getMessage()));
             LOG.error("La corrida {} fallo", corrida.id(), e);
         }
     }
@@ -265,6 +277,9 @@ public class ServicioSimulacion {
 
     /** Corrida por identificador. */
     public Corrida requerir(String id) {
+        if (id == null || id.isBlank()) {
+            throw new SolicitudInvalida("El identificador de corrida es obligatorio");
+        }
         Corrida corrida = corridas.get(id);
         if (corrida == null) {
             throw new RecursoNoEncontrado("No existe la corrida " + id);
@@ -371,7 +386,8 @@ public class ServicioSimulacion {
 
         int total = filtradas.size();
         int totalPaginas = total == 0 ? 0 : (total + filasPorPagina - 1) / filasPorPagina;
-        int desde = Math.min(numeroPagina * filasPorPagina, total);
+        long desplazamiento = (long) numeroPagina * filasPorPagina;
+        int desde = (int) Math.min(desplazamiento, total);
         int hasta = Math.min(desde + filasPorPagina, total);
         return new PaginaPedidos(filtradas.subList(desde, hasta), numeroPagina, filasPorPagina,
                 total, totalPaginas, filtro, soloActivos);
@@ -559,7 +575,7 @@ public class ServicioSimulacion {
                 instantanea == null ? corrida.datos().calendario().inicio() : instantanea.fechaHoraSimulada(),
                 milisegundos, corrida.datos().pedidos().size(), corrida.datos().unidades().size(),
                 activas, instantanea == null ? 0 : instantanea.metricas().unidadesEntregadas(),
-                fabrica.descripcion(),
+                fabrica.descripcion(), corrida.error(),
                 corrida.datos().avisos());
     }
 

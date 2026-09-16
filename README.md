@@ -198,6 +198,12 @@ pedidos no atendidos, el costo, los kilometros, las iteraciones, el resultado de
 de factibilidad, el perfil de convergencia y, en ALNS, los pesos finales de los operadores de
 la capa adaptativa del apartado 7.3.3.
 
+Al final de cada corrida se imprime una conclusion legible. Indica si todos los pedidos fueron
+entregados, identifica explicitamente los pendientes o incumplidos y resume el rendimiento de la
+ejecucion. En la comparacion tambien se muestra el rendimiento de cada solucion y solo se llama
+solucion completa a una que tenga `H=0`; si ninguna cumple, se reporta como mejor aproximacion,
+no como resultado operativo valido.
+
 Antes de medir corre una fase de calentamiento de la maquina virtual, que el apartado 13 del
 ISA exige: cada algoritmo se ejecuta 500 ms sobre la misma fotografia y su resultado se
 descarta, para que el primero de la lista no mida en frio. Se ajusta con
@@ -249,12 +255,15 @@ simulaciones, registro de averias y cambio en caliente de parametros, y un canal
 `/ws/simulacion` que difunde el estado completo de la simulacion en curso.
 
 Toda respuesta de error, la levante el servicio o el contenedor, trae el mismo cuerpo JSON con
-`codigo`, `error`, `mensaje` en espanol, `ruta` e `instante`. Los codigos son 400 para una
-peticion mal formada o una carga que no es multipart, 404 para una corrida o una ruta que no
-existen, 405 para un metodo no mapeado en esa ruta, 409 para una operacion que choca con el
-estado (arrancar con una corrida ya en curso, o averiar una unidad ya averiada o en
-mantenimiento), 413 para un archivo de averias por encima del limite y 415 para un tipo de
-contenido que el extremo no sabe leer.
+`codigo`, `codigoError`, `tipo`, `error`, `mensaje` en espanol, `ruta` e `instante`.
+`codigoError` y `tipo` son estables para que el visualizador no tenga que interpretar texto:
+`VALIDACION` para entradas inadmisibles, `ESTADO` para operaciones incompatibles con el estado
+actual, `RECURSO` para recursos o rutas inexistentes, `DATOS` para fallos de carga y `PROTOCOLO`
+para errores HTTP de metodo o contenido. Los codigos son 400 para una peticion mal formada o
+una carga que no es multipart, 404 para una corrida o una ruta que no existen, 405 para un
+metodo no mapeado en esa ruta, 409 para una operacion que choca con el estado (arrancar con una
+corrida ya en curso, o averiar una unidad ya averiada o en mantenimiento), 413 para un archivo
+de averias por encima del limite y 415 para un tipo de contenido que el extremo no sabe leer.
 
 Al conectarse al canal, un cliente recibe de inmediato la cabecera `corrida` y la ultima
 `instantanea` (o el `resultado` final) de la corrida activa o, si no hay ninguna activa, de la

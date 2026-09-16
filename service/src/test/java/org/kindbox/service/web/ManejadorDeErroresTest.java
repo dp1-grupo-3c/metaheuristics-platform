@@ -53,6 +53,8 @@ class ManejadorDeErroresTest {
                 .andExpect(status().isNotFound())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.codigo").value(404))
+                .andExpect(jsonPath("$.codigoError").value("RECURSO_NO_ENCONTRADO"))
+                .andExpect(jsonPath("$.tipo").value("RECURSO"))
                 .andExpect(jsonPath("$.error").value("No encontrado"))
                 .andExpect(jsonPath("$.mensaje").value("No existe la corrida sim-999"))
                 .andExpect(jsonPath("$.ruta").value("/api/simulaciones/sim-999"))
@@ -100,6 +102,8 @@ class ManejadorDeErroresTest {
         mvc.perform(post("/api/simulaciones").contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.codigo").value(409))
+                .andExpect(jsonPath("$.codigoError").value("CONFLICTO_ESTADO"))
+                .andExpect(jsonPath("$.tipo").value("ESTADO"))
                 .andExpect(jsonPath("$.error").value("Conflicto de estado"))
                 .andExpect(jsonPath("$.mensaje", containsString("sim-001")));
     }
@@ -126,6 +130,8 @@ class ManejadorDeErroresTest {
         mvc.perform(post("/api/simulaciones").contentType(MediaType.APPLICATION_JSON).content("{esto no es json"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.codigo").value(400))
+                .andExpect(jsonPath("$.codigoError").value("SOLICITUD_INVALIDA"))
+                .andExpect(jsonPath("$.tipo").value("VALIDACION"))
                 .andExpect(jsonPath("$.error").value("Solicitud invalida"))
                 .andExpect(jsonPath("$.mensaje").value("El cuerpo de la peticion no se pudo interpretar "
                         + "como JSON valido"));

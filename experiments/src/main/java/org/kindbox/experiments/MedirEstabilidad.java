@@ -394,5 +394,20 @@ public final class MedirEstabilidad {
                 "  planificador: %d ejecuciones, %.0f ms de media, %d ms reales de corrida%n",
                 m.ejecucionesPlanificador(), m.milisegundosPorEjecucion(), r.milisegundosReales());
         System.out.println("  " + espia.resumen());
+        System.out.println();
+        System.out.println("CONCLUSION DE ESTABILIDAD");
+        if (m.pedidosPendientes() == 0 && m.pedidosIncumplidos() == 0) {
+            System.out.println("  Resultado correcto: no quedaron pedidos pendientes ni incumplidos.");
+        } else {
+            System.out.printf(Locale.ROOT,
+                    "  Resultado incompleto: quedaron %d pedidos pendientes y %d incumplidos.%n",
+                    m.pedidosPendientes(), m.pedidosIncumplidos());
+        }
+        System.out.printf(Locale.ROOT,
+                "  Rendimiento de estabilidad: %.2f %% de reasignacion; %d permanencias y "
+                        + "%d reasignaciones forzadas.%n",
+                100.0 * espia.tasaReasignacion(), espia.permanencias(), espia.reasignacionesForzadas());
+        System.out.println("  Interpretacion: una tasa menor indica un plan mas estable entre "
+                + "replanificaciones; las reasignaciones forzadas se deben a unidades no disponibles.");
     }
 }

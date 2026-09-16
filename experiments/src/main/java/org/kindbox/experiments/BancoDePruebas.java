@@ -55,6 +55,11 @@ public final class BancoDePruebas {
     /** Milisegundos de calentamiento por algoritmo si no se indica {@code calentamientoMs}. */
     public static final long CALENTAMIENTO_MS_POR_DEFECTO = 500L;
 
+    private record Evaluacion(String etiqueta, int pedidosNoAtendidos, double costo,
+                              long milisegundos, long iteraciones,
+                              boolean factible, boolean modeloCorrecto) {
+    }
+
     private BancoDePruebas() {
     }
 
@@ -87,6 +92,7 @@ public final class BancoDePruebas {
 
         var objetivo = new FuncionObjetivoJerarquica();
         var verificador = new VerificadorRestricciones(fabrica.bloqueos());
+        List<Evaluacion> evaluaciones = new java.util.ArrayList<>();
 
         calentar(nombres, semilla, instancia);
 
@@ -95,7 +101,8 @@ public final class BancoDePruebas {
         Solucion base = new AhorrosClarkeWright()
                 .construir(instancia, new ProgramadorRuta(instancia), new Aleatorio(1L));
         long msBase = (System.nanoTime() - t0) / 1_000_000L;
-        informar("Clarke-Wright", base, msBase, 0, null, instancia, objetivo, verificador);
+        evaluaciones.add(informar("Clarke-Wright", base, msBase, 0, null,
+                instancia, objetivo, verificador));
         double referencia = base.valor().costo();
 
         for (long ms : presupuestos) {
@@ -106,8 +113,8 @@ public final class BancoDePruebas {
                 ResultadoPlanificacion r = algoritmo.resolver(instancia, presupuesto);
                 long real = (System.nanoTime() - inicio) / 1_000_000L;
                 String etiqueta = String.format(Locale.ROOT, "%s %d ms", r.algoritmo(), ms);
-                informar(etiqueta, r.solucion(), real, r.iteraciones(), r.perfil(),
-                        instancia, objetivo, verificador);
+                evaluaciones.add(informar(etiqueta, r.solucion(), real, r.iteraciones(), r.perfil(),
+                        instancia, objetivo, verificador));
                 if (real > ms + 200) {
                     System.out.printf(Locale.ROOT,
                             "   AVISO presupuesto excedido: pedidos %d ms, consumidos %d ms%n", ms, real);
@@ -123,6 +130,7 @@ public final class BancoDePruebas {
                     System.out.println("   pesos de operadores: " + formatearPesos(r.pesosOperadores()));
                 }
             }
+            concluir(evaluaciones);
         }
     }
 
@@ -204,9 +212,10 @@ public final class BancoDePruebas {
     }
 
     /** Imprime una linea de resultado y contrasta el valor declarado con el recalculado. */
-    private static void informar(String etiqueta, Solucion solucion, long ms, long iteraciones,
-                                 PerfilConvergencia perfil, InstanciaPlanificacion instancia,
-                                 FuncionObjetivoJerarquica objetivo, VerificadorRestricciones verificador) {
+    private static Evaluacion informar(String etiqueta, Solucion solucion, long ms, long iteraciones,
+                                       PerfilConvergencia perfil, InstanciaPlanificacion instancia,
+                                       FuncionObjetivoJerarquica objetivo,
+                                       VerificadorRestricciones verificador) {
         ValorObjetivo declarado = solucion.valor();
         ValorObjetivo recalculado = objetivo.evaluar(instancia, solucion);
         var verificacion = verificador.verificar(instancia, solucion);
@@ -219,6 +228,60 @@ public final class BancoDePruebas {
                 solucion.rutasConEntregas().size(), iteraciones, ms,
                 verificacion.factible() ? "FACTIBLE" : "INFACTIBLE " + verificacion.tipos(),
                 equivalente ? "coincide" : "DISCREPA declarado=" + declarado + " recalculado=" + recalculado);
+        return new Evaluacion(etiqueta, declarado.h(), declarado.costo(), ms, iteraciones,
+                verificacion.factible(), equivalente);
+    }
+
+    /** Presenta una lectura final comprensible de la comparacion completa. */
+    private static void concluir(List<Evaluacion> evaluaciones) {
+        System.out.println();
+        System.out.println("CONCLUSION DE LA COMPARACION");
+        boolean todasValidas = evaluaciones.stream()
+                .allMatch(e -> e.factible() && e.modeloCorrecto());
+        boolean todosEntregan = evaluaciones.stream().allMatch(e -> e.pedidosNoAtendidos() == 0);
+        if (todasValidas && todosEntregan) {
+            System.out.println("  No se detectaron resultados incorrectos: todas las soluciones "
+                    + "fueron factibles, coherentes y entregaron todos los pedidos.");
+        } else {
+            System.out.println("  Se detectaron resultados que requieren atencion:");
+            evaluaciones.stream()
+                    .filter(e -> !e.factible() || !e.modeloCorrecto() || e.pedidosNoAtendidos() > 0)
+                    .forEach(e -> System.out.printf(Locale.ROOT,
+                            "    - %s: %s%s%s%n", e.etiqueta(),
+                            e.pedidosNoAtendidos() > 0
+                                    ? e.pedidosNoAtendidos() + " pedidos no atendidos; " : "",
+                            !e.factible() ? "solucion infactible; " : "",
+                            !e.modeloCorrecto() ? "valor declarado distinto al recalculado." : ""));
+        }
+
+        System.out.println("  RESUMEN DE RENDIMIENTO");
+        evaluaciones.forEach(e -> System.out.printf(Locale.ROOT,
+                "    %s -> %s, costo S/ %.2f, %d ms, %d iteraciones%n",
+                e.etiqueta(), e.pedidosNoAtendidos() == 0 ? "entrega completa"
+                        : e.pedidosNoAtendidos() + " no atendidos",
+                e.costo(), e.milisegundos(), e.iteraciones()));
+
+        Evaluacion mejor = evaluaciones.stream()
+                .filter(e -> e.factible() && e.modeloCorrecto())
+                .min((a, b) -> {
+                    int porPedidos = Integer.compare(a.pedidosNoAtendidos(), b.pedidosNoAtendidos());
+                    return porPedidos != 0 ? porPedidos : Double.compare(a.costo(), b.costo());
+                })
+                .orElse(null);
+        if (mejor == null) {
+            System.out.println("  Rendimiento: no hay una solucion valida para comparar.");
+        } else if (!todosEntregan) {
+            System.out.printf(Locale.ROOT,
+                    "  No hay una solucion completa aceptable. La mejor aproximacion fue %s, "
+                            + "pero dejo %d pedidos no atendidos.%n",
+                    mejor.etiqueta(), mejor.pedidosNoAtendidos());
+        } else {
+            System.out.printf(Locale.ROOT,
+                    "  Mejor resultado completo: %s, costo S/ %.2f.%n",
+                    mejor.etiqueta(), mejor.costo());
+            System.out.println("  Interpretacion: la comparacion prioriza entregar todos los pedidos; "
+                    + "entre soluciones igualmente completas, gana la de menor costo.");
+        }
     }
 
     /** Comprueba que la sucesion de hitos del perfil no empeora en el orden lexicografico. */
