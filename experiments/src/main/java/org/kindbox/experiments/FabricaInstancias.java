@@ -40,13 +40,17 @@ public final class FabricaInstancias {
     }
 
     /**
-     * Pedidos ya registrados en el instante dado y todavia dentro de plazo o vencidos.
-     * Es el conjunto de pendientes que veria el planificador si nada se hubiese entregado.
+     * Pedidos que el planificador todavía puede cumplir en el instante dado.
+     *
+     * <p>Un pedido vencido no debe entrar en una fotografía estática como si siguiera
+     * siendo atendible: hacerlo convierte cualquier comparación posterior en una
+     * prueba imposible y produce cientos de falsos "no atendidos". Los incumplimientos
+     * ya ocurridos son responsabilidad de la simulación, no de una nueva planificación.</p>
      */
     public List<Pedido> pendientesEn(long minuto) {
         List<Pedido> pendientes = new ArrayList<>();
         for (Pedido p : datos.pedidos()) {
-            if (p.minutoRegistro() <= minuto) {
+            if (p.minutoRegistro() <= minuto && p.minutoLimite() > minuto) {
                 pendientes.add(p);
             }
         }

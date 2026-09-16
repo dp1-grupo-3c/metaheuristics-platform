@@ -1,6 +1,7 @@
 package org.kindbox.service.configuracion;
 
 import java.time.LocalDate;
+import org.kindbox.core.metaheuristica.FabricaAlgoritmos;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
@@ -171,5 +172,47 @@ public class PropiedadesKindBox {
 
     public void setTamanoMaximoPaginaPedidos(int tamanoMaximoPaginaPedidos) {
         this.tamanoMaximoPaginaPedidos = tamanoMaximoPaginaPedidos;
+    }
+
+    /**
+     * Valida la configuracion efectiva antes de arrancar componentes que la consumen.
+     * Los avisos de datos del escenario siguen siendo tolerantes, pero una configuracion
+     * imposible debe impedir el arranque para no producir corridas ambiguas.
+     */
+    public void validar() {
+        if (directorioDatos == null || directorioDatos.isBlank()) {
+            throw new IllegalArgumentException("kindbox.directorio-datos no puede estar vacio");
+        }
+        if (primerDiaPorDefecto == null) {
+            throw new IllegalArgumentException("kindbox.primer-dia-por-defecto es obligatorio");
+        }
+        exigirPositivo(diasPorDefecto, "kindbox.dias-por-defecto");
+        exigirPositivo(duracionMinutosPorDefecto, "kindbox.duracion-minutos-por-defecto");
+        exigirPositivo(saltoMinutosPorDefecto, "kindbox.salto-minutos-por-defecto");
+        exigirPositivo(minutosEntreFotografiasPorDefecto,
+                "kindbox.minutos-entre-fotografias-por-defecto");
+        if (algoritmoPorDefecto == null || algoritmoPorDefecto.isBlank()) {
+            throw new IllegalArgumentException("kindbox.algoritmo-por-defecto es obligatorio");
+        }
+        FabricaAlgoritmos.canonico(algoritmoPorDefecto);
+        if (!Double.isFinite(averiasPorUnidadPorTurno)
+                || averiasPorUnidadPorTurno < 0.0 || averiasPorUnidadPorTurno > 1.0) {
+            throw new IllegalArgumentException(
+                    "kindbox.averias-por-unidad-por-turno debe estar entre 0 y 1");
+        }
+        exigirPositivo(corridasEnMemoria, "kindbox.corridas-en-memoria");
+        exigirPositivo(capacidadColaDifusion, "kindbox.capacidad-cola-difusion");
+        exigirPositivo(tamanoPaginaPedidos, "kindbox.tamano-pagina-pedidos");
+        exigirPositivo(tamanoMaximoPaginaPedidos, "kindbox.tamano-maximo-pagina-pedidos");
+        if (tamanoPaginaPedidos > tamanoMaximoPaginaPedidos) {
+            throw new IllegalArgumentException(
+                    "kindbox.tamano-pagina-pedidos no puede superar el tamano-maximo-pagina-pedidos");
+        }
+    }
+
+    private static void exigirPositivo(int valor, String propiedad) {
+        if (valor <= 0) {
+            throw new IllegalArgumentException(propiedad + " debe ser positivo: " + valor);
+        }
     }
 }

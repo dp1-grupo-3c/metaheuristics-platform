@@ -56,8 +56,10 @@ public final class CorrerEscenario {
         ConfiguracionEscenario base = switch (escenario) {
             case "COLAPSO" -> ConfiguracionEscenario.colapso(primerDia, salto, nombreAlgoritmo, semilla);
             case "DIA" -> ConfiguracionEscenario.diaADia(primerDia, salto, nombreAlgoritmo, semilla);
-            default -> ConfiguracionEscenario.simulacion5D(primerDia, reloj.duracionMinutos(), salto,
-                    nombreAlgoritmo, semilla);
+            case "5D", "SIMULACION_5D" -> ConfiguracionEscenario.simulacion5D(
+                    primerDia, reloj.duracionMinutos(), salto, nombreAlgoritmo, semilla);
+            default -> throw new IllegalArgumentException("Escenario desconocido: '" + escenario
+                    + "'. Los admitidos son DIA, 5D y COLAPSO");
         };
         ConfiguracionEscenario configuracion = OpcionArranque.aplicar(reloj.aplicar(base));
         Algoritmo algoritmo = FabricaAlgoritmos.crear(nombreAlgoritmo, semilla);
@@ -110,6 +112,26 @@ public final class CorrerEscenario {
         System.out.printf(Locale.ROOT, "  costo recalculado desde los km = S/ %.2f  %s%n",
                 costoRecalculado,
                 Math.abs(costoRecalculado - m.costoAcumulado()) < 0.005 ? "coincide" : "DISCREPA");
+        System.out.println();
+        System.out.println("CONCLUSION DEL ESCENARIO");
+        boolean sinPedidosNoAtendidos = m.pedidosPendientes() == 0 && m.pedidosIncumplidos() == 0;
+        if (sinPedidosNoAtendidos && m.particionCoherente()) {
+            System.out.println("  Resultado correcto: todos los pedidos fueron entregados y "
+                    + "la particion de metricas es coherente.");
+        } else {
+            System.out.printf(Locale.ROOT,
+                    "  Resultado incompleto: quedaron %d pendientes y %d incumplidos.%n",
+                    m.pedidosPendientes(), m.pedidosIncumplidos());
+        }
+        double porcentajeEntregado = m.pedidosRegistrados() == 0 ? 100.0
+                : 100.0 * m.pedidosEntregados() / m.pedidosRegistrados();
+        System.out.printf(Locale.ROOT,
+                "  Rendimiento: %.2f %% de pedidos entregados, %.0f ms promedio por planificacion, "
+                        + "%d replanificaciones y %d km recorridos.%n",
+                porcentajeEntregado, m.milisegundosPorEjecucion(),
+                m.ejecucionesPlanificador(), m.kilometrosTotales());
+        System.out.println("  Lectura: " + (r.estado() == org.kindbox.core.simulacion.EstadoCorrida.CULMINADA
+                ? "el horizonte configurado se completo." : "la corrida termino antes del horizonte configurado."));
     }
 
     private static String formatear(MetricasSimulacion m) {

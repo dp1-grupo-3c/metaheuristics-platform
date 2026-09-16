@@ -38,6 +38,7 @@ import org.kindbox.core.simulacion.TipoEscenario;
  * @param unidadesActivasPorTipo  vehiculos activos por tipo, para el conteo de la barra
  * @param productosEntregados     paquetes del producto P entregados hasta el instante
  * @param motor                   motor de simulacion en uso
+ * @param error                   detalle funcional si la corrida termina con FALLIDA
  * @param avisos                  archivos o registros que la carga del escenario no pudo leer
  */
 public record ResumenCorrida(
@@ -61,6 +62,7 @@ public record ResumenCorrida(
         Map<String, Integer> unidadesActivasPorTipo,
         int productosEntregados,
         String motor,
+        String error,
         List<String> avisos) {
 
     /**

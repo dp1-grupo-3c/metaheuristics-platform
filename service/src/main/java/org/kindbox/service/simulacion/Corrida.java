@@ -44,6 +44,7 @@ public final class Corrida implements ObservadorSimulacion {
     private volatile EstadoCorrida estado = EstadoCorrida.PREPARADA;
     private volatile InstantaneaSimulacion instantanea;
     private volatile ResultadoSimulacion resultado;
+    private volatile String error;
 
     public Corrida(String id, ConfiguracionEscenario configuracion,
                    RepositorioDatos.DatosEscenario datos, int duracionMinutosReales) {
@@ -99,6 +100,15 @@ public final class Corrida implements ObservadorSimulacion {
     /** Resumen final, o {@code null} si la corrida sigue en curso. */
     public ResultadoSimulacion resultado() {
         return resultado;
+    }
+
+    /** Mensaje funcional disponible cuando la corrida termina con fallo. */
+    public String error() {
+        return error;
+    }
+
+    void error(String error) {
+        this.error = error;
     }
 
     /** Identificadores de los pedidos ya entregados por completo. */

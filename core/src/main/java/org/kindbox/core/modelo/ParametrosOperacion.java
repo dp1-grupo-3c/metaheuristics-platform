@@ -48,6 +48,9 @@ public final class ParametrosOperacion {
 
     /** Velocidad vigente del tipo, en Km/h. */
     public double velocidad(TipoUnidad tipo) {
+        if (tipo == null) {
+            throw new IllegalArgumentException("El tipo de unidad es obligatorio");
+        }
         candado.lock();
         try {
             return velocidades.get(tipo);
@@ -61,6 +64,9 @@ public final class ParametrosOperacion {
      * siguiente iteracion de planificacion.
      */
     public void velocidad(TipoUnidad tipo, double kmPorHora) {
+        if (tipo == null) {
+            throw new IllegalArgumentException("El tipo de unidad es obligatorio");
+        }
         if (kmPorHora <= 0 || !Double.isFinite(kmPorHora)) {
             throw new IllegalArgumentException("Velocidad invalida para " + tipo + ": " + kmPorHora);
         }
@@ -197,6 +203,19 @@ public final class ParametrosOperacion {
             long version) {
 
         public Instantanea {
+            if (velocidadKmH == null || velocidadKmH.length != TipoUnidad.values().length) {
+                throw new IllegalArgumentException("La instantanea necesita una velocidad por cada tipo de unidad");
+            }
+            for (double velocidad : velocidadKmH) {
+                if (velocidad <= 0.0 || !Double.isFinite(velocidad)) {
+                    throw new IllegalArgumentException("La instantanea contiene una velocidad invalida");
+                }
+            }
+            if (minutosAcondicionamiento <= 0 || minutosAlimentacion <= 0
+                    || minutosSeparacionCambioTurno < 0 || minutosTrasvase <= 0
+                    || umbralSemaforoAmbar < 0 || umbralSemaforoVerde <= umbralSemaforoAmbar) {
+                throw new IllegalArgumentException("La instantanea contiene parametros operativos invalidos");
+            }
             velocidadKmH = velocidadKmH.clone();
         }
 

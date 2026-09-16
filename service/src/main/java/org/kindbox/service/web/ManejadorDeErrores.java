@@ -54,12 +54,14 @@ public class ManejadorDeErrores {
 
     @ExceptionHandler(RecursoNoEncontrado.class)
     public ResponseEntity<RespuestaError> noEncontrado(RecursoNoEncontrado e, HttpServletRequest peticion) {
-        return respuesta(HttpStatus.NOT_FOUND, "No encontrado", e.getMessage(), peticion);
+        return respuesta(HttpStatus.NOT_FOUND, "RECURSO_NO_ENCONTRADO", "RECURSO",
+                "No encontrado", e.getMessage(), peticion);
     }
 
     @ExceptionHandler(ConflictoDeEstado.class)
     public ResponseEntity<RespuestaError> conflicto(ConflictoDeEstado e, HttpServletRequest peticion) {
-        return respuesta(HttpStatus.CONFLICT, "Conflicto de estado", e.getMessage(), peticion);
+        return respuesta(HttpStatus.CONFLICT, "CONFLICTO_ESTADO", "ESTADO",
+                "Conflicto de estado", e.getMessage(), peticion);
     }
 
     @ExceptionHandler({SolicitudInvalida.class, IllegalArgumentException.class,
@@ -70,7 +72,8 @@ public class ManejadorDeErrores {
         String mensaje = e instanceof HttpMessageNotReadableException
                 ? "El cuerpo de la peticion no se pudo interpretar como JSON valido"
                 : e.getMessage();
-        return respuesta(HttpStatus.BAD_REQUEST, "Solicitud invalida", mensaje, peticion);
+        return respuesta(HttpStatus.BAD_REQUEST, "SOLICITUD_INVALIDA", "VALIDACION",
+                "Solicitud invalida", mensaje, peticion);
     }
 
     /**
@@ -80,15 +83,16 @@ public class ManejadorDeErrores {
     @ExceptionHandler({NoHandlerFoundException.class, NoResourceFoundException.class})
     public ResponseEntity<RespuestaError> rutaDesconocida(Exception e, HttpServletRequest peticion) {
         LOG.debug("Ruta desconocida: {}", e.toString());
-        return respuesta(HttpStatus.NOT_FOUND, "No encontrado",
-                "No existe el extremo " + peticion.getRequestURI(), peticion);
+        return respuesta(HttpStatus.NOT_FOUND, "RUTA_NO_ENCONTRADA", "RECURSO",
+                "No encontrado", "No existe el extremo " + peticion.getRequestURI(), peticion);
     }
 
     /** El verbo no esta mapeado en esa ruta, por ejemplo un PUT sobre una corrida. */
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<RespuestaError> metodoNoPermitido(HttpRequestMethodNotSupportedException e,
                                                             HttpServletRequest peticion) {
-        return respuesta(HttpStatus.METHOD_NOT_ALLOWED, "Metodo no permitido",
+        return respuesta(HttpStatus.METHOD_NOT_ALLOWED, "METODO_NO_PERMITIDO", "PROTOCOLO",
+                "Metodo no permitido",
                 "El metodo " + e.getMethod() + " no esta permitido en " + peticion.getRequestURI()
                         + ". Metodos admitidos: " + metodosAdmitidos(e), peticion);
     }
@@ -98,7 +102,8 @@ public class ManejadorDeErrores {
     public ResponseEntity<RespuestaError> tipoNoSoportado(HttpMediaTypeNotSupportedException e,
                                                           HttpServletRequest peticion) {
         MediaType recibido = e.getContentType();
-        return respuesta(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Tipo de contenido no soportado",
+        return respuesta(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "TIPO_CONTENIDO_NO_SOPORTADO", "PROTOCOLO",
+                "Tipo de contenido no soportado",
                 "El tipo de contenido " + (recibido == null ? "ausente" : recibido.toString())
                         + " no se admite en " + peticion.getRequestURI()
                         + ". Tipos admitidos: " + tiposAdmitidos(e), peticion);
@@ -108,7 +113,8 @@ public class ManejadorDeErrores {
     @ExceptionHandler(MultipartException.class)
     public ResponseEntity<RespuestaError> cargaInvalida(MultipartException e, HttpServletRequest peticion) {
         LOG.debug("Carga de archivo mal formada en {}: {}", peticion.getRequestURI(), e.toString());
-        return respuesta(HttpStatus.BAD_REQUEST, "Solicitud invalida",
+        return respuesta(HttpStatus.BAD_REQUEST, "CARGA_MULTIPARTE_INVALIDA", "VALIDACION",
+                "Solicitud invalida",
                 "La peticion no es una carga de archivo valida. Envie un formulario "
                         + "multipart/form-data con el archivo de averias en la parte 'archivo'", peticion);
     }
@@ -119,7 +125,8 @@ public class ManejadorDeErrores {
                                                                  HttpServletRequest peticion) {
         long maximo = e.getMaxUploadSize();
         String limite = maximo > 0 ? " El maximo admitido es de " + maximo + " bytes." : "";
-        return respuesta(HttpStatus.PAYLOAD_TOO_LARGE, "Archivo demasiado grande",
+        return respuesta(HttpStatus.PAYLOAD_TOO_LARGE, "ARCHIVO_DEMASIADO_GRANDE", "VALIDACION",
+                "Archivo demasiado grande",
                 "El archivo supera el tamano maximo admitido por el servicio." + limite
                         + " Divida la carga de averias en varios archivos.", peticion);
     }
@@ -127,13 +134,15 @@ public class ManejadorDeErrores {
     @ExceptionHandler(ErrorDeDatos.class)
     public ResponseEntity<RespuestaError> errorDeDatos(ErrorDeDatos e, HttpServletRequest peticion) {
         LOG.error("Fallo al leer el escenario", e);
-        return respuesta(HttpStatus.INTERNAL_SERVER_ERROR, "Error de datos", e.getMessage(), peticion);
+        return respuesta(HttpStatus.INTERNAL_SERVER_ERROR, "ERROR_DATOS_SERVIDOR", "DATOS",
+                "Error de datos", e.getMessage(), peticion);
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<RespuestaError> errorInterno(Exception e, HttpServletRequest peticion) {
         LOG.error("Error interno en {}", peticion.getRequestURI(), e);
-        return respuesta(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno",
+        return respuesta(HttpStatus.INTERNAL_SERVER_ERROR, "ERROR_INTERNO", "INTERNO",
+                "Error interno",
                 "El servicio no pudo completar la operacion. El detalle del fallo esta en el "
                         + "registro del servidor.", peticion);
     }
@@ -162,10 +171,12 @@ public class ManejadorDeErrores {
         return String.join(", ", nombres);
     }
 
-    private static ResponseEntity<RespuestaError> respuesta(HttpStatus estado, String error,
-                                                            String mensaje, HttpServletRequest peticion) {
+    private static ResponseEntity<RespuestaError> respuesta(HttpStatus estado, String codigoError,
+                                                            String tipo, String error, String mensaje,
+                                                            HttpServletRequest peticion) {
         String texto = mensaje == null || mensaje.isBlank() ? error : mensaje;
         return ResponseEntity.status(estado)
-                .body(RespuestaError.de(estado.value(), error, texto, peticion.getRequestURI()));
+                .body(RespuestaError.de(estado.value(), codigoError, tipo, error, texto,
+                        peticion.getRequestURI()));
     }
 }

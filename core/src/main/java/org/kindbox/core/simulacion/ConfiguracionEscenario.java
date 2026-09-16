@@ -59,6 +59,21 @@ public record ConfiguracionEscenario(
     public static final String PROPIEDAD_ARRANQUE_DESDE_PLAN_VIGENTE = "arranqueDesdePlanVigente";
 
     public ConfiguracionEscenario {
+        if (tipo == null) {
+            throw new IllegalArgumentException("El tipo de escenario es obligatorio");
+        }
+        if (primerDia == null || ultimoDia == null) {
+            throw new IllegalArgumentException("El escenario necesita fechas de inicio y fin");
+        }
+        if (ultimoDia.isBefore(primerDia)) {
+            throw new IllegalArgumentException("El rango del escenario esta invertido");
+        }
+        if (modoReloj == null) {
+            throw new IllegalArgumentException("El modo de reloj es obligatorio");
+        }
+        if (algoritmo == null || algoritmo.isBlank()) {
+            throw new IllegalArgumentException("El algoritmo es obligatorio");
+        }
         if (saltoMinutos <= 0) {
             throw new IllegalArgumentException("El salto de planificacion debe ser positivo");
         }
