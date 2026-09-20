@@ -775,18 +775,17 @@ public final class AhorrosClarkeWright implements HeuristicaConstructiva {
     /**
      * Asigna cada ruta a una unidad concreta, la reevalua con esa unidad y confirma el plan.
      *
-     * <p>Las rutas se recorren de mayor a menor numero de paradas, que es su exigencia: la
-     * ruta larga tiene menos unidades capaces de asumirla, de modo que elegir primero por ella
-     * evita quedarse sin margen. Cada ruta toma la unidad libre de su tipo cuyo trayecto en
-     * vacio hasta la primera parada sea menor, y solo entonces se conocen los instantes
-     * reales, de modo que se vuelve a programar siempre.</p>
+     * <p>Las rutas se recorren por el plazo mas proximo de sus pedidos. Reservar primero una
+     * unidad para la ruta critica evita que las entregas prioritarias queden detras de rutas
+     * baratas pero flexibles.</p>
      */
     private Solucion asignarYConfirmar(InstanciaPlanificacion instancia, ProgramadorRuta programador,
                                        int visitas) {
         int activas = 0;
         for (int r = 0; r < visitas; r++) {
             if (activaDeRuta[r]) {
-                ordenDeRuta[activas++] = ((long) (Integer.MAX_VALUE - paradasDeRuta[r]) << 32) | r;
+                long limite = limiteMinimoDeRuta(instancia, r);
+                ordenDeRuta[activas++] = (limite << 32) | (r & 0xFFFFFFFFL);
             }
         }
         Arrays.sort(ordenDeRuta, 0, activas);
@@ -808,6 +807,15 @@ public final class AhorrosClarkeWright implements HeuristicaConstructiva {
 
         cerrarConUnidadesLibres(instancia, programador, rutas, visitas);
         return componerSolucion(instancia, rutas);
+    }
+
+    /** Reserva primero una unidad para la ruta cuyo pedido vence antes. */
+    private long limiteMinimoDeRuta(InstanciaPlanificacion instancia, int ruta) {
+        long limite = Long.MAX_VALUE;
+        for (int visita = primeraDeRuta[ruta]; visita >= 0; visita = siguienteVisita[visita]) {
+            limite = Math.min(limite, instancia.pedidoMinutoLimite(visitaPedido[visita]));
+        }
+        return limite;
     }
 
     /**
@@ -924,12 +932,15 @@ public final class AhorrosClarkeWright implements HeuristicaConstructiva {
                 while (longitud < limiteParadas) {
                     int mejor = -1;
                     int mejorKm = MatrizDistancias.INALCANZABLE;
+                    long mejorLimite = Long.MAX_VALUE;
                     for (int v = 0; v < visitas; v++) {
                         if (visitaServida[v] || visitaDescartada[v] || visitaCantidad[v] > capacidad) {
                             continue;
                         }
                         int km = matriz.km(punto, instancia.puntoPedido(visitaPedido[v]));
-                        if (km < mejorKm) {
+                        long limite = instancia.pedidoMinutoLimite(visitaPedido[v]);
+                        if (limite < mejorLimite || (limite == mejorLimite && km < mejorKm)) {
+                            mejorLimite = limite;
                             mejorKm = km;
                             mejor = v;
                         }

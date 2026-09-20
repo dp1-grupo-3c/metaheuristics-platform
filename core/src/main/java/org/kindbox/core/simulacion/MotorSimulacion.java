@@ -21,6 +21,7 @@ import org.kindbox.core.io.RepositorioDatos;
 import org.kindbox.core.metaheuristica.Algoritmo;
 import org.kindbox.core.metaheuristica.PresupuestoComputo;
 import org.kindbox.core.metaheuristica.ResultadoPlanificacion;
+import org.kindbox.core.metaheuristica.PlanificadorCritico;
 import org.kindbox.core.modelo.Almacen;
 import org.kindbox.core.modelo.Averia;
 import org.kindbox.core.modelo.Bloqueo;
@@ -152,6 +153,8 @@ public final class MotorSimulacion {
     private long minutoPrimerIncumplimiento = -1L;
     private int pedidoDelPrimerIncumplimiento = -1;
     private long minutoReplanificacionPorBloqueo = Long.MIN_VALUE;
+    private boolean replanificacionPorLiberacionProgramada;
+    private long ultimoMinutoReplanificacion = Long.MIN_VALUE;
     /**
      * Replanificaciones lanzadas en la corrida. Es el numero de orden del que se deriva la
      * semilla de cada iteracion del planificador; solo lo toca el hilo de la simulacion.
@@ -552,8 +555,13 @@ public final class MotorSimulacion {
     /** Procesa un suceso. Devuelve el mensaje de desenlace si la corrida debe terminar. */
     private String procesar(Evento evento) {
         switch (evento.tipo()) {
+            case REPLANIFICACION_POR_LIBERACION -> {
+                replanificacionPorLiberacionProgramada = false;
+                replanificarSiCorresponde();
+                return null;
+            }
             case REPLANIFICACION -> {
-                replanificar();
+                replanificarSiCorresponde();
                 return null;
             }
             case FOTOGRAFIA -> {
@@ -985,6 +993,7 @@ public final class MotorSimulacion {
             u.terminarItinerario();
             u.unidad().estado(EstadoUnidad.DISPONIBLE);
             u.unidad().minutoDisponibleDesde(minutoActual);
+            programarReplanificacionPorLiberacion();
         }
     }
 
@@ -1005,6 +1014,18 @@ public final class MotorSimulacion {
     private void programarMovimiento(UnidadEnCurso u, long minuto, TipoEvento tipo, int parada) {
         long secuencia = cola.programar(Math.max(minutoActual, minuto), tipo, u.indice(), parada).secuencia();
         u.secuenciaMovimiento(secuencia);
+    }
+
+    /**
+     * Solicita una nueva asignacion en cuanto una unidad queda libre. Las liberaciones del
+     * mismo minuto se agrupan para evitar una busqueda separada por cada vehiculo.
+     */
+    private void programarReplanificacionPorLiberacion() {
+        if (replanificacionPorLiberacionProgramada || minutoActual >= minutoFin) {
+            return;
+        }
+        replanificacionPorLiberacionProgramada = true;
+        cola.programar(minutoActual, TipoEvento.REPLANIFICACION_POR_LIBERACION);
     }
 
     /** Contabiliza los kilometros y el costo de operacion recorridos hasta el nodo indicado. */
@@ -1052,9 +1073,7 @@ public final class MotorSimulacion {
             candado.unlock();
         }
 
-        PresupuestoComputo presupuesto = PresupuestoComputo
-                .deSimulacion(configuracion.saltoMinutos(), configuracion.factorAceleracion())
-                .arrancar();
+        PresupuestoComputo presupuesto = presupuestoDePlanificacion().arrancar();
         presupuestoVigente = presupuesto;
         if (cancelado) {
             presupuesto.cancelar();
@@ -1064,6 +1083,7 @@ public final class MotorSimulacion {
                 ? algoritmo.resolver(fotografia.instancia(), presupuesto, semillaIteracion)
                 : algoritmo.resolverDesde(fotografia.instancia(), presupuesto, semillaIteracion,
                         fotografia.planVigente());
+        plan = PlanificadorCritico.protegerResultado(fotografia.instancia(), presupuesto, plan);
         presupuestoVigente = null;
 
         candado.lock();
@@ -1081,6 +1101,39 @@ public final class MotorSimulacion {
         long milisegundos = plan.milisegundos();
         String nombre = plan.algoritmo();
         notificar(o -> o.alReplanificar(minuto, nombre, pendientes, noAtendidos, costo, milisegundos));
+    }
+
+    /** Evita dos ejecuciones cuando una liberacion coincide con la cadencia periodica. */
+    private void replanificarSiCorresponde() {
+        if (ultimoMinutoReplanificacion == minutoActual) {
+            return;
+        }
+        ultimoMinutoReplanificacion = minutoActual;
+        replanificar();
+    }
+
+    /**
+     * Permite repetir una campaña con más tiempo de búsqueda sin cambiar el reloj simulado.
+     * La propiedad es intencionalmente explícita: solo se usa para experimentos y conserva
+     * como valor por defecto el presupuesto derivado del escenario.
+     */
+    private PresupuestoComputo presupuestoDePlanificacion() {
+        String texto = System.getProperty("presupuestoPlanificadorMs");
+        if (texto == null || texto.isBlank()) {
+            return PresupuestoComputo.deSimulacion(configuracion.saltoMinutos(),
+                    configuracion.factorAceleracion());
+        }
+        final long milisegundos;
+        try {
+            milisegundos = Long.parseLong(texto.trim());
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("presupuestoPlanificadorMs no valido: '" + texto
+                    + "'. Debe ser un entero positivo", e);
+        }
+        if (milisegundos <= 0L) {
+            throw new IllegalArgumentException("presupuestoPlanificadorMs debe ser positivo");
+        }
+        return PresupuestoComputo.deMilisegundosConPerfil(milisegundos);
     }
 
     /**

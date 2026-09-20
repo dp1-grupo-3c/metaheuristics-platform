@@ -240,9 +240,12 @@ public final class MotorInsercion {
         if (ordenArrepentimiento < 2) {
             double mejor = INFINITO;
             for (int i = 0; i < n; i++) {
-                double delta = mejorDelta[pendientes[i]];
-                if (delta < mejor) {
-                    mejor = delta;
+                int tarea = pendientes[i];
+                int actual = pendientes[elegido];
+                if (esMasUrgente(tarea, actual)
+                        || (tareas.limite(tarea) == tareas.limite(actual)
+                        && mejorDelta[tarea] < mejor)) {
+                    mejor = mejorDelta[tarea];
                     elegido = i;
                 }
             }
@@ -252,15 +255,22 @@ public final class MotorInsercion {
         double desempate = INFINITO;
         for (int i = 0; i < n; i++) {
             int tarea = pendientes[i];
+            int actual = pendientes[elegido];
             double valor = arrepentimiento[tarea];
-            if (valor > mejorArrepentimiento
-                    || (valor == mejorArrepentimiento && mejorDelta[tarea] < desempate)) {
+            if (esMasUrgente(tarea, actual)
+                    || (tareas.limite(tarea) == tareas.limite(actual)
+                    && (valor > mejorArrepentimiento
+                    || (valor == mejorArrepentimiento && mejorDelta[tarea] < desempate)))) {
                 mejorArrepentimiento = valor;
                 desempate = mejorDelta[tarea];
                 elegido = i;
             }
         }
         return elegido;
+    }
+
+    private boolean esMasUrgente(int tarea, int otra) {
+        return tareas.limite(tarea) < tareas.limite(otra);
     }
 
     /** Valora la tarea en todas sus unidades candidatas y deja listo su mejor movimiento. */

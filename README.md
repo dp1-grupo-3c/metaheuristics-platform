@@ -244,6 +244,43 @@ se apaga con `-Dalns.filtroCotaInferior=false`. En HGS viene apagado, porque la 
 kilometros ya descarta casi todos los movimientos de la educacion y la concatenacion cuesta
 mas de lo que ahorra; se enciende con `-Dhgs.filtroCotaInferior=true`.
 
+### Verificar factibilidad antes de elegir un algoritmo
+
+La plataforma incluye una prueba independiente que no ejecuta ALNS, HGS ni la heuristica
+constructiva. Ordena los pedidos por vencimiento y simula, para cada unidad, viajes de una
+sola entrega con retorno al almacen central. Usa distancias Manhattan sin bloqueos ni
+mantenimiento, por lo que un resultado positivo es solo un **filtro optimista**; un resultado
+negativo por `IMPOSIBLE_INDIVIDUAL` sí identifica pedidos que ni siquiera pueden llegar a
+tiempo bajo ese supuesto favorable.
+
+```bash
+./mvnw -q -pl core install -DskipTests
+./mvnw -q -pl experiments exec:java \
+  -Dexec.mainClass=org.kindbox.experiments.VerificarFactibilidad \
+  -Dexec.args="data 2026-09-01 5"
+```
+
+El ultimo argumento es la cantidad de dias. El conjunto reducido pasa el filtro:
+
+```bash
+./mvnw -q -pl experiments exec:java \
+  -Dexec.mainClass=org.kindbox.experiments.VerificarFactibilidad \
+  -Dexec.args="data/prueba 2026-01-01 10"
+```
+
+El informe separa `IMPOSIBLE_INDIVIDUAL` de `NO_PROGRAMABLE`. Este ultimo significa que la
+politica conservadora no encontro una secuencia de viajes, pero no demuestra imposibilidad
+matematica. En cambio, si aparecen pedidos imposibles individualmente, primero deben
+revisarse los datos, los plazos o los recursos antes de comparar metaheuristicas.
+
+`BancoDePruebas` valida cada ruta con `VerificadorRestricciones`, incluyendo turnos,
+capacidad, inventario, bloqueos y tiempos de llegada. Por eso una fotografia con pedidos
+pendientes no debe interpretarse como una demostracion de que el conjunto completo sea
+imposible: solo demuestra que el planificador y ese presupuesto no construyeron una
+solucion completa para esa fotografia. La demostracion fuerte requiere una solucion con
+`H=0` que el verificador acepte; mientras eso no ocurra, el escenario debe considerarse
+**no certificado**, no factible por supuesto.
+
 ### Levantar la API
 
 ```bash

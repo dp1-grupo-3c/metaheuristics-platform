@@ -35,6 +35,8 @@ public enum TipoEvento {
     LLEGADA_A_PARADA,
     /** Una unidad termina el servicio de una parada y puede continuar. */
     FIN_SERVICIO,
+    /** Una unidad quedo libre antes de la siguiente replanificacion periodica. */
+    REPLANIFICACION_POR_LIBERACION,
     /** Se ejecuta el planificador sobre la totalidad de los pedidos pendientes. */
     REPLANIFICACION,
     /** Se toma una fotografia del estado para el visualizador. */
