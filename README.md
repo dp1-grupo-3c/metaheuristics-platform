@@ -244,6 +244,27 @@ se apaga con `-Dalns.filtroCotaInferior=false`. En HGS viene apagado, porque la 
 kilometros ya descarta casi todos los movimientos de la educacion y la concatenacion cuesta
 mas de lo que ahorra; se enciende con `-Dhgs.filtroCotaInferior=true`.
 
+### Diagnostico independiente del conjunto de pedidos
+
+`VerificarFactibilidad` ejecuta una politica de viajes individuales desde el almacen
+central, con entregas parciales, distancias Manhattan y retorno para recargar. No ejecuta
+HGS ni ALNS. Respeta las velocidades y el tiempo de acondicionamiento configurados; el
+ultimo viaje cuenta cuando llega al cliente, sin exigir su retorno antes del plazo.
+
+```bash
+./mvnw -pl experiments -am compile
+java -cp core/target/classes:experiments/target/classes \
+  org.kindbox.experiments.VerificarFactibilidad data 2026-09-01 5
+```
+
+`PROGRAMABLE_EN_MODELO_SIMPLIFICADO` significa que esta politica encuentra un programa;
+queda pendiente verificar turnos, alimentacion, bloqueos, mantenimiento y averias.
+`CAPACIDAD_CENTRAL_INSUFICIENTE` se refiere exclusivamente a viajes desde el central:
+no demuestra imposibilidad fisica, pues el modelo completo permite otros almacenes y
+posiciones iniciales. `NO_PROGRAMABLE` indica que la politica voraz no encontro viajes
+suficientes al compartir la flota. Ninguno de estos resultados certifica ni descarta la
+factibilidad del problema completo. Tampoco permite elegir entre HGS y ALNS.
+
 ### Levantar la API
 
 ```bash
