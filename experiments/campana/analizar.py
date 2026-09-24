@@ -134,7 +134,7 @@ def holm(pvalores):
 # --------------------------------------------------------------------- datos
 
 def cargar(directorio):
-    filas = [pd.read_csv(f) for f in sorted(glob.glob(os.path.join(directorio, "filas", "*.csv")))]
+    filas = [pd.read_csv(f, dtype={"commit": str}) for f in sorted(glob.glob(os.path.join(directorio, "filas", "*.csv")))]
     if not filas:
         sys.exit("No hay corridas en " + directorio)
     df = pd.concat(filas, ignore_index=True)
@@ -223,7 +223,8 @@ def contrastes(df):
 def fmt(x, dec=1):
     if x is None or (isinstance(x, float) and math.isnan(x)):
         return "–"
-    return f"{x:,.{dec}f}".replace(",", " ")
+    texto = f"{x:,.{dec}f}".replace(",", " ")
+    return texto[1:] if texto.startswith("-") and float(texto.replace(" ", "")) == 0 else texto
 
 
 def med_rango(s, dec=0):

@@ -1,0 +1,27 @@
+familia,escenario,nivel,metrica,columna,sentido_mejor,a,b,pares,no_nulas,mediana_a,mediana_b,a_gana,b_gana,empates,hl,ic_inf,ic_sup,biserial,p,p_holm,veredicto
+principal,5D,N1,Pedidos incumplidos,pedidos_incumplidos,menor,ALNS-C,HGS,10,3,0.0,0.0,3,0,7,0.0,-1.0,0.0,-1.0,0.25,1.0,no significativa
+principal,5D,N1,Minuto del primer incumplido,minuto_primer_incumplido_c,mayor,ALNS-C,HGS,10,3,7200.0,7200.0,3,0,7,0.0,0.0,3151.5,1.0,0.25,1.0,no significativa
+principal,5D,N1,Pendientes al cierre,pedidos_pendientes,menor,ALNS-C,HGS,10,4,3.0,3.0,2,2,6,0.0,-0.5,1.0,0.2,1.0,1.0,no significativa
+principal,5D,N1,Costo por pedido entregado (S/),costo_por_pedido,menor,ALNS-C,HGS,10,10,108.05699999999999,105.009,1,9,0,3.6259999999999906,0.8134999999999977,6.111000000000004,0.8181818181818182,0.01953125,0.1953125,no significativa
+arranque,5D,N1,Pedidos incumplidos,pedidos_incumplidos,menor,ALNS-C,ALNS-F,10,1,0.0,0.0,1,0,9,0.0,-0.5,0.0,-1.0,1.0,1.0,no significativa
+arranque,5D,N1,Minuto del primer incumplido,minuto_primer_incumplido_c,mayor,ALNS-C,ALNS-F,10,1,7200.0,7200.0,1,0,9,0.0,0.0,1454.5,1.0,1.0,1.0,no significativa
+arranque,5D,N1,Pendientes al cierre,pedidos_pendientes,menor,ALNS-C,ALNS-F,10,3,3.0,3.0,2,1,7,0.0,-1.0,0.0,-0.5,0.75,1.0,no significativa
+arranque,5D,N1,Costo por pedido entregado (S/),costo_por_pedido,menor,ALNS-C,ALNS-F,10,10,108.05699999999999,109.589,6,4,0,-1.818000000000005,-4.667500000000004,0.6659999999999968,-0.4909090909090909,0.193359375,1.0,no significativa
+principal,5D,N2,Pedidos incumplidos,pedidos_incumplidos,menor,ALNS-C,HGS,10,6,0.5,0.5,3,3,4,0.0,-1.5,1.0,-0.047619047619047616,1.0,1.0,no significativa
+principal,5D,N2,Minuto del primer incumplido,minuto_primer_incumplido_c,mayor,ALNS-C,HGS,10,8,5739.5,6951.0,4,4,2,244.5,-2901.0,3201.0,0.1111111111111111,0.8125,1.0,no significativa
+principal,5D,N2,Pendientes al cierre,pedidos_pendientes,menor,ALNS-C,HGS,10,7,11.0,11.0,5,2,3,-0.5,-2.0,0.5,-0.4642857142857143,0.328125,1.0,no significativa
+principal,5D,N2,Costo por pedido entregado (S/),costo_por_pedido,menor,ALNS-C,HGS,10,10,91.645,96.14750000000001,9,1,0,-4.737500000000004,-7.113999999999997,-2.5590000000000046,-0.9636363636363636,0.00390625,0.04296875,significativa a favor de ALNS-C
+arranque,5D,N2,Pedidos incumplidos,pedidos_incumplidos,menor,ALNS-C,ALNS-F,10,4,0.5,1.0,3,1,6,0.0,-0.5,0.0,-0.5,0.625,1.0,no significativa
+arranque,5D,N2,Minuto del primer incumplido,minuto_primer_incumplido_c,mayor,ALNS-C,ALNS-F,10,5,5739.5,4878.0,4,1,5,249.0,-607.5,1691.0,0.3333333333333333,0.625,1.0,no significativa
+arranque,5D,N2,Pendientes al cierre,pedidos_pendientes,menor,ALNS-C,ALNS-F,10,7,11.0,9.5,3,4,3,0.0,-1.0,1.0,0.0,1.0,1.0,no significativa
+arranque,5D,N2,Costo por pedido entregado (S/),costo_por_pedido,menor,ALNS-C,ALNS-F,10,10,91.645,92.8965,9,1,0,-1.4339999999999975,-2.2034999999999982,-0.07849999999999824,-0.7818181818181819,0.02734375,0.328125,no significativa
+principal,5D,N3,Pedidos incumplidos,pedidos_incumplidos,menor,ALNS-C,HGS,10,6,3.0,4.5,3,3,4,0.0,-2.0,1.0,-0.047619047619047616,1.0,1.0,no significativa
+principal,5D,N3,Minuto del primer incumplido,minuto_primer_incumplido_c,mayor,ALNS-C,HGS,10,9,897.0,904.0,5,4,1,71.5,-179.0,1641.0,0.28888888888888886,0.49609375,1.0,no significativa
+principal,5D,N3,Pendientes al cierre,pedidos_pendientes,menor,ALNS-C,HGS,10,10,29.0,34.0,10,0,0,-5.5,-7.5,-3.5,-1.0,0.001953125,0.025390625,significativa a favor de ALNS-C
+principal,5D,N3,Costo por pedido entregado (S/),costo_por_pedido,menor,ALNS-C,HGS,10,10,81.50049999999999,91.44900000000001,10,0,0,-10.453500000000005,-11.149999999999991,-9.74900000000001,-1.0,0.001953125,0.025390625,significativa a favor de ALNS-C
+arranque,5D,N3,Pedidos incumplidos,pedidos_incumplidos,menor,ALNS-C,ALNS-F,10,10,3.0,6.5,10,0,0,-3.0,-4.5,-1.5,-1.0,0.001953125,0.025390625,significativa a favor de ALNS-C
+arranque,5D,N3,Minuto del primer incumplido,minuto_primer_incumplido_c,mayor,ALNS-C,ALNS-F,10,6,897.0,840.0,5,1,4,279.0,0.0,3180.0,0.9047619047619048,0.0625,0.6875,no significativa
+arranque,5D,N3,Pendientes al cierre,pedidos_pendientes,menor,ALNS-C,ALNS-F,10,10,29.0,31.5,8,2,0,-2.0,-3.5,0.5,-0.5272727272727272,0.154296875,1.0,no significativa
+arranque,5D,N3,Costo por pedido entregado (S/),costo_por_pedido,menor,ALNS-C,ALNS-F,10,10,81.50049999999999,81.60249999999999,5,5,0,0.180499999999995,-0.4825000000000017,0.9815000000000111,0.16363636363636364,0.6953125,1.0,no significativa
+principal,COLAPSO,N4,Minuto de colapso,minuto_primer_incumplido_c,mayor,ALNS-C,HGS,10,9,4250.0,3655.0,6,3,1,114.0,-3937.0,1799.0,0.15555555555555556,0.71484375,1.0,no significativa
+arranque,COLAPSO,N4,Minuto de colapso,minuto_primer_incumplido_c,mayor,ALNS-C,ALNS-F,10,7,4250.0,3952.5,3,4,3,0.0,-1648.0,2236.5,0.07142857142857142,0.9375,1.0,no significativa
