@@ -203,9 +203,51 @@ dos son más baratos que HGS en N2 y N3. **La ventaja en costo es del mecanismo 
 ventaja en cumplimiento es del arranque.** Conviene declararlo así en la decisión, tal como
 pide R-03.
 
-### 11.3 Causa común de los incumplidos: el límite efectivo por cierre de turno
+### 11.3 Causas de los incumplidos: diagnóstico por pedido
 
-*(Se completa con el diagnóstico por pedido de las réplicas N3 y N4; ver apartado 11.3 abajo.)*
+Para no quedarse en los conteos, la réplica 1 de N3 se repitió con el diagnóstico por pedido
+(`-DdiagnosticoPedidos=true`). El diagnóstico sigue a cada pedido incumplido en todas las
+replanificaciones que lo vieron y clasifica la causa:
+
+- **PLAN_ROTO**: estuvo asignado a tiempo y una replanificación posterior lo soltó.
+- **COMPETENCIA**: solo unidades ya ocupadas podían atenderlo.
+- **IMPOSIBLE_FISICO**: ni un auto libre en el almacén más cercano llegaba a tiempo.
+
+| Variante | Incumplidos | Pedidos y causa |
+|---|---|---|
+| ALNS-C | 1 | 1109 (COMPETENCIA) |
+| ALNS-F | 4 | 94, 133 y 1286 (PLAN_ROTO); 1109 (COMPETENCIA) |
+| HGS | 2 | 73 y 1321 (PLAN_ROTO) |
+
+Ningún incumplido es IMPOSIBLE_FISICO: todos eran alcanzables. Se leen tres cosas:
+
+1. **Las variantes sin arranque desde el plan vigente pierden pedidos que ya tenían.** 5 de
+   los 6 incumplidos de ALNS-F y HGS son PLAN_ROTO: el pedido estuvo asignado dentro de plazo
+   y una replanificación que partió de cero lo soltó. Es el mismo mecanismo que el apartado
+   11.2 mide a nivel agregado, visto ahora pedido a pedido.
+2. **El límite efectivo por cierre de turno.** Una entrega exige una hora de
+   acondicionamiento que debe terminar dentro del turno. Un pedido que vence en la última hora
+   de un turno tiene, en la práctica, su límite en el cierre del turno menos 60 minutos. Los
+   planificadores comparan contra el límite nominal y lo difieren creyendo que les sobra
+   tiempo:
+   - el **pedido 1109** vence a las 22:50, pero su límite real eran las 22:00;
+   - el **pedido 133** vence a las 14:57, pero su límite real eran las 14:00;
+   - el **pedido 1321** vence a las 14:27, 33 minutos antes del cierre de las 15:00, así que su límite real eran las 14:00.
+
+   Si los pedidos vencieran al azar a lo largo del día, en esa franja caería 1 de cada 8
+   incumplidos. Aquí caen 4 de los 7. El pedido 1109 es además el colapso mediano de ALNS-C
+   en N4 (minuto 4 250).
+3. **Una diferencia genuina a favor de HGS.** El pedido 1109 (33 paquetes, más que la
+   capacidad de un auto) exige dos entregas parciales. ALNS no llegó a colocarlo en ninguna
+   de las nueve replanificaciones que lo vieron; HGS sí lo entregó, a las 21:55, 5 minutos
+   antes de su límite real.
+
+**Corrección propuesta antes de repetir la campaña** (regla del paso 2):
+- Usar un límite efectivo, min(límite, cierre del turno − 60 min), en el nivel de urgencia de la función objetivo común y en el compromiso de ALNS.
+- Revisar cómo inserta ALNS los pedidos que requieren entregas parciales.
+
+Ambos cambios afectan al objetivo común o al algoritmo, así que se aplican antes de una nueva
+campaña, nunca a mitad de esta.
 
 ### 11.4 Límites de la campaña
 
