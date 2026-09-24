@@ -1,0 +1,14 @@
+commit=45890e5
+fecha=2026-09-24T03:42:23Z
+presupuesto_ms=2000
+paralelos=3
+java=openjdk version "21.0.10" 2026-01-20
+cpu=Intel(R) Xeon(R) Processor @ 2.10GHz x 4
+memoria=16481980 kB
+datos=GenerarDatos data_campana 2026-09-01 2026-10-31 ESTABLE 384
+1a44d49f8d137c3887db7f720c6d57f846b4497f0250e86052e732339edf6341  ./bloqueos/202609.bloqueadas
+2c74c115d6722fee77fa5b8e4c1abc8719e72a38c8beee92b527d0d6bf021def  ./bloqueos/202610.bloqueadas
+1882676209f0f8df6f14ff33722c82b9fc02061cb7657d2422da1c6f45410943  ./flota.txt
+01d273b4c70a063d1134cb107b9d2677f2e107f7f9c0763cfbcc23c4e861700a  ./mantenimiento/2026/mant.preventivo.09.10
+6585a66d73297cfda3ebc4c690638500b6f64e58c44687e4e23a2d5d025a0b34  ./ventas/ventas202609
+841062d2bc32709c5215e459a2fbd34049ef2c1f9ccee3cb747ded04b657bca3  ./ventas/ventas202610
