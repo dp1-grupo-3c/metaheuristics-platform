@@ -63,8 +63,8 @@ import org.kindbox.core.simulacion.ResultadoSimulacion;
  * del ISA, y {@code RAPIDO} para K igual a 7 200. Los detalles estan en
  * {@link OpcionReloj}.</p>
  *
- * <p>Con {@code -DarranqueDesdePlanVigente=true} cada replanificacion arranca desde el plan
- * vigente, que es justamente la hipotesis del apartado 11.4 que este medidor contrasta:
+ * <p>Por defecto cada replanificacion arranca desde el plan vigente, y con
+ * {@code -DarranqueDesdePlanVigente=false} desde la heuristica constructiva; es justamente la hipotesis del apartado 11.4 que este medidor contrasta:
  * corriendo dos veces con la misma semilla, una con el indicador y otra sin el, la diferencia
  * de tasa de reasignacion es el efecto del modo de arranque. Los detalles estan en
  * {@link OpcionArranque}.</p>

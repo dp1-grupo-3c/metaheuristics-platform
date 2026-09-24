@@ -37,8 +37,8 @@ import org.kindbox.core.simulacion.TipoEscenario;
  * <p>Con {@code -DdiagnosticoPedidos=true} se clasifica al cierre la causa de cada pedido
  * incumplido o entregado con menos de una hora de holgura; ver {@link DiagnosticoPedidos}.</p>
  *
- * <p>Con {@code -DarranqueDesdePlanVigente=true} cada replanificacion arranca desde el plan
- * vigente en lugar de desde la heuristica constructiva, que es la hipotesis experimental de
+ * <p>Por defecto cada replanificacion arranca desde el plan vigente en lugar de desde la
+ * heuristica constructiva, que se pide con {@code -DarranqueDesdePlanVigente=false}; que es la hipotesis experimental de
  * los apartados 7.3.5 y 11.4 del ISA. Los detalles estan en {@link OpcionArranque}.</p>
  */
 public final class CorrerEscenario {

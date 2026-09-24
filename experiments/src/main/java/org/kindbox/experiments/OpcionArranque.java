@@ -13,7 +13,7 @@ import org.kindbox.core.simulacion.ConfiguracionEscenario;
  * entre replanificaciones, porque la busqueda arranca con desviacion nula respecto de la
  * asignacion vigente. Contrastar las dos variantes exige poder cambiar de modo sin recompilar
  * y sin tocar ninguna otra cosa, y por eso el indicador llega por la propiedad de sistema
- * {@code -DarranqueDesdePlanVigente=true}, igual que los parametros {@code -Dhgs.*} y
+ * {@code -DarranqueDesdePlanVigente}, activo por defecto y desactivable con {@code =false}, igual que los parametros {@code -Dhgs.*} y
  * {@code -Dalns.*} llegan a {@code FabricaAlgoritmos}. Un valor que no sea {@code true} ni
  * {@code false} detiene el ejecutable.</p>
  *
@@ -35,9 +35,8 @@ final class OpcionArranque {
     /** Linea que se imprime al arrancar, con el aviso si el algoritmo no aprovecha el indicador. */
     static String describir(ConfiguracionEscenario configuracion, Algoritmo algoritmo) {
         if (!configuracion.arranqueDesdePlanVigente()) {
-            return "Arranque: heuristica constructiva comun (-D"
-                    + ConfiguracionEscenario.PROPIEDAD_ARRANQUE_DESDE_PLAN_VIGENTE
-                    + "=true para partir del plan vigente)";
+            return "Arranque: heuristica constructiva comun (pedido con -D"
+                    + ConfiguracionEscenario.PROPIEDAD_ARRANQUE_DESDE_PLAN_VIGENTE + "=false)";
         }
         if (!algoritmo.admiteArranqueDesdePlanVigente()) {
             return "Arranque: heuristica constructiva comun"

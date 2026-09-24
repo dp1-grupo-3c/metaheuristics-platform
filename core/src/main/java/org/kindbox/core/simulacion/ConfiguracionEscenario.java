@@ -125,7 +125,10 @@ public record ConfiguracionEscenario(
 
     /**
      * Lee de las propiedades el indicador {@value #PROPIEDAD_ARRANQUE_DESDE_PLAN_VIGENTE}.
-     * Ausente o vacio es {@code false}, que es el arranque de referencia.
+     * Ausente o vacio es {@code true}: cada replanificacion parte del plan vigente, porque
+     * con el arranque constructivo el presupuesto se gasta en reconstruir asignaciones que ya
+     * estaban resueltas y el plan pierde pedidos que ya tenia colocados a tiempo. El arranque
+     * constructivo de referencia se pide con {@code false}.
      *
      * @throws IllegalArgumentException si el valor no es {@code true} ni {@code false}. Caer
      *                                  en silencio al valor por defecto haria pasar una
@@ -134,7 +137,7 @@ public record ConfiguracionEscenario(
     public static boolean leerArranqueDesdePlanVigente(Properties propiedades) {
         String texto = propiedades == null ? null : propiedades.getProperty(PROPIEDAD_ARRANQUE_DESDE_PLAN_VIGENTE);
         if (texto == null || texto.isBlank()) {
-            return false;
+            return true;
         }
         String limpio = texto.trim().toLowerCase(Locale.ROOT);
         if (limpio.equals("true")) {

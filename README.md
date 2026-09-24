@@ -154,16 +154,16 @@ parametros completos del algoritmo, y avisa si el presupuesto cae fuera del rang
 ./mvnw -q -pl experiments exec:java \
   -Dexec.mainClass=org.kindbox.experiments.CorrerEscenario \
   -Dexec.args="data 5D 2026-09-01 ALNS 30" \
-  -DarranqueDesdePlanVigente=true
+  -DarranqueDesdePlanVigente=false
 ```
 
-Por defecto cada replanificacion construye su solucion de partida con la heuristica de ahorros.
-Con `-DarranqueDesdePlanVigente=true` parte del plan vigente de la replanificacion anterior,
+Por defecto cada replanificacion parte del plan vigente de la replanificacion anterior,
 recortado a la fotografia: solo los pedidos que siguen pendientes y las unidades que siguen
 disponibles, y cada ruta recortada por su cola hasta que vuelve a ser factible. Es el segundo
 modo de arranque del apartado 7.3.5 del ISA y la hipotesis experimental del apartado 11.4:
 partir del plan vigente deberia rebajar la tasa de reasignacion de pedidos entre
-replanificaciones. Vale para `CorrerEscenario`, `MedirEstabilidad` y la API, con el mismo
+replanificaciones. Con `-DarranqueDesdePlanVigente=false` cada replanificacion construye su
+solucion de partida con la heuristica de ahorros, que es el arranque de referencia. Vale para `CorrerEscenario`, `MedirEstabilidad` y la API, con el mismo
 nombre de propiedad; solo lo aprovecha ALNS, y con HGS el ejecutable avisa de que el indicador
 no tiene efecto. Un valor que no sea `true` ni `false` detiene el ejecutable.
 
