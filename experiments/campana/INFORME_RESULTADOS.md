@@ -242,6 +242,22 @@ Ningún incumplido es IMPOSIBLE_FISICO: todos eran alcanzables. Se leen tres cos
    de las nueve replanificaciones que lo vieron; HGS sí lo entregó, a las 21:55, 5 minutos
    antes de su límite real.
 
+**Colapso (N4).** La réplica 1 de N4 se repitió también con el diagnóstico. Las tres
+variantes colapsaron en el mismo pedido, el 1109, en el minuto 4 250 (día 3, 22:50, con la
+rampa al 70 %). Es el mismo pedido grande que vence en la última hora del turno: ALNS-C y
+ALNS-F nunca lo asignaron (COMPETENCIA) y HGS lo tuvo asignado y lo soltó (PLAN_ROTO). El
+colapso de N4 no lo decide la saturación general de la flota, sino un pedido concreto con un
+límite efectivo más temprano que el nominal.
+
+**Reproducibilidad del colapso.** En la campaña, esa misma réplica colapsó en el minuto 897
+con ALNS-C, en el 4 250 con ALNS-F y en el 10 570 con HGS; repetida, las tres colapsan en el
+4 250. Con presupuesto de reloj, cada ejecución completa un número distinto de iteraciones y
+toma decisiones distintas, así que la misma instancia y la misma semilla no garantizan el mismo
+plan (como ya advertía el apartado 10.5 del piloto). Esa variabilidad de la búsqueda se suma a
+la variabilidad entre instancias y explica buena parte de la dispersión de la tabla 4 (de 14 a
+176 horas). Por eso el instante de colapso necesita más réplicas, o repeticiones por réplica,
+para resolver diferencias entre algoritmos.
+
 **Corrección propuesta antes de repetir la campaña** (regla del paso 2):
 - Usar un límite efectivo, min(límite, cierre del turno − 60 min), en el nivel de urgencia de la función objetivo común y en el compromiso de ALNS.
 - Revisar cómo inserta ALNS los pedidos que requieren entregas parciales.
@@ -263,6 +279,7 @@ campaña, nunca a mitad de esta.
 | R-11 | Tres corridas en paralelo en 4 núcleos, en lugar de ejecución secuencial (S-07). | La contención de CPU podría restar iteraciones a una variante. | El orden es aleatorio y compartido por las tres variantes; ninguna llamada superó el presupuesto (máximo 1 965 ms); el tiempo de pared de la 5D es idéntico entre variantes (8,43 min). |
 | R-12 | V-4 (monotonía respecto de la solución inicial) no se instrumentó. | Una búsqueda que devolviera una solución peor que la constructiva no se detectaría. | V-2 garantiza que el valor informado es el real. Queda como verificación pendiente. |
 | R-13 | La cota de S-11 se expresa en pedidos, pero el código la define en paquetes (1 536 paquetes/día ≈ 384 pedidos/día). | Un lector podría esperar un volumen cuatro veces mayor en N4. | Corregir el texto de S-11 y H6; la campaña usa la cota en paquetes. |
+| R-15 | Búsqueda limitada por reloj, no reproducible exactamente. | La misma réplica repetida dio colapsos de 897, 4 250 y 10 570 min según la ejecución. | Reportar mediana y rango, emparejar por instancia y, para H6, aumentar las réplicas o repetir cada una varias veces. |
 | R-14 | La campaña se interrumpió dos veces por reinicios del contenedor. | Podría mezclar configuraciones. | Cada corrida es independiente y reanudable. No hubo ningún cambio de código ni de datos entre reanudaciones (verificado con `git diff`), y los hashes del manifiesto se mantienen. |
 
 ## Reproducción
