@@ -1,14 +1,16 @@
 # Verificación del visualizador
 
-Fecha local: 23/09/2026. Backend base: `7ce6a6a`. No se modificaron los módulos Java.
+Fecha local: 24/09/2026. Migración del visualizador sobre `bfe8602`. No se modificaron los módulos Java.
 
-Entorno: JDK 21.0.12, Node.js 26.8.2, Vite 8.3.0, Playwright 1.63.0 y Chromium 153. Servidor iniciado con `./mvnw -q -pl service spring-boot:run`, puerto 8080; interfaz en 5173, compilación en 4173. Datos reales del repositorio en `data/`, septiembre de 2026 (juego sintético generado anteriormente, no la carpeta docente original).
+Entorno: JDK 21.0.12, Node.js 26.8.2, Next.js 16.3.6, React 19.3.0, TanStack Query 5.103.2, Leaflet 1.9.4, Playwright 1.63.0 y Chromium 153. Servidor iniciado con `./mvnw -q -pl service spring-boot:run`, puerto 8080; desarrollo en 5173, exportación estática en 4173. Datos reales del repositorio en `data/`, septiembre de 2026 (juego sintético generado anteriormente, no la carpeta docente original).
 
 ## Comprobaciones automatizadas
 
-- `npm test`: cuatro pruebas de formato, presupuesto, escape de contenido y errores por código 400/404/409/500.
-- `npm run build`: compilación de producción sin errores, sin dependencias de ejecución.
-- `npm run verificar`: cinco pruebas de navegador. Tres usan el servidor real; dos controlan respuestas para estados difíciles de provocar de forma segura.
+- `npm test`: dos archivos aprobados, con seis casos de formato, presupuesto, escape, errores por código, consultas compartidas, mutaciones e instantáneas separadas por corrida.
+- `npm run build`: exportación estática de Next.js en `out/`, sin servidor Node.js necesario en producción.
+- `KINDBOX_VISUALIZADOR=http://127.0.0.1:4173 npm run verificar`: seis pruebas de navegador aprobadas sobre la exportación. Cuatro usan el servidor real; dos controlan respuestas para estados difíciles de provocar de forma segura.
+- `npm run dev`: arranque comprobado en Chromium, mapa Leaflet visible y conexión estable al backend real, sin errores de página.
+- Rutas directas `/acceso`, `/panel`, `/pedidos`, `/simulacion`, `/reportes`, `/configuracion` y `/seguimiento`: respuesta 200 y panel correspondiente. Orientación cartesiana de almacenes, zoom por teclado y encuadre de Leaflet comprobados.
 - Archivo inválido: error 400 del lector Java visible, incluyendo línea y nombre de archivo. Archivo válido: una avería programada. Registro individual aplicado a TA02.
 - ALNS en 5D y HGS en colapso: arranque con semilla visible, instantáneas de las 37 unidades y cancelación con confirmación. La prueba verifica que el reporte no se cierre por la carrera entre WebSocket y DELETE.
 - Interrupción de red y recuperación, navegación por teclado, búsqueda, tamaño de página, selección de vehículo desde la lista, zoom y encuadre.

@@ -1,3 +1,4 @@
+import * as plano from 'leaflet';
 import { escapar, nombresTipo, nombresEstado, numero, duracion, fechaMinuto, etiquetaSemaforo } from './formato.js';
 import { icono } from './iconos.js';
 
@@ -5,93 +6,86 @@ export class MapaCiudad {
     constructor(contenedor, seleccionar) {
         this.contenedor = contenedor;
         this.seleccionar = seleccionar;
-        this.centroX = 35;
-        this.centroY = 25;
-        this.aumento = 1;
         this.capas = { unidades: true, rutas: true, pedidos: true, bloqueos: true };
         this.datos = { almacenes: [], unidades: [], bloqueosVigentes: [] };
         this.pedidos = [];
         this.marcadores = new Map();
-        contenedor.innerHTML = `<svg class="reticula" aria-hidden="true"><g class="cuadricula"></g><g class="trazos"></g></svg><div class="marcadores"></div>
+        contenedor.innerHTML = `<div class="lienzoLeaflet"></div>
             <div class="mapaTitulo"><span class="sobreTitulo">PaqRap · Red de reparto</span><h1>Mapa de distribución</h1><span>70 × 50 km · Retícula de distribución</span></div>
             <div class="herramientasMapa"><button data-zoom="2" aria-label="Acercar mapa">+</button><button data-zoom="0.5" aria-label="Alejar mapa">−</button><button data-zoom="0" aria-label="Ver toda la ciudad">⌖</button></div>
-            <div class="escalaMapa"><span id="escalaGrafica"></span><span id="escalaTexto"></span></div>
+            <div class="escalaMapa"><span id="escalaGrafica"></span><span id="escalaTexto">5 km</span></div>
             <output class="coordenadas" aria-label="Coordenadas del mapa">(0,0)</output>
             <section class="tarjetaMapa" hidden aria-label="Detalle del elemento"><button class="cerrarTarjeta" aria-label="Cerrar detalle">×</button><div class="detalleMapa"></div></section>`;
-        this.svg = contenedor.querySelector('svg');
-        this.capaMarcadores = contenedor.querySelector('.marcadores');
         this.tarjeta = contenedor.querySelector('.tarjetaMapa');
+        this.limites = plano.latLngBounds([[0, 0], [50, 70]]);
+        this.mapa = plano.map(contenedor.querySelector('.lienzoLeaflet'), {
+            crs: plano.CRS.Simple, minZoom: -2, maxZoom: 6, zoomSnap: 0,
+            zoomControl: false, attributionControl: false, keyboard: false,
+            zoomAnimation: false, fadeAnimation: false, markerZoomAnimation: false,
+        });
+        this.cuadricula = plano.layerGroup().addTo(this.mapa);
+        this.trazos = plano.layerGroup().addTo(this.mapa);
+        this.crearCuadricula();
+        this.encuadrar();
         contenedor.querySelector('.cerrarTarjeta').onclick = () => this.elegir(null);
         contenedor.querySelectorAll('[data-zoom]').forEach(boton => boton.onclick = () => this.zoom(Number(boton.dataset.zoom)));
-        contenedor.addEventListener('wheel', evento => {
-            if (evento.target.closest('.tarjetaMapa')) return;
-            evento.preventDefault();
-            this.zoom(evento.deltaY < 0 ? 2 : 0.5);
-        }, { passive: false });
-        this.punteros = new Map();
-        contenedor.addEventListener('pointerdown', evento => {
-            if (evento.target.closest('button, .tarjetaMapa')) return;
-            this.punteros.set(evento.pointerId, { x: evento.clientX, y: evento.clientY });
-            this.arrastre = { x: evento.clientX, y: evento.clientY, centroX: this.centroX, centroY: this.centroY };
-            this.movido = false;
-            contenedor.setPointerCapture(evento.pointerId);
+        this.mapa.on('click', () => this.elegir(null));
+        this.mapa.on('mousemove', evento => {
+            const x = Math.max(0, Math.min(70, Math.round(evento.latlng.lng)));
+            const y = Math.max(0, Math.min(50, Math.round(evento.latlng.lat)));
+            contenedor.querySelector('.coordenadas').textContent = `(${x},${y})`;
         });
-        contenedor.addEventListener('pointermove', evento => {
-            const limites = contenedor.getBoundingClientRect();
-            const x = Math.round((evento.clientX - limites.left - this.ancho / 2) / this.escala + this.centroX);
-            const y = Math.round((this.alto / 2 + 30 - evento.clientY + limites.top) / this.escala + this.centroY);
-            contenedor.querySelector('.coordenadas').textContent = `(${Math.max(0, Math.min(70, x))},${Math.max(0, Math.min(50, y))})`;
-            if (!this.punteros.has(evento.pointerId)) return;
-            this.punteros.set(evento.pointerId, { x: evento.clientX, y: evento.clientY });
-            if (this.punteros.size === 2) {
-                const [primero, segundo] = [...this.punteros.values()];
-                const distancia = Math.hypot(primero.x - segundo.x, primero.y - segundo.y);
-                if (this.distanciaPellizco && Math.abs(distancia / this.distanciaPellizco - 1) > 0.35) {
-                    this.zoom(distancia > this.distanciaPellizco ? 2 : 0.5);
-                    this.distanciaPellizco = distancia;
-                }
-                this.distanciaPellizco ||= distancia;
-                this.movido = true;
-            } else if (this.arrastre) {
-                const desplazamientoX = evento.clientX - this.arrastre.x;
-                const desplazamientoY = evento.clientY - this.arrastre.y;
-                if (Math.abs(desplazamientoX) + Math.abs(desplazamientoY) > 4) this.movido = true;
-                this.centroX = Math.max(0, Math.min(70, this.arrastre.centroX - desplazamientoX / this.escala));
-                this.centroY = Math.max(0, Math.min(50, this.arrastre.centroY + desplazamientoY / this.escala));
-                this.dibujar();
-            }
+        this.mapa.on('move zoom', () => this.actualizarSuperposiciones());
+        this.mapa.on('moveend', () => {
+            const centro = this.mapa.getCenter();
+            const x = Math.max(0, Math.min(70, centro.lng));
+            const y = Math.max(0, Math.min(50, centro.lat));
+            if (centro.lng !== x || centro.lat !== y) this.mapa.panTo([y, x], { animate: false });
         });
-        const soltar = evento => {
-            if (!this.punteros.has(evento.pointerId)) return;
-            this.punteros.delete(evento.pointerId);
-            this.distanciaPellizco = null;
-            this.arrastre = null;
-            if (!this.movido) this.elegir(null);
-        };
-        contenedor.addEventListener('pointerup', soltar);
-        contenedor.addEventListener('pointercancel', soltar);
+        this.eventos = new AbortController();
         contenedor.addEventListener('keydown', evento => {
-            if (evento.target !== contenedor) return;
-            const teclas = { ArrowLeft: [-5, 0], ArrowRight: [5, 0], ArrowUp: [0, 5], ArrowDown: [0, -5] };
-            if (teclas[evento.key]) {
-                evento.preventDefault();
-                this.centroX = Math.max(0, Math.min(70, this.centroX + teclas[evento.key][0]));
-                this.centroY = Math.max(0, Math.min(50, this.centroY + teclas[evento.key][1]));
-                this.dibujar();
-            } else if (['+', '=', '-', 'Home'].includes(evento.key)) {
+            if (evento.target !== contenedor && evento.target !== this.mapa.getContainer()) return;
+            const teclas = { ArrowLeft: [-80, 0], ArrowRight: [80, 0], ArrowUp: [0, -80], ArrowDown: [0, 80] };
+            if (teclas[evento.key]) { evento.preventDefault(); this.mapa.panBy(teclas[evento.key], { animate: false }); }
+            else if (['+', '=', '-', 'Home'].includes(evento.key)) {
                 evento.preventDefault();
                 this.zoom(evento.key === 'Home' ? 0 : evento.key === '-' ? 0.5 : 2);
             }
+        }, { signal: this.eventos.signal });
+        this.observadorTamano = new ResizeObserver(() => {
+            const encuadrado = this.mapa.getZoom() <= this.mapa.getMinZoom() + 0.01;
+            this.mapa.invalidateSize({ pan: false });
+            if (encuadrado) this.encuadrar();
+            this.actualizarSuperposiciones();
         });
-        new ResizeObserver(() => this.dibujar()).observe(contenedor);
+        this.observadorTamano.observe(contenedor);
+    }
+    crearCuadricula() {
+        const opciones = { color: '#616161', opacity: 1, weight: 0.5, interactive: false };
+        for (let x = 0; x <= 70; x++) {
+            plano.polyline([[0, x], [50, x]], { ...opciones, weight: x % 10 ? 0.5 : 1 }).addTo(this.cuadricula);
+            if (x % 10 === 0) this.rotulo([0, x], x, 'ejeHorizontal');
+        }
+        for (let y = 0; y <= 50; y++) {
+            plano.polyline([[y, 0], [y, 70]], { ...opciones, weight: y % 10 ? 0.5 : 1 }).addTo(this.cuadricula);
+            if (y % 10 === 0) this.rotulo([y, 0], y, 'ejeVertical');
+        }
+    }
+    rotulo(coordenada, texto, clase) {
+        plano.marker(coordenada, { interactive: false, keyboard: false, icon: plano.divIcon({ className: `rotuloEje ${clase}`, html: String(texto), iconSize: [30, 20], iconAnchor: clase === 'ejeHorizontal' ? [15, -8] : [36, 10] }) }).addTo(this.cuadricula);
+    }
+    encuadrar() {
+        this.mapa.setMinZoom(-5);
+        this.mapa.fitBounds(this.limites, { paddingTopLeft: [50, 135], paddingBottomRight: [50, 50], animate: false });
+        this.mapa.setMinZoom(this.mapa.getZoom());
     }
     zoom(factor) {
-        if (!factor) { this.aumento = 1; this.centroX = 35; this.centroY = 25; }
-        else this.aumento = Math.max(1, Math.min(64 / this.escalaBase, this.aumento * factor));
-        this.dibujar();
+        if (!factor) this.encuadrar();
+        else this.mapa.setZoom(this.mapa.getZoom() + Math.log2(factor));
     }
     posicion(x, y) {
-        return [this.ancho / 2 + (x - this.centroX) * this.escala, this.alto / 2 + 30 - (y - this.centroY) * this.escala];
+        const punto = this.mapa.latLngToContainerPoint([y, x]);
+        return [punto.x, punto.y];
     }
     actualizar(datos, pedidos, parametros, corrida) {
         this.datos = datos;
@@ -106,48 +100,29 @@ export class MapaCiudad {
         this.dibujar();
     }
     centrarPedido(pedido) {
-        this.centroX = pedido.x;
-        this.centroY = pedido.y;
+        this.mapa.panTo([pedido.y, pedido.x], { animate: false });
         this.elegir(`pedido-${pedido.id}`);
     }
     camino(nodos, clase, color, opacidad = 1) {
-        if (!nodos || nodos.length < 4) return '';
+        if (!nodos || nodos.length < 4) return;
         const puntos = [];
-        for (let indice = 0; indice < nodos.length; indice += 2) puntos.push(this.posicion(nodos[indice], nodos[indice + 1]).join(','));
-        return `<polyline points="${puntos.join(' ')}" class="${clase}" style="--colorTrazo:var(--${color});opacity:${opacidad}"/>`;
+        for (let indice = 0; indice < nodos.length; indice += 2) puntos.push([nodos[indice + 1], nodos[indice]]);
+        plano.polyline(puntos, {
+            color: `var(--${color})`, opacity: opacidad, weight: clase === 'bloqueo' ? 8 : 6,
+            dashArray: clase.includes('pendiente') ? '14 10' : null,
+            className: clase, interactive: false,
+        }).addTo(this.trazos);
     }
     dibujar() {
-        this.ancho = this.contenedor.clientWidth;
-        this.alto = this.contenedor.clientHeight;
-        this.escalaBase = Math.max(1, Math.min((this.ancho - 80) / 70, (this.alto - 220) / 50));
-        this.escala = Math.min(64, this.escalaBase * this.aumento);
-        this.svg.setAttribute('viewBox', `0 0 ${this.ancho} ${this.alto}`);
-        let lineas = '';
-        for (let x = 0; x <= 70; x++) {
-            const [px, arriba] = this.posicion(x, 50);
-            const [, abajo] = this.posicion(x, 0);
-            lineas += `<path d="M${px} ${arriba}V${abajo}" class="${x % 10 ? '' : 'principal'}"/>`;
-            if (x % 10 === 0) lineas += `<text x="${px}" y="${abajo + 23}">${x}</text>`;
-        }
-        for (let y = 0; y <= 50; y++) {
-            const [izquierda, py] = this.posicion(0, y);
-            const [derecha] = this.posicion(70, y);
-            lineas += `<path d="M${izquierda} ${py}H${derecha}" class="${y % 10 ? '' : 'principal'}"/>`;
-            if (y % 10 === 0) lineas += `<text x="${izquierda - 22}" y="${py + 4}">${y}</text>`;
-        }
-        this.svg.querySelector('.cuadricula').innerHTML = lineas;
+        this.trazos.clearLayers();
         const unidades = this.datos.unidades || [];
-        let trazos = this.capas.bloqueos ? (this.datos.bloqueosVigentes || []).map(bloqueo => this.camino(bloqueo.nodos, 'bloqueo', 'rojo')).join('') : '';
+        if (this.capas.bloqueos) for (const bloqueo of this.datos.bloqueosVigentes || []) this.camino(bloqueo.nodos, 'bloqueo', 'rojo');
         if (this.capas.rutas) for (const unidad of unidades) {
             const opacidad = !this.elegida || this.elegida === unidad.codigo ? 1 : 0.5;
-            trazos += this.camino(unidad.caminoPendiente, 'ruta pendiente', unidad.tipo.toLowerCase(), opacidad);
-            trazos += this.camino(unidad.caminoRecorrido, 'ruta recorrida', unidad.tipo.toLowerCase(), opacidad);
-            if (this.elegida === unidad.codigo && unidad.destinoX >= 0) {
-                const [x, y] = this.posicion(unidad.destinoX, unidad.destinoY);
-                trazos += `<circle cx="${x}" cy="${y}" r="10" fill="var(--${unidad.tipo.toLowerCase()})"/>`;
-            }
+            this.camino(unidad.caminoPendiente, 'ruta pendiente', unidad.tipo.toLowerCase(), opacidad);
+            this.camino(unidad.caminoRecorrido, 'ruta recorrida', unidad.tipo.toLowerCase(), opacidad);
+            if (this.elegida === unidad.codigo && unidad.destinoX >= 0) plano.circleMarker([unidad.destinoY, unidad.destinoX], { radius: 10, color: `var(--${unidad.tipo.toLowerCase()})`, fillOpacity: 1, interactive: false }).addTo(this.trazos);
         }
-        this.svg.querySelector('.trazos').innerHTML = trazos;
         const elementos = [];
         if (this.capas.pedidos) for (const pedido of this.pedidos) elementos.push({ clave: `pedido-${pedido.id}`, x: pedido.x, y: pedido.y, color: pedido.semaforo.toLowerCase(), simbolo: 'pedidos', etiqueta: `Pedido ${pedido.id} en (${pedido.x},${pedido.y})`, dato: pedido, clase: 'pedido', texto: String(pedido.id) });
         for (const almacen of this.datos.almacenes || []) elementos.push({ clave: `almacen-${almacen.id}`, ...almacen, color: almacen.central ? 'marca' : almacen.color.toLowerCase(), simbolo: almacen.central ? 'casa' : 'caja', etiqueta: `${almacen.nombre} en (${almacen.x},${almacen.y})`, dato: almacen, clase: 'almacen', texto: almacen.central ? 'Central' : `A${almacen.id}` });
@@ -156,28 +131,42 @@ export class MapaCiudad {
         const presentes = new Set();
         for (const elemento of elementos) {
             presentes.add(elemento.clave);
-            let boton = this.marcadores.get(elemento.clave);
-            if (!boton) {
-                boton = document.createElement('button');
+            let registro = this.marcadores.get(elemento.clave);
+            if (!registro) {
+                const boton = document.createElement('button');
                 boton.type = 'button';
-                boton.onclick = () => this.elegir(elemento.clave);
-                this.marcadores.set(elemento.clave, boton);
-                this.capaMarcadores.append(boton);
+                boton.onclick = evento => { evento.stopPropagation(); this.elegir(elemento.clave); };
+                const capa = plano.marker([elemento.y, elemento.x], { keyboard: false, icon: plano.divIcon({ html: boton, className: 'envolturaMarcador', iconSize: [0, 0], iconAnchor: [0, 0] }) }).addTo(this.mapa);
+                registro = { boton, capa };
+                this.marcadores.set(elemento.clave, registro);
             }
-            const [x, y] = this.posicion(elemento.x, elemento.y);
+            const { boton, capa } = registro;
+            capa.setLatLng([elemento.y, elemento.x]);
+            capa.setZIndexOffset(this.elegida === elemento.clave ? 10000 : elemento.clase === 'unidad' ? 1000 : 0);
             boton.className = `marcador ${elemento.clase}${this.elegida === elemento.clave ? ' elegido' : ''}`;
-            boton.style.cssText = `left:${x}px;top:${y}px;--colorMarcador:var(--${elemento.color})`;
+            boton.style.setProperty('--colorMarcador', `var(--${elemento.color})`);
             boton.setAttribute('aria-label', elemento.etiqueta);
             boton.title = elemento.etiqueta;
             const contenido = `${icono(elemento.simbolo)}<span class="rotulo">${escapar(elemento.texto)}</span>${elemento.tipoAveria ? '<b class="insignia">!</b>' : ''}${elemento.clase === 'almacen' && !elemento.central ? `<small class="nivel">${{VERDE:'▰▰▰',AMBAR:'▰▰',ROJO:'!'}[elemento.dato.color]}</small>` : ''}`;
             if (boton.innerHTML !== contenido) boton.innerHTML = contenido;
         }
-        for (const [clave, boton] of this.marcadores) if (!presentes.has(clave)) { boton.remove(); this.marcadores.delete(clave); }
-        const elegido = elementos.find(elemento => elemento.clave === this.elegida);
+        for (const [clave, registro] of this.marcadores) if (!presentes.has(clave)) { registro.capa.remove(); this.marcadores.delete(clave); }
+        this.elementos = elementos;
+        this.actualizarSuperposiciones();
+    }
+    actualizarSuperposiciones() {
+        this.ancho = this.contenedor.clientWidth;
+        this.alto = this.contenedor.clientHeight;
+        const elegido = this.elementos?.find(elemento => elemento.clave === this.elegida);
         this.tarjeta.hidden = !elegido;
         if (elegido) this.mostrarDetalle(elegido);
-        this.contenedor.querySelector('#escalaGrafica').style.width = `${this.escala * 5}px`;
-        this.contenedor.querySelector('#escalaTexto').textContent = '5 km';
+        const longitud = 5 * 2 ** this.mapa.getZoom();
+        this.contenedor.querySelector('#escalaGrafica').style.width = `${longitud}px`;
+    }
+    destruir() {
+        this.observadorTamano.disconnect();
+        this.eventos.abort();
+        this.mapa.remove();
     }
     mostrarDetalle(elemento) {
         const dato = elemento.dato;

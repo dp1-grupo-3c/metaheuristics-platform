@@ -107,7 +107,7 @@ prueba('Servidor real: rutas, bloqueos, parámetros en caliente y desenlace natu
     esperar(respuesta.status()).toBe(201);
     const corrida = await respuesta.json();
     await esperar(pagina.locator('#identidad')).toContainText(corrida.id);
-    await esperar.poll(() => pagina.locator('polyline.ruta').evaluateAll(rutas => rutas.some(ruta => ruta.getTotalLength() > 0)), { timeout: 60000 }).toBeTruthy();
+    await esperar.poll(() => pagina.locator('path.ruta').evaluateAll(rutas => rutas.some(ruta => ruta.getTotalLength() > 0)), { timeout: 60000 }).toBeTruthy();
     await pagina.screenshot({ path: 'test-results/rutas-reales.png' });
     const conflicto = await peticiones.post('/api/simulaciones', { data: {} });
     esperar(conflicto.status()).toBe(409);
@@ -128,8 +128,31 @@ prueba('Servidor real: rutas, bloqueos, parámetros en caliente y desenlace natu
     const detalle = await (await peticiones.get(`/api/simulaciones/${corrida.id}`)).json();
     esperar(['COLAPSADA', 'CULMINADA']).toContain(detalle.corrida.estado);
     esperar(detalle.resultado.metricas.ejecucionesPlanificador).toBeGreaterThan(0);
-    await esperar(pagina.locator('polyline.bloqueo')).toHaveCount(detalle.instantanea.bloqueosVigentes.length);
+    await esperar(pagina.locator('path.bloqueo')).toHaveCount(detalle.instantanea.bloqueosVigentes.length);
     const cantidadPedidos = await (await peticiones.get(`/api/simulaciones/${corrida.id}/pedidos?soloActivos=true&tamano=500`)).json();
     await esperar(pagina.locator('.marcador.pedido')).toHaveCount(cantidadPedidos.totalFilas, { timeout: 10000 });
     await pagina.screenshot({ path: 'test-results/desenlace-natural.png' });
+});
+
+prueba('Next exportado: rutas directas y orientación cartesiana de Leaflet', async ({ page: pagina }) => {
+    const paneles = { acceso: 'Sesión', panel: 'Métricas', pedidos: 'Pedidos', simulacion: 'KindBox Sim', reportes: 'Métricas', configuracion: 'KindBox Sim', seguimiento: 'Pedidos' };
+    for (const [ruta, titulo] of Object.entries(paneles)) {
+        const respuesta = await pagina.goto(`/${ruta}/`);
+        esperar(respuesta.status()).toBe(200);
+        await esperar(pagina.locator('#estadoConexion')).toContainText('Conexión Estable');
+        if (await pagina.locator('#dialogo').isVisible()) await pagina.keyboard.press('Escape');
+        await esperar(pagina.locator('#tituloPanel')).toHaveText(titulo);
+        await esperar(pagina.locator('.leaflet-container')).toBeVisible();
+    }
+    await pagina.getByRole('button', { name: 'Cerrar panel' }).click();
+    const central = await pagina.locator('.marcador.almacen').filter({ hasText: 'Central' }).boundingBox();
+    const noroeste = await pagina.locator('.marcador.almacen').filter({ hasText: 'A1' }).boundingBox();
+    esperar(noroeste.x).toBeLessThan(central.x);
+    esperar(noroeste.y).toBeLessThan(central.y);
+    const escala = await pagina.locator('#escalaGrafica').evaluate(elemento => elemento.getBoundingClientRect().width);
+    await pagina.locator('#mapa').focus();
+    await pagina.keyboard.press('+');
+    await esperar.poll(() => pagina.locator('#escalaGrafica').evaluate(elemento => elemento.getBoundingClientRect().width)).toBeGreaterThan(escala);
+    await pagina.keyboard.press('Home');
+    await esperar.poll(() => pagina.locator('#escalaGrafica').evaluate(elemento => elemento.getBoundingClientRect().width)).toBeCloseTo(escala, 0);
 });

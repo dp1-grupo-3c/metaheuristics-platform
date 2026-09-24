@@ -19,7 +19,7 @@ npm ci
 npm run dev
 ```
 
-Abra **http://localhost:5173**. Vite remite `/api` y `/ws` al servidor en `127.0.0.1:8080`; funciona también desde otro dispositivo usando la dirección del equipo anfitrión. Para otro servidor:
+Abra **http://localhost:5173**. El intermediario de desarrollo inicia Next.js en el puerto interno 5174 y remite `/api` y `/ws` al servidor en `127.0.0.1:8080`; funciona también desde otro dispositivo usando la dirección del equipo anfitrión. Para otro servidor:
 
 ```bash
 KINDBOX_SERVIDOR=http://127.0.0.1:8081 npm run dev
@@ -44,13 +44,21 @@ npx playwright install chromium
 npm run verificar
 ```
 
-`preview` sirve la compilación en http://localhost:4173 con el mismo intermediario REST/WebSocket. Es una comprobación local, no un servidor de producción. `dist/` se despliega como archivos estáticos; el servidor de despliegue debe remitir `/api/` a Spring y `/ws/` con actualización de protocolo WebSocket. No se necesitan cambios de CORS en Java: el servicio ya permite los orígenes y el intermediario mantiene el mismo origen en el navegador. Véase la [configuración oficial de Vite](https://vite.dev/config/server-options.html#server-proxy).
+`preview` sirve la compilación en http://localhost:4173 con el mismo intermediario REST/WebSocket. Es una comprobación local, no un servidor de producción. `out/` se despliega como archivos estáticos; el servidor de despliegue debe remitir `/api/` a Spring y `/ws/` con actualización de protocolo WebSocket. No se necesitan cambios de CORS en Java: el servicio ya permite los orígenes y el intermediario mantiene el mismo origen en el navegador. La VM sirve los archivos con Nginx; no necesita instalar Node.js. Véase la [exportación estática de Next.js](https://nextjs.org/docs/app/guides/static-exports).
 
 `npm run verificar` necesita el servidor real y `npm run dev` encendidos, datos de septiembre de 2026 y ninguna corrida activa. **Crea y cancela corridas de prueba, registra averías y modifica parámetros temporalmente.** No se debe ejecutar contra una presentación en curso. `KINDBOX_VISUALIZADOR` permite otra URL de interfaz; `KINDBOX_NAVEGADOR` permite usar un ejecutable Chromium ya instalado. Los resultados y capturas quedan en `test-results/`, excluido de Git. Pruebas implementadas con [Playwright](https://playwright.dev/docs/test-configuration).
 
 ## Decisiones de implementación
 
-JavaScript modular, CSS y SVG nativos; Vite como herramienta de desarrollo y compilación. No hay dependencias de ejecución, claves de mapas ni recursos externos. La retícula cartesiana real del modelo sustituye el mapa de calles de las capturas, tal como exige el estándar 61. El origen está abajo a la izquierda; el mapa permite selección, zoom, arrastre, pellizco, teclado, capas y encuadre completo.
+El visualizador está alineado con las tecnologías del diagrama de arquitectura:
+
+- **Next.js y React:** App Router, páginas exportadas a `out/` y montaje del visualizador exclusivamente en el cliente. Las vistas existentes conservan su renderizador DOM dentro de un componente React con limpieza de eventos, canal y mapa al desmontarse. No se requiere servidor Next.js en producción.
+- **TanStack Query:** `QueryClientProvider`, caché por ruta REST, deduplicación de consultas simultáneas, registro de mutaciones e invalidación tras escrituras. Un `QueryObserver` gestiona el sondeo periódico. Los mensajes WebSocket se guardan por corrida y tipo; se descartan instantáneas atrasadas. Las mutaciones no se reintentan automáticamente para evitar duplicar corridas o averías.
+- **Leaflet con CRS.Simple:** administra la proyección, desplazamiento, zoom, marcadores y capas vectoriales de rutas y bloqueos. Se convierten los pares del servidor `(x,y)` al orden Leaflet `[y,x]`, con origen abajo a la izquierda. No se usan teselas geográficas, servicios externos ni claves.
+
+Las rutas estáticas `/`, `/acceso/`, `/panel/`, `/pedidos/`, `/simulacion/`, `/reportes/`, `/configuracion/` y `/seguimiento/` abren el panel correspondiente. `/acceso/` informa que no hay autenticación; `/seguimiento/` permite consultar los pedidos disponibles, sin presentarse como una vista privada de cliente. Ambas requieren ampliar el backend para aplicar roles y privacidad.
+
+La compilación incorpora las dependencias del navegador. Node.js se usa en desarrollo y construcción; `servidor.mjs` es solo la herramienta local para servir Next.js o `out/` y reenviar REST/WebSocket. No forma parte del despliegue propuesto en la VM. [TanStack Query](https://tanstack.com/query/latest/docs/reference/QueryClient) · [Leaflet CRS.Simple](https://leafletjs.com/examples/crs-simple/crs-simple.html).
 
 Los identificadores propios y los textos están en español. Se conservan las claves obligatorias de HTML, CSS, JavaScript, herramientas y protocolos. La paleta proviene de `61.std.gui.v01.docx`; la organización reproduce los paneles y reportes de `01.definicion.prototipo.v02.pdf` y `prototype-shots`.
 
@@ -81,3 +89,8 @@ No se cambió el contrato para cubrir estos puntos:
 6. **Históricos:** los parámetros son globales y mutables, sin instantánea histórica de umbrales. El reporte etiqueta sus límites como vigentes, sin atribuirlos falsamente a toda la corrida.
 
 Estos puntos impiden afirmar conformidad completa con los ítems V05, V06, V13 y V16 del estándar. El cierre del reporte conserva el último mapa para inspección; «Configurar nueva corrida» recupera el formulario con los valores anteriores.
+
+
+## Pendiente del resto de la arquitectura
+
+Esta migración se limita al visualizador. Permanecen pendientes la seguridad con sesión/CSRF/roles, MySQL/JPA/Flyway, ingesta idempotente, diario de comandos y puntos de control, latido y numeración de instantáneas, actualización a Spring Boot 4.1, instalación de Nginx/systemd en la VM, despliegue automatizado, respaldos y validación de límites de CPU/memoria. El backend continúa con Spring Boot 3.3.5 y Java 21. Estos elementos no se dan por implementados ni se modificaron en esta entrega.

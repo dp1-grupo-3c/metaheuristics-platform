@@ -1,9 +1,21 @@
-import './estilos.css';
-import { solicitar, CanalSimulacion, tituloError } from './api.js';
+import { QueryObserver as ObservadorConsulta } from '@tanstack/react-query';
+import { crearSolicitante, guardarMensaje } from './consultas.js';
+import { CanalSimulacion, tituloError } from './api.js';
 import { escapar, numero, soles, duracion, fecha, sumarDias, fechaMinuto, presupuestoSegundos, nombresTipo, nombresEstado, nombresEscenario, estadosFinales, etiquetaSemaforo } from './formato.js';
 import { icono } from './iconos.js';
 import { MapaCiudad } from './mapa.js';
 
+export function montarVisualizador(aplicacion, clienteConsultas, panelInicial = 'configuracion') {
+const consultar = crearSolicitante(clienteConsultas);
+const solicitar = async (...argumentos) => {
+    const resultado = await consultar(...argumentos);
+    if (desmontado) throw new Error("Vista desmontada");
+    return resultado;
+};
+const eventos = new AbortController();
+let desmontado = false;
+let detenerObservador;
+let observador;
 const estado = {
     corrida: null, instantanea: null, resultado: null, parametros: null, almacenes: [],
     pedidosMapa: [], pagina: null, paginaNumero: 0, averias: [], panel: null,
@@ -11,7 +23,6 @@ const estado = {
     ocupado: false, historico: false, cerrados: new Set(), consulta: window.innerWidth < 1024,
 };
 const porId = identificador => document.getElementById(identificador);
-const aplicacion = porId('aplicacion');
 const navegacion = [['configuracion', 'menu', 'Configuración'], ['metricas', 'metricas', 'Métricas'], ['pedidos', 'pedidos', 'Pedidos'], ['averias', 'averias', 'Averías'], ['leyenda', 'leyenda', 'Leyenda'], ['sesion', 'perfil', 'Sesión']];
 aplicacion.innerHTML = `
     <header class="cabecera">
@@ -44,6 +55,7 @@ aplicacion.innerHTML = `
 const mapa = new MapaCiudad(porId('mapa'), () => {});
 let temporizadorNotificacion;
 function notificar(mensaje, esError = false) {
+    if (desmontado) return;
     clearTimeout(temporizadorNotificacion);
     porId('notificacion').hidden = false;
     porId('notificacion').classList.toggle('esError', esError);
@@ -58,6 +70,7 @@ porId('cerrarNotificacion').onclick = () => { porId('notificacion').hidden = tru
 const enCurso = () => estado.corrida && !estadosFinales.has(estado.corrida.estado);
 const metricas = () => estado.resultado?.metricas || estado.instantanea?.metricas;
 function pintarMapa() {
+    if (desmontado) return;
     mapa.actualizar(estado.instantanea || { almacenes: estado.almacenes, unidades: [], bloqueosVigentes: [] }, estado.pedidosMapa, estado.parametros, estado.corrida);
 }
 function cambiarConexion(conexion) {
@@ -69,6 +82,7 @@ function cambiarConexion(conexion) {
     pintarFrescura();
 }
 function pintarFrescura() {
+    if (desmontado) return;
     porId('frescura').hidden = estado.conexion === 'Conexión Estable';
     porId('frescura').textContent = `Última consulta recibida: ${estado.ultimaRecepcion ? estado.ultimaRecepcion.toLocaleString('es-PE', { hour12: false }) : 'sin datos'}. Se conserva el último estado conocido.`;
 }
@@ -99,6 +113,7 @@ function recibirInstantanea(instantanea) {
     actualizarPanelVivo();
 }
 const canal = new CanalSimulacion(mensaje => {
+    guardarMensaje(clienteConsultas, mensaje);
     if (estado.historico) return;
     estado.ultimaRecepcion = new Date();
     if (mensaje.tipo === 'corrida') {
@@ -118,6 +133,7 @@ const canal = new CanalSimulacion(mensaje => {
 porId('reconectar').onclick = () => canal.reintentar();
 
 function pintarCabecera() {
+    if (desmontado) return;
     const corrida = estado.corrida;
     const foto = estado.instantanea;
     const indicadores = metricas();
@@ -387,6 +403,7 @@ porId('cerrarPanel').onclick = () => {
 };
 document.querySelector('.marca').onclick = evento => { evento.preventDefault(); abrirPanel('configuracion'); };
 function actualizarPanelVivo() {
+    if (desmontado) return;
     if (porId('metricasVivas')) porId('metricasVivas').innerHTML = tablaMetricas(metricas());
     if (porId('verResultado')) porId('verResultado').hidden = !estadosFinales.has(estado.corrida?.estado);
     const unidades = estado.instantanea?.unidades || [];
@@ -462,8 +479,8 @@ document.addEventListener('keydown', evento => {
     if (evento.key !== 'Escape' || porId('dialogo').open) return;
     if (mapa.elegida) mapa.elegir(null);
     else if (estado.panel) porId('cerrarPanel').click();
-});
-window.addEventListener('resize', () => { estado.consulta = window.innerWidth < 1024; pintarCabecera(); });
+}, { signal: eventos.signal });
+window.addEventListener('resize', () => { estado.consulta = window.innerWidth < 1024; pintarCabecera(); }, { signal: eventos.signal });
 let consultando = false;
 let ciclo = 0;
 async function descubrir() {
@@ -473,7 +490,7 @@ async function descubrir() {
     if (corridas.length && !estado.historico) recibirCabecera(corridas[0]);
 }
 async function refrescar() {
-    if (consultando) return;
+    if (consultando || desmontado) return;
     consultando = true;
     try {
         if (ciclo % 5 === 0 || !estado.parametros) {
@@ -521,18 +538,35 @@ async function refrescar() {
     } finally { ciclo++; consultando = false; }
 }
 async function iniciar() {
-    abrirPanel('configuracion');
+    abrirPanel(panelInicial);
     try {
         const [salud, parametros, almacenes] = await Promise.all([solicitar('/salud'), solicitar('/parametros'), solicitar('/almacenes')]);
+        if (desmontado) return;
         estado.parametros = parametros;
         estado.almacenes = almacenes;
         pintarMapa();
         if (!salud.datosDisponibles) notificar('El servidor no encuentra el directorio de datos. Configure sus datos antes de comenzar.', true);
-        abrirPanel('configuracion');
+        abrirPanel(panelInicial);
         await descubrir();
         await refrescar();
     } catch (error) { mostrarError(error); }
+    if (desmontado) return;
     canal.conectar();
-    setInterval(() => { refrescar(); pintarCabecera(); }, 1000);
+    observador = new ObservadorConsulta(clienteConsultas, {
+        queryKey: ['monitoreo', panelInicial],
+        queryFn: async () => { await refrescar(); if (!desmontado) pintarCabecera(); return Date.now(); },
+        refetchInterval: 1000, refetchIntervalInBackground: true, retry: false, networkMode: 'always',
+    });
+    detenerObservador = observador.subscribe(() => {});
 }
 iniciar();
+return () => {
+    desmontado = true;
+    detenerObservador?.();
+    observador?.destroy();
+    eventos.abort();
+    clearTimeout(temporizadorNotificacion);
+    canal.cerrar();
+    mapa.destruir();
+};
+}

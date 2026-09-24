@@ -70,6 +70,11 @@ export class CanalSimulacion {
             if (this.intentos < 6) this.espera = setTimeout(() => this.conectar(), Math.min(1000 * 2 ** (this.intentos - 1), 15000));
         };
     }
+    cerrar() {
+        this.version++;
+        clearTimeout(this.espera);
+        this.canal?.close();
+    }
     reintentar() {
         this.intentos = 0;
         this.conectar();

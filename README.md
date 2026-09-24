@@ -343,8 +343,8 @@ Proyecto academico del curso 1INF54, Pontificia Universidad Catolica del Peru.
 
 ## Visualizador web
 
-La interfaz KindBox vive en [`visualizador/`](visualizador/README.md), fuera del reactor
-Maven. Con el servicio encendido, ejecute `npm ci` y `npm run dev` en esa carpeta y abra
+La interfaz KindBox usa **Next.js, TanStack Query y Leaflet (CRS.Simple)** y vive en [`visualizador/`](visualizador/README.md), fuera del reactor
+Maven. Su compilación estática queda en `visualizador/out/`, apta para Nginx sin Node.js en la VM. Con el servicio encendido, ejecute `npm ci` y `npm run dev` en esa carpeta y abra
 http://localhost:5173. Incluye mapa cartesiano interactivo, monitoreo WebSocket, configuración,
 pedidos, métricas, averías y reportes. Su README documenta las pruebas contra el servicio,
 el despliegue y las funciones del estándar GUI que necesitan ampliar el contrato del backend.

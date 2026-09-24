@@ -98,7 +98,7 @@ progress::-webkit-progress-value { background: var(--marca); border-radius: 4px;
 .cuadricula path { stroke: var(--reticula); stroke-width: .5px; fill: none; }
 .cuadricula .principal { stroke-width: 1px; }
 .cuadricula text { fill: var(--etiqueta); text-anchor: middle; font-size: 12px; }
-.ruta, .bloqueo { fill: none; stroke: var(--colorTrazo); stroke-width: 6px; stroke-linecap: round; stroke-linejoin: round; }
+.ruta, .bloqueo { fill: none;  stroke-width: 6px; stroke-linecap: round; stroke-linejoin: round; }
 .ruta.pendiente { stroke-dasharray: 14 10; }
 .bloqueo { stroke-width: 8px; }
 .mapaTitulo { position: absolute; left: 25px; top: 22px; pointer-events: none; padding: 10px 14px; border-left: 2px solid var(--marca); background: var(--mapa); }
@@ -257,3 +257,10 @@ dialog::backdrop { background: rgb(0 0 0 / 40%); }
     .desenlace { font-size: 20px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before { animation: none !important; scroll-behavior: auto !important; } }
+
+.lienzoLeaflet { position: absolute; inset: 0; z-index: 0; background: var(--mapa); font-family: inherit; }
+.leaflet-pane > svg { width: auto; height: auto; }
+.rotuloEje { color: var(--etiqueta); font-size: 12px; text-align: center; }
+.envolturaMarcador { background: none; border: 0; }
+.envolturaMarcador .marcador { left: 0; top: 0; }
+.mapa.desactualizado .lienzoLeaflet { opacity: .7; }
