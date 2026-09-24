@@ -310,6 +310,11 @@ public final class BusquedaAdaptativaVecindadAmplia implements Algoritmo {
 
         mejor.copiarDesde(vigente);
         ValorObjetivo mejorValor = mejor.valor();
+        // Compromiso del plan vigente: ningun candidato puede soltar un pedido que el plan
+        // anterior atendia y que el arranque pudo conservar. Cambiarlo por otro con la misma
+        // H, aunque ese otro pueda esperar horas, es justo lo que dejaba vencer pedidos que
+        // ya iban en camino.
+        final int topeComprometidos = vigente.comprometidosEnBanco();
 
         double escalarVigente = vigente.escalar(penalizacion);
         criterio.calibrar(escalarVigente);
@@ -335,7 +340,10 @@ public final class BusquedaAdaptativaVecindadAmplia implements Algoritmo {
             final ValorObjetivo valorCandidato = candidato.valor();
             final double escalarCandidato = candidato.escalar(penalizacion);
             final int resultado;
-            if (valorCandidato.mejorQue(mejorValor)) {
+            if (candidato.comprometidosEnBanco() > topeComprometidos) {
+                sinMejora++;
+                resultado = CapaAdaptativa.RECHAZADA;
+            } else if (valorCandidato.mejorQue(mejorValor)) {
                 mejor.copiarDesde(candidato);
                 mejorValor = valorCandidato;
                 vigente.copiarDesde(candidato);

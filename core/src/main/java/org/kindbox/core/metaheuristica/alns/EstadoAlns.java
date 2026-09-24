@@ -64,6 +64,9 @@ import org.kindbox.core.problema.ValorObjetivo;
  */
 public final class EstadoAlns {
 
+    /** Holgura, en minutos, por debajo de la cual un pedido del plan vigente no puede soltarse. */
+    static final long HOLGURA_COMPROMISO = 120L;
+
     /** Holgura minima de filas de ruta, para instancias con turnos muy cortos. */
     private static final int CAPACIDAD_RUTA_MINIMA = 8;
 
@@ -372,6 +375,27 @@ public final class EstadoAlns {
      */
     public ValorObjetivo valor() {
         return new ValorObjetivo(pedidosPendientes, urgenciaBanco, costoTotal, pesoEstabilidad * desviacionVigente);
+    }
+
+    /**
+     * Pedidos comprometidos por el plan vigente que este estado tiene en el banco. Un pedido
+     * esta comprometido cuando el plan anterior lo asignaba a una unidad que sigue en la
+     * fotografia y le quedan a lo sumo {@link #HOLGURA_COMPROMISO} minutos: los de holgura
+     * mayor pueden ceder su sitio a uno mas urgente y volver en otra replanificacion; la busqueda no admite soltar mas de los que ya solto el arranque, que son
+     * los que dejaron de ser factibles con la fotografia nueva.
+     */
+    public int comprometidosEnBanco() {
+        if (pedidosConUnidadVigente == 0) {
+            return 0;
+        }
+        int n = 0;
+        for (int p = 0; p < cantidadPedidos; p++) {
+            if (unidadVigenteDe[p] >= 0 && tareasEnBancoDe[p] > 0
+                    && instancia.pedidoMinutoLimite(p) - instancia.minutoActual() <= HOLGURA_COMPROMISO) {
+                n++;
+            }
+        }
+        return n;
     }
 
     /**
