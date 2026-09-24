@@ -42,6 +42,8 @@ public final class Individuo {
     private final int[] sucesor;
 
     private int pedidosNoAtendidos;
+    /** Suma de la urgencia de los pedidos con remanente sin asignar; desempata a igual H. */
+    private double urgencia;
     private double costo;
     private int desfase;
     private int desviacionPlan;
@@ -163,6 +165,15 @@ public final class Individuo {
         this.pedidosNoAtendidos = valor;
     }
 
+    /** Suma de 1/(holgura+1) de los pedidos con remanente sin asignar, como en {@link ValorObjetivo}. */
+    public double urgencia() {
+        return urgencia;
+    }
+
+    public void urgencia(double valor) {
+        this.urgencia = valor;
+    }
+
     /** Costo de operacion de las rutas, en soles. */
     public double costo() {
         return costo;
@@ -206,7 +217,7 @@ public final class Individuo {
 
     /** Valor de la funcion objetivo jerarquica que corresponde a la decodificacion. */
     public ValorObjetivo valor() {
-        return new ValorObjetivo(pedidosNoAtendidos, costo, 0.0);
+        return new ValorObjetivo(pedidosNoAtendidos, urgencia, costo, 0.0);
     }
 
     /**
@@ -224,12 +235,13 @@ public final class Individuo {
      * penalizacion blanda de la desviacion respecto del plan vigente.
      */
     public double costoInterno(double pesoDesfase, double pesoEstabilidad) {
-        return costo + ParametrosHgs.PENALIZACION_TAREA_NO_ATENDIDA * cantidadBanco
+        return costo + ParametrosHgs.PENALIZACION_TAREA_NO_ATENDIDA * (cantidadBanco + urgencia)
                 + pesoDesfase * desfase + pesoEstabilidad * desviacionPlan;
     }
 
     /**
-     * Indica si este individuo es mejor que el otro segun el objetivo jerarquico, con la
+     * Indica si este individuo es mejor que el otro segun el objetivo jerarquico (H, luego la
+     * urgencia de lo no atendido, luego el costo), con la
      * estabilidad desempatando dentro del nivel 2. Es la comparacion que fija el rango por
      * valor objetivo de la aptitud combinada del apartado 6.3.3, y por tanto la que lleva el
      * termino de estabilidad hasta la seleccion de progenitores y la supervivencia.
@@ -240,6 +252,9 @@ public final class Individuo {
         }
         if (pedidosNoAtendidos != otro.pedidosNoAtendidos) {
             return pedidosNoAtendidos < otro.pedidosNoAtendidos;
+        }
+        if (Math.abs(urgencia - otro.urgencia) > ValorObjetivo.TOLERANCIA_URGENCIA) {
+            return urgencia < otro.urgencia;
         }
         return costoPenalizado(pesoEstabilidad) < otro.costoPenalizado(pesoEstabilidad);
     }
@@ -281,6 +296,7 @@ public final class Individuo {
         this.cantidadRutas = otro.cantidadRutas;
         this.cantidadBanco = otro.cantidadBanco;
         this.pedidosNoAtendidos = otro.pedidosNoAtendidos;
+        this.urgencia = otro.urgencia;
         this.costo = otro.costo;
         this.desfase = otro.desfase;
         this.desviacionPlan = otro.desviacionPlan;

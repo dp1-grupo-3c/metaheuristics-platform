@@ -222,6 +222,7 @@ public final class BusquedaGeneticaHibrida implements Algoritmo {
         private int selloCota;
         private int cotaPedidos;
         private double cotaCosto;
+        private double cotaUrgencia;
 
         private Solucion mejorSolucion;
         private ValorObjetivo mejorValor = ValorObjetivo.PEOR;
@@ -610,9 +611,12 @@ public final class BusquedaGeneticaHibrida implements Algoritmo {
         private boolean registrarMejor(Individuo individuo, boolean sondeo) {
             calcularCotaEntregable(individuo);
             if (mejorSolucion != null && !sondeo) {
+                double diferenciaUrgencia = cotaUrgencia - mejorValor.urgencia();
                 boolean mejora = cotaPedidos < mejorValor.pedidosNoAtendidos()
                         || (cotaPedidos == mejorValor.pedidosNoAtendidos()
-                            && cotaCosto < mejorValor.costo() - 1e-9);
+                            && (diferenciaUrgencia < -ValorObjetivo.TOLERANCIA_URGENCIA
+                                || (Math.abs(diferenciaUrgencia) <= ValorObjetivo.TOLERANCIA_URGENCIA
+                                    && cotaCosto < mejorValor.costo() - 1e-9)));
                 if (!mejora) {
                     return false;
                 }
@@ -645,7 +649,7 @@ public final class BusquedaGeneticaHibrida implements Algoritmo {
         }
 
         /**
-         * H y costo del individuo contando solo sus rutas sin desfase. Las tareas de las
+         * H, urgencia y costo del individuo contando solo sus rutas sin desfase. Las tareas de las
          * rutas con desfase se cuentan como no atendidas, que es el peor caso de la
          * materializacion.
          */
@@ -653,11 +657,14 @@ public final class BusquedaGeneticaHibrida implements Algoritmo {
             selloCota++;
             int pedidos = 0;
             double costo = 0.0;
+            double urgencia = 0.0;
             for (int i = 0; i < individuo.cantidadBanco(); i++) {
                 int pedido = tareas.pedido(individuo.banco()[i]);
                 if (marcaCota[pedido] != selloCota) {
                     marcaCota[pedido] = selloCota;
                     pedidos++;
+                    urgencia += ValorObjetivo.urgenciaDe(
+                            instancia.pedidoMinutoLimite(pedido) - instancia.minutoActual());
                 }
             }
             final int[] visitas = individuo.visitas();
@@ -677,6 +684,7 @@ public final class BusquedaGeneticaHibrida implements Algoritmo {
                 }
             }
             cotaPedidos = pedidos;
+            cotaUrgencia = urgencia;
             cotaCosto = costo;
         }
 

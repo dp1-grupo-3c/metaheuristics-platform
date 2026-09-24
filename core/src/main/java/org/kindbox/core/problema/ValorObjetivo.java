@@ -28,7 +28,7 @@ public record ValorObjetivo(int pedidosNoAtendidos, double urgencia, double cost
         implements Comparable<ValorObjetivo> {
 
     /** Diferencia de urgencia por debajo de la cual dos valores se consideran iguales. */
-    private static final double TOLERANCIA_URGENCIA = 1e-9;
+    public static final double TOLERANCIA_URGENCIA = 1e-9;
 
     /** Valor sin nivel de urgencia, el de las soluciones que no lo calculan. */
     public ValorObjetivo(int pedidosNoAtendidos, double costo, double penalizacion) {
