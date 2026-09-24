@@ -14,16 +14,36 @@ package org.kindbox.core.problema;
  * restricciones relajadas. Nunca participa en la comparacion jerarquica de dos soluciones
  * factibles, solo en la aptitud interna de cada algoritmo.</p>
  *
+ * <p>{@code urgencia} es un nivel intermedio que solo desempata soluciones con la misma
+ * {@code H}: la suma, sobre los pedidos no atendidos, de {@code 1 / (holgura + 1)}, con la
+ * holgura en minutos desde la fotografia. A igual numero de pedidos sin atender, se prefiere
+ * dejar fuera los que todavia pueden esperar a una replanificacion posterior.</p>
+ *
  * @param pedidosNoAtendidos numero de pedidos sin asignacion factible dentro de plazo
+ * @param urgencia           suma de 1/(holgura+1) de los pedidos no atendidos
  * @param costo              costo de operacion en soles
  * @param penalizacion       suma de terminos blandos, en unidades de costo
  */
-public record ValorObjetivo(int pedidosNoAtendidos, double costo, double penalizacion)
+public record ValorObjetivo(int pedidosNoAtendidos, double urgencia, double costo, double penalizacion)
         implements Comparable<ValorObjetivo> {
+
+    /** Diferencia de urgencia por debajo de la cual dos valores se consideran iguales. */
+    private static final double TOLERANCIA_URGENCIA = 1e-9;
+
+    /** Valor sin nivel de urgencia, el de las soluciones que no lo calculan. */
+    public ValorObjetivo(int pedidosNoAtendidos, double costo, double penalizacion) {
+        this(pedidosNoAtendidos, 0.0, costo, penalizacion);
+    }
+
+    /** Urgencia de un pedido no atendido con la holgura dada, en minutos. */
+    public static double urgenciaDe(long holgura) {
+        return 1.0 / (Math.max(0L, holgura) + 1.0);
+    }
 
     /** Valor peor posible, util como elemento neutro de una minimizacion. */
     public static final ValorObjetivo PEOR =
-            new ValorObjetivo(Integer.MAX_VALUE, Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY);
+            new ValorObjetivo(Integer.MAX_VALUE, Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY,
+                    Double.POSITIVE_INFINITY);
 
     /** Valor sin pedidos pendientes ni costo. */
     public static ValorObjetivo cero() {
@@ -51,7 +71,8 @@ public record ValorObjetivo(int pedidosNoAtendidos, double costo, double penaliz
     }
 
     /**
-     * Comparacion lexicografica: primero H, luego el costo penalizado.
+     * Comparacion lexicografica: primero H, luego la urgencia de lo no atendido y por ultimo
+     * el costo penalizado.
      * Devuelve un valor negativo si este objetivo es mejor.
      */
     @Override
@@ -59,6 +80,9 @@ public record ValorObjetivo(int pedidosNoAtendidos, double costo, double penaliz
         int porH = Integer.compare(pedidosNoAtendidos, otro.pedidosNoAtendidos);
         if (porH != 0) {
             return porH;
+        }
+        if (Math.abs(urgencia - otro.urgencia) > TOLERANCIA_URGENCIA) {
+            return Double.compare(urgencia, otro.urgencia);
         }
         return Double.compare(costoPenalizado(), otro.costoPenalizado());
     }
@@ -70,6 +94,6 @@ public record ValorObjetivo(int pedidosNoAtendidos, double costo, double penaliz
 
     @Override
     public String toString() {
-        return String.format("H=%d S=%.2f pen=%.2f", pedidosNoAtendidos, costo, penalizacion);
+        return String.format("H=%d U=%.4f S=%.2f pen=%.2f", pedidosNoAtendidos, urgencia, costo, penalizacion);
     }
 }

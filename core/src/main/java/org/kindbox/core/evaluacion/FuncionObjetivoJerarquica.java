@@ -64,9 +64,11 @@ public final class FuncionObjetivoJerarquica implements FuncionObjetivo {
         }
 
         int pedidosNoAtendidos = 0;
+        double urgencia = 0.0;
         for (int i = 0; i < cantidadPedidos; i++) {
             if (entregado[i] < instancia.pedidoCantidad(i)) {
                 pedidosNoAtendidos++;
+                urgencia += ValorObjetivo.urgenciaDe(instancia.pedidoMinutoLimite(i) - instancia.minutoActual());
             }
         }
 
@@ -76,7 +78,7 @@ public final class FuncionObjetivoJerarquica implements FuncionObjetivo {
         }
 
         double penalizacion = PESO_ESTABILIDAD * desviacionDelPlanVigente(instancia, solucion);
-        return new ValorObjetivo(pedidosNoAtendidos, costo, penalizacion);
+        return new ValorObjetivo(pedidosNoAtendidos, urgencia, costo, penalizacion);
     }
 
     @Override
