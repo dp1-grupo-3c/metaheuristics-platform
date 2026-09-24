@@ -42,9 +42,13 @@ import org.kindbox.core.modelo.TipoUnidad;
  *
  * <p>Uso:</p>
  * <pre>
- *   java org.kindbox.experiments.GenerarDatos [directorio] [fechaInicial] [fechaFinal] [perfil]
+ *   java org.kindbox.experiments.GenerarDatos [directorio] [fechaInicial] [fechaFinal] [perfil] [pedidosPorDia]
  *   java org.kindbox.experiments.GenerarDatos data 2026-01-01 2028-12-31 CRECIENTE
  * </pre>
+ *
+ * <p>El quinto argumento, opcional, sustituye los pedidos por dia iniciales del perfil sin
+ * tocar su mezcla de plazos ni su semilla. La campana experimental lo usa para generar su base
+ * maestra a la capacidad diaria de la flota.</p>
  *
  * <p>El rango se redondea a meses completos, porque los archivos del curso son mensuales y
  * porque asi el archivo de un mes no depende de con que dia se pidio la generacion.</p>
@@ -82,6 +86,9 @@ public final class GenerarDatos {
         LocalDate desde = fecha(args, 1, FECHA_INICIAL_POR_DEFECTO);
         LocalDate hasta = fecha(args, 2, FECHA_FINAL_POR_DEFECTO);
         PerfilDemanda perfil = PerfilDemanda.porNombre(args.length > 3 ? args[3] : PERFIL_POR_DEFECTO);
+        if (args.length > 4) {
+            perfil = perfil.conPedidosPorDiaInicial(Double.parseDouble(args[4]));
+        }
         if (hasta.isBefore(desde)) {
             throw new IllegalArgumentException("La fecha final " + hasta + " es anterior a la inicial " + desde);
         }

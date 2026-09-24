@@ -16,6 +16,7 @@ pom.xml.versionsBackup
 # Ver la seccion "Generar los juegos de datos" del README.
 /data/
 /salidas/
+/data_campana/
 *.bloqueadas
 ventas[0-9][0-9][0-9][0-9][0-9][0-9]
 mant.preventivo.*
