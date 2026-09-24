@@ -156,6 +156,33 @@ def series(directorio):
     return salida
 
 
+def formato_plantilla(df):
+    """Las mismas corridas con las columnas de la plantilla de resultados 5D de referencia.
+
+    volumen es el nivel; disrupcion es "bloqueos" (sin averias ni mantenimientos); pedidos
+    atendidos y a tiempo coinciden, porque un pedido que vence sin completarse sale de los
+    pendientes y ya no se entrega; tiempo_ejecucion_ms es el tiempo de pared de la corrida.
+    """
+    return pd.DataFrame({
+        "volumen": df.nivel,
+        "disrupcion": "bloqueos",
+        "algoritmo": df.variante,
+        "replica": df.replica,
+        "semilla": df.semilla,
+        "pedidos_totales": df.pedidos_registrados,
+        "pedidos_atendidos": df.pedidos_entregados,
+        "pedidos_a_tiempo": df.pedidos_entregados,
+        "pct_cumplimiento_global": (100.0 * df.pedidos_entregados / df.pedidos_registrados).round(2),
+        "costo_operativo_total": df.costo_total.round(2),
+        "saturacion_almacenes_pct": df.saturacion_almacenes_pct.round(2),
+        "tiempo_ejecucion_ms": (1000 * df.tiempo_pared_s).round(0).astype(int),
+        "escenario": df.escenario,
+        "pedidos_incumplidos": df.pedidos_incumplidos,
+        "pedidos_pendientes_cierre": df.pedidos_pendientes,
+        "minuto_primer_incumplido": df.minuto_primer_incumplido,
+    })
+
+
 # --------------------------------------------------------------------- contrastes
 
 METRICAS_5D = [
@@ -349,7 +376,7 @@ def escalabilidad(df, salida):
     fig, ejes = plt.subplots(1, 3, figsize=(11, 3.6), dpi=160)
     paneles = [("pct_cumplimiento", "% de cumplimiento de plazo", "%"),
                ("costo_por_pedido", "Costo por pedido entregado", "S/ por pedido"),
-               ("ms_p90", "Tiempo por llamada (P90)", "ms")]
+               ("ms_max", "Tiempo máximo por llamada", "ms (línea: presupuesto)")]
     for ax, (col, titulo, ylabel) in zip(ejes, paneles):
         for var in VARIANTES:
             g = df[(df.escenario == "5D") & (df.variante == var)].groupby("nivel")[col]
@@ -362,6 +389,11 @@ def escalabilidad(df, salida):
         ax.set_xticks(range(3))
         ax.set_xticklabels(NIVELES_5D)
         estilo(ax, titulo, ylabel)
+        if col == "ms_max":
+            presupuesto = float(df.presupuesto_ms.max())
+            ax.axhline(presupuesto, color=TINTA_2, linewidth=1, linestyle="--")
+            ax.set_ylim(0, presupuesto * 1.1)
+            ax.ticklabel_format(axis="y", style="plain", useOffset=False)
     ejes[0].legend(frameon=False, fontsize=8, loc="lower left")
     fig.suptitle("Escalabilidad: mediana por nivel (banda: percentiles 10–90)", x=0.01, ha="left",
                  fontsize=10, color=TINTA_2)
@@ -436,6 +468,7 @@ def main():
     directorio = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(__file__), "resultados")
     df = cargar(directorio)
     df.to_csv(os.path.join(directorio, "campana.csv"), index=False)
+    formato_plantilla(df).to_csv(os.path.join(directorio, "resultados_formato_plantilla.csv"), index=False)
     pruebas = contrastes(df)
     pruebas.to_csv(os.path.join(directorio, "pruebas.csv"), index=False)
     tablas(df, pruebas, directorio)
