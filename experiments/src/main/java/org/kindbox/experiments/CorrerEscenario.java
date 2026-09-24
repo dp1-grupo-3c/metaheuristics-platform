@@ -34,6 +34,9 @@ import org.kindbox.core.simulacion.TipoEscenario;
  * simulacion 5D al reloj de pared durante esos minutos, que es el modo de las
  * presentaciones. Los detalles estan en {@link OpcionReloj}.</p>
  *
+ * <p>Con {@code -DdiagnosticoPedidos=true} se clasifica al cierre la causa de cada pedido
+ * incumplido o entregado con menos de una hora de holgura; ver {@link DiagnosticoPedidos}.</p>
+ *
  * <p>Con {@code -DarranqueDesdePlanVigente=true} cada replanificacion arranca desde el plan
  * vigente en lugar de desde la heuristica constructiva, que es la hipotesis experimental de
  * los apartados 7.3.5 y 11.4 del ISA. Los detalles estan en {@link OpcionArranque}.</p>
@@ -76,9 +79,16 @@ public final class CorrerEscenario {
         System.out.println(OpcionArranque.describir(configuracion, algoritmo));
         System.out.println("Algoritmo: " + algoritmo);
 
-        var motor = new MotorSimulacion(datos, configuracion, new ParametrosOperacion(), algoritmo, List.of());
+        DiagnosticoPedidos diagnostico = DiagnosticoPedidos.activo()
+                ? new DiagnosticoPedidos(algoritmo, datos.pedidos()) : null;
+        var motor = new MotorSimulacion(datos, configuracion, new ParametrosOperacion(),
+                diagnostico == null ? algoritmo : diagnostico,
+                diagnostico == null ? List.of() : List.of(diagnostico));
         ResultadoSimulacion resultado = motor.ejecutar();
         publicar(resultado);
+        if (diagnostico != null) {
+            diagnostico.publicar(motor.estado(), resultado.minutoFinal());
+        }
     }
 
     /** Publica el resumen y comprueba las invariantes que el visualizador dara por buenas. */
