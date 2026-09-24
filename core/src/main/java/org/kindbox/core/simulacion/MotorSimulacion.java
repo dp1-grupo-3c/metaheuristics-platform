@@ -1054,6 +1054,7 @@ public final class MotorSimulacion {
 
         PresupuestoComputo presupuesto = PresupuestoComputo
                 .deSimulacion(configuracion.saltoMinutos(), configuracion.factorAceleracion())
+                .conReserva(PresupuestoComputo.RESERVA_CIERRE_MS)
                 .arrancar();
         presupuestoVigente = presupuesto;
         if (cancelado) {

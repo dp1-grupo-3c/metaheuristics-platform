@@ -55,6 +55,18 @@ class PresupuestoComputoTest {
     }
 
     @Test
+    @DisplayName("La reserva de cierre adelanta el agotamiento y se acota a la mitad")
+    void reservaDeCierre() throws InterruptedException {
+        PresupuestoComputo presupuesto = PresupuestoComputo.deMilisegundos(200L).conReserva(150L).arrancar();
+        assertEquals(200L, presupuesto.milisegundosTotales(), "el total informado no cambia");
+        assertFalse(presupuesto.agotado());
+        Thread.sleep(120L);
+        assertTrue(presupuesto.agotado(), "con la reserva acotada a 100 ms, a los 120 ms ya se agoto");
+        assertEquals(1.0, presupuesto.fraccionConsumida());
+        assertThrows(IllegalArgumentException.class, () -> presupuesto.conReserva(-1L));
+    }
+
+    @Test
     @DisplayName("La cancelacion agota el presupuesto y arrancar lo restituye")
     void cancelarYArrancar() {
         PresupuestoComputo presupuesto = PresupuestoComputo.deIteraciones(10L).arrancar();
