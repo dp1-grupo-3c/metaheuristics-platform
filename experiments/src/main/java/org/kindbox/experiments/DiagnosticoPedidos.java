@@ -54,6 +54,9 @@ final class DiagnosticoPedidos implements Algoritmo, ObservadorSimulacion {
     private long sobregiros;
     private long peorSobregiroMs;
     private long llamadas;
+    /** Pedido cuyo contexto se vuelca en cada fotografia, con -Ddiagnostico.pedido=id. */
+    private final int pedidoTrazado = Integer.getInteger("diagnostico.pedido", -1);
+    private Map<String, Ruta> planAnterior = new HashMap<>();
 
     /** Lo observado de un pedido a lo largo de las replanificaciones que lo vieron. */
     private static final class Historia {
@@ -148,6 +151,7 @@ final class DiagnosticoPedidos implements Algoritmo, ObservadorSimulacion {
             }
         }
         Map<Integer, Integer> banco = sol.cantidadNoAtendida();
+        trazar(inst, sol);
         ParametrosOperacion.Instantanea par = inst.parametros();
         for (int i = 0; i < inst.cantidadPedidos(); i++) {
             int id = inst.pedidoId(i);
@@ -214,6 +218,53 @@ final class DiagnosticoPedidos implements Algoritmo, ObservadorSimulacion {
                     libre, ocupadaOk, turno && !libre && !ocupadaOk));
         }
         return resultado;
+    }
+
+    /** Vuelca el contexto del pedido trazado: su unidad en el plan anterior y en el nuevo. */
+    private void trazar(InstanciaPlanificacion inst, Solucion sol) {
+        Map<String, Ruta> nuevo = new HashMap<>();
+        for (Ruta r : sol.rutas()) {
+            nuevo.put(r.codigoUnidad(), r);
+        }
+        int i = pedidoTrazado < 0 ? -1 : inst.indiceDePedido(pedidoTrazado);
+        if (i >= 0) {
+            System.out.printf(Locale.ROOT, "TRAZA t=%d pedido=%d limite=%d cant=%d banco=%s%n", inst.minutoActual(),
+                    pedidoTrazado, inst.pedidoMinutoLimite(i), inst.pedidoCantidad(i),
+                    sol.cantidadNoAtendida().get(pedidoTrazado));
+            for (Map.Entry<String, Ruta> e : planAnterior.entrySet()) {
+                boolean loTenia = e.getValue().paradas().stream()
+                        .anyMatch(p -> p.tipo() == TipoParada.ENTREGA && p.idPedido() == pedidoTrazado);
+                if (!loTenia) {
+                    continue;
+                }
+                int u = inst.indiceDeUnidad(e.getKey());
+                System.out.printf(Locale.ROOT, "  unidad %s disp=%d nodo=%d carga=%d finTurno=%d%n", e.getKey(),
+                        u < 0 ? -1 : inst.unidadMinutoDisponible(u), u < 0 ? -1 : inst.unidadNodo(u),
+                        u < 0 ? -1 : inst.unidadCarga(u), u < 0 ? -1 : inst.unidadMinutoFinTurno(u));
+                System.out.println("    antes: " + describir(inst, e.getValue()));
+                System.out.println("    ahora: " + describir(inst, nuevo.get(e.getKey())));
+            }
+        }
+        planAnterior = nuevo;
+    }
+
+    private static String describir(InstanciaPlanificacion inst, Ruta r) {
+        if (r == null) {
+            return "(sin ruta)";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (Parada p : r.paradas()) {
+            switch (p.tipo()) {
+                case ENTREGA -> {
+                    int i = inst.indiceDePedido(p.idPedido());
+                    sb.append(String.format(Locale.ROOT, "E%d[%d<=%s] ", p.idPedido(), p.minutoLlegada(),
+                            i < 0 ? "?" : String.valueOf(inst.pedidoMinutoLimite(i))));
+                }
+                case ABASTECIMIENTO -> sb.append(String.format(Locale.ROOT, "A%d@%d ", p.idAlmacen(), p.minutoLlegada()));
+                case ALIMENTACION -> sb.append(String.format(Locale.ROOT, "P@%d-%d ", p.minutoLlegada(), p.minutoSalida()));
+            }
+        }
+        return sb.toString();
     }
 
     /** Llegada de la unidad al pedido en visita directa, pasando por un almacen si le falta carga. */
