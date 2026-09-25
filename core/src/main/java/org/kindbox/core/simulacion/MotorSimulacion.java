@@ -158,6 +158,17 @@ public final class MotorSimulacion {
      */
     private long replanificacionesLanzadas;
 
+    /**
+     * Credito de la pausa de alimentacion por turno, como en el simulador del grupo 6: una
+     * pausa cumplida, o 60 minutos continuos sin ruta dentro de la ventana de alimentacion,
+     * cuentan como la pausa del turno y el planificador no vuelve a insertar otra. Sin el
+     * credito, cada replanificacion insertaba una pausa nueva mientras la holgura lo
+     * permitiera y una unidad podia encadenar varias antes de salir. Se desactiva con
+     * -Dkindbox.creditoAlimentacion=false.
+     */
+    private final boolean creditoAlimentacion =
+            !"false".equalsIgnoreCase(System.getProperty("kindbox.creditoAlimentacion", "true"));
+
     private int[] caminoTrabajo = new int[512];
     private int longitudTrabajo;
 
@@ -915,7 +926,11 @@ public final class MotorSimulacion {
                 abastecer(u, parada);
                 u.unidad().estado(EstadoUnidad.ABASTECIENDO);
             }
-            case ALIMENTACION -> u.unidad().estado(EstadoUnidad.EN_ALIMENTACION);
+            case ALIMENTACION -> {
+                u.unidad().estado(EstadoUnidad.EN_ALIMENTACION);
+                // Un servicio en curso no se interrumpe: la pausa se acredita al empezar.
+                u.acreditarPausa(Turno.inicioDelTurno(minutoActual));
+            }
             default -> throw new IllegalStateException("Tipo de parada no contemplado: " + parada.tipo());
         }
         programarMovimiento(u, u.minutoSalidaParada(k), TipoEvento.FIN_SERVICIO, k);
@@ -985,6 +1000,7 @@ public final class MotorSimulacion {
             u.terminarItinerario();
             u.unidad().estado(EstadoUnidad.DISPONIBLE);
             u.unidad().minutoDisponibleDesde(minutoActual);
+            u.marcarInactiva(minutoActual);
         }
     }
 
@@ -994,6 +1010,7 @@ public final class MotorSimulacion {
             u.terminarItinerario();
             u.unidad().estado(EstadoUnidad.DISPONIBLE);
             u.unidad().minutoDisponibleDesde(minutoActual);
+            u.marcarInactiva(minutoActual);
             return;
         }
         u.partirHacia(0, minutoActual);
@@ -1176,7 +1193,7 @@ public final class MotorSimulacion {
             UnidadTransporte espejo = new UnidadTransporte(u.codigo(), u.unidad().tipo(), nodoRedireccion[i]);
             espejo.cargaABordo(u.unidad().cargaABordo());
             espejo.minutoDisponibleDesde(minutoDisponible[i]);
-            constructor.unidad(espejo);
+            constructor.unidad(espejo, -1L, creditoAlimentacion && pausaCumplida(u, minutoDisponible[i], minuto, foto));
         }
         for (UnidadEnCurso u : planificables) {
             for (Parada p : paradasPendientes(u)) {
@@ -1212,6 +1229,32 @@ public final class MotorSimulacion {
         }
         long desdeLlegada = u.minutoLlegadaParada(parada) - foto.minutosDeViaje(u.unidad().tipo(), kmRestantes);
         return Math.min(interpolado, Math.max(interpolado - 1, desdeLlegada));
+    }
+
+    /**
+     * Indica si la unidad ya cumplio la pausa de alimentacion del turno en que queda
+     * disponible: porque hizo una parada de alimentacion en ese turno, o porque estuvo al
+     * menos la duracion de la pausa detenida sin ruta dentro de la ventana de alimentacion
+     * del turno (una hora despues de su inicio y una hora antes de su cierre).
+     */
+    private static boolean pausaCumplida(UnidadEnCurso u, long disponible, long minuto,
+                                         ParametrosOperacion.Instantanea foto) {
+        long inicioTurno = Turno.inicioDelTurno(disponible);
+        if (u.pausaAcreditadaEn(inicioTurno)) {
+            return true;
+        }
+        long desde = u.inactivaDesde();
+        if (desde == Long.MIN_VALUE || u.conItinerario()) {
+            return false;
+        }
+        long ventanaDesde = inicioTurno + foto.minutosSeparacionCambioTurno();
+        long ventanaHasta = inicioTurno + Turno.DURACION_MIN - foto.minutosSeparacionCambioTurno();
+        long solape = Math.min(minuto, ventanaHasta) - Math.max(desde, ventanaDesde);
+        if (solape >= foto.minutosAlimentacion()) {
+            u.acreditarPausa(inicioTurno);
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -1324,9 +1367,11 @@ public final class MotorSimulacion {
             } else {
                 u.unidad().estado(EstadoUnidad.DISPONIBLE);
                 u.unidad().minutoDisponibleDesde(minuto);
+                u.marcarInactiva(minuto);
             }
             return;
         }
+        u.marcarActiva();
 
         InstanciaPlanificacion instancia = fotografia.instancia();
         int nodoRedireccion = fotografia.nodoRedireccion()[indiceEnInstancia];

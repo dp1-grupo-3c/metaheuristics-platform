@@ -103,17 +103,22 @@ public final class CorridaCampana {
             case "COLAPSO" -> true;
             default -> throw new IllegalArgumentException("Escenario no admitido: " + escenario);
         };
-        if (colapso != nivel.equals("N4")) {
-            throw new IllegalArgumentException("N4 va con COLAPSO y N1-N3 con 5D");
+        if (!nivel.equals("COMPLETO") && colapso != nivel.equals("N4")) {
+            throw new IllegalArgumentException("N4 va con COLAPSO y N1-N3 con 5D; COMPLETO admite ambos");
         }
+        // Horizonte en dias y salto de replanificacion, configurables para reproducir el
+        // protocolo de otro equipo (por defecto: 30 dias en colapso, 5 en 5D, salto de 30 min).
+        int dias = Integer.parseInt(a.getOrDefault("dias", colapso ? "30" : "5"));
+        int salto = Integer.parseInt(a.getOrDefault("salto", "30"));
         String algoritmo = switch (variante) {
             case "ALNS-C", "ALNS-F" -> "ALNS";
             case "HGS" -> "HGS";
+            case "TS" -> "TS";
             default -> throw new IllegalArgumentException("Variante no admitida: " + variante);
         };
         boolean arranqueCalido = variante.equals("ALNS-C");
         long semilla = SEMILLA_BASE + replica;
-        LocalDate ultimoDia = primerDia.plusDays(colapso ? 29 : 4);
+        LocalDate ultimoDia = primerDia.plusDays(dias - 1);
 
         RepositorioDatos.DatosEscenario base = new RepositorioDatos(raiz).cargar(primerDia, ultimoDia);
         List<Pedido> muestra = muestrear(base.pedidos(), base.calendario(), nivel, semilla);
@@ -122,10 +127,10 @@ public final class CorridaCampana {
                 base.avisos());
 
         // K tal que el 60 % de SA/K sea el presupuesto pedido, igual que PresupuestoComputo.
-        double factor = 30 * 60 * PresupuestoComputo.FRACCION_EFECTIVA * 1000.0 / presupuestoMs;
+        double factor = salto * 60 * PresupuestoComputo.FRACCION_EFECTIVA * 1000.0 / presupuestoMs;
         ConfiguracionEscenario configuracion = new ConfiguracionEscenario(
                 colapso ? TipoEscenario.COLAPSO : TipoEscenario.SIMULACION_5D, primerDia, ultimoDia,
-                30, factor, ModoReloj.LIBRE, algoritmo, semilla, 1440, false, 0.0, arranqueCalido);
+                salto, factor, ModoReloj.LIBRE, algoritmo, semilla, 1440, false, 0.0, arranqueCalido);
 
         Medidor medidor = new Medidor(FabricaAlgoritmos.crear(algoritmo, semilla),
                 new VerificadorRestricciones(new RegistroBloqueos(datos.bloqueos())));
@@ -142,7 +147,8 @@ public final class CorridaCampana {
             diagnostico.publicar(motor.estado(), r.minutoFinal());
         }
 
-        String id = String.format(Locale.ROOT, "%s_%s_%s_r%02d", escenario, nivel, variante, replica);
+        String id = String.format(Locale.ROOT, "%s_%s_%s_r%02d", escenario, nivel, variante, replica)
+                + a.getOrDefault("etiqueta", "");
         Map<String, Object> fila = new LinkedHashMap<>();
         MetricasSimulacion m = r.metricas();
         int cerrados = m.pedidosEntregados() + m.pedidosIncumplidos();
@@ -156,6 +162,8 @@ public final class CorridaCampana {
         fila.put("replica", replica);
         fila.put("semilla", semilla);
         fila.put("presupuesto_ms", presupuestoMs);
+        fila.put("salto_min", salto);
+        fila.put("primer_dia", primerDia);
         fila.put("commit", System.getProperty("campana.commit", "?"));
         fila.put("estado", r.estado());
         fila.put("minuto_final", r.minutoFinal());
@@ -192,6 +200,7 @@ public final class CorridaCampana {
             case "N2" -> 0.50;
             case "N3" -> 0.75;
             case "N4" -> Math.min(1.0, 0.50 + 0.10 * Math.max(0L, dia));
+            case "COMPLETO" -> 1.0;
             default -> throw new IllegalArgumentException("Nivel no admitido: " + nivel);
         };
     }

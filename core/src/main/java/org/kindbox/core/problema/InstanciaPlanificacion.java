@@ -56,6 +56,7 @@ public final class InstanciaPlanificacion {
     private final int[] unidadCarga;
     private final long[] unidadMinutoDisponible;
     private final long[] unidadMinutoFinTurno;
+    private final boolean[] unidadPausaCumplida;
 
     private final Map<Integer, Integer> indicePorIdPedido;
     private final Map<String, Integer> indicePorCodigoUnidad;
@@ -109,6 +110,7 @@ public final class InstanciaPlanificacion {
         this.unidadCarga = new int[cantidadUnidades];
         this.unidadMinutoDisponible = new long[cantidadUnidades];
         this.unidadMinutoFinTurno = new long[cantidadUnidades];
+        this.unidadPausaCumplida = new boolean[cantidadUnidades];
         this.indicePorCodigoUnidad = new HashMap<>(cantidadUnidades * 2);
         for (int i = 0; i < cantidadUnidades; i++) {
             UnidadTransporte u = c.unidades.get(i);
@@ -120,6 +122,7 @@ public final class InstanciaPlanificacion {
             unidadMinutoDisponible[i] = arranque;
             long horizonte = c.horizontes.get(i);
             unidadMinutoFinTurno[i] = horizonte > 0 ? horizonte : Turno.finDelTurno(arranque);
+            unidadPausaCumplida[i] = c.pausasCumplidas.get(i);
             indicePorCodigoUnidad.put(u.codigo(), i);
         }
 
@@ -263,6 +266,15 @@ public final class InstanciaPlanificacion {
         return unidadMinutoFinTurno[i];
     }
 
+    /**
+     * Indica si la unidad ya cumplio la pausa de alimentacion del turno en que arranca su ruta.
+     * El decodificador no le inserta otra: la pausa es exigible una vez por jornada, no una vez
+     * por replanificacion.
+     */
+    public boolean unidadPausaCumplida(int i) {
+        return unidadPausaCumplida[i];
+    }
+
     /** Punto de la matriz que corresponde a la posicion inicial de la unidad {@code i}. */
     public int puntoUnidad(int i) {
         return cantidadAlmacenes + cantidadPedidos + i;
@@ -328,6 +340,7 @@ public final class InstanciaPlanificacion {
         private final List<Integer> cantidadesPendientes = new ArrayList<>();
         private final List<UnidadTransporte> unidades = new ArrayList<>();
         private final List<Long> horizontes = new ArrayList<>();
+        private final List<Boolean> pausasCumplidas = new ArrayList<>();
         private final Map<Integer, String> asignacionVigente = new HashMap<>();
 
         public Constructor minutoActual(long minuto) {
@@ -371,8 +384,17 @@ public final class InstanciaPlanificacion {
          * horizontes extendidos sin tocar el resto del planificador.
          */
         public Constructor unidad(UnidadTransporte unidad, long minutoFinHorizonte) {
+            return unidad(unidad, minutoFinHorizonte, false);
+        }
+
+        /**
+         * Agrega una unidad indicando ademas si ya cumplio la pausa de alimentacion del turno en
+         * que queda disponible.
+         */
+        public Constructor unidad(UnidadTransporte unidad, long minutoFinHorizonte, boolean pausaCumplida) {
             unidades.add(unidad);
             horizontes.add(minutoFinHorizonte);
+            pausasCumplidas.add(pausaCumplida);
             return this;
         }
 

@@ -70,7 +70,8 @@ public final class FabricaAlgoritmos {
 
     /** Nombres canonicos de los algoritmos disponibles. */
     public static List<String> nombres() {
-        return List.of(BusquedaGeneticaHibrida.NOMBRE, BusquedaAdaptativaVecindadAmplia.NOMBRE);
+        return List.of(BusquedaGeneticaHibrida.NOMBRE, BusquedaAdaptativaVecindadAmplia.NOMBRE,
+                org.kindbox.core.metaheuristica.tabu.BusquedaTabu.NOMBRE);
     }
 
     /**
@@ -84,8 +85,9 @@ public final class FabricaAlgoritmos {
             case "HGS", "GENETICA", "BUSQUEDA_GENETICA_HIBRIDA" -> BusquedaGeneticaHibrida.NOMBRE;
             case "ALNS", "VECINDAD", "BUSQUEDA_ADAPTATIVA_VECINDAD_AMPLIA" ->
                     BusquedaAdaptativaVecindadAmplia.NOMBRE;
+            case "TS", "TABU", "BUSQUEDA_TABU" -> org.kindbox.core.metaheuristica.tabu.BusquedaTabu.NOMBRE;
             default -> throw new IllegalArgumentException("Algoritmo desconocido: " + nombre
-                    + ". Los disponibles son " + String.join(" y ", nombres()));
+                    + ". Los disponibles son " + String.join(", ", nombres()));
         };
     }
 
@@ -111,6 +113,10 @@ public final class FabricaAlgoritmos {
         ParametrosAlns alns = TABLA_ALNS.aplicar(ParametrosAlns.porDefecto(), ajustes);
         if (BusquedaGeneticaHibrida.NOMBRE.equals(canonico)) {
             return new BusquedaGeneticaHibrida(new AhorrosClarkeWright(), hgs, semilla);
+        }
+        if (org.kindbox.core.metaheuristica.tabu.BusquedaTabu.NOMBRE.equals(canonico)) {
+            // Busqueda tabu portada del prototipo del grupo 6; objetivo con -Dts.objetivo.
+            return new org.kindbox.core.metaheuristica.tabu.BusquedaTabu(semilla);
         }
         return new BusquedaAdaptativaVecindadAmplia(new AhorrosClarkeWright(), alns, semilla);
     }

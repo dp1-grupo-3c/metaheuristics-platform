@@ -71,6 +71,10 @@ public final class UnidadEnCurso {
     private boolean misionTrasvase;
     private int unidadAsistida = -1;
     private TipoAveria averia;
+    /** Inicio del turno en que la unidad cumplio su pausa de alimentacion, o MIN_VALUE. */
+    private long turnoPausaAcreditada = Long.MIN_VALUE;
+    /** Instante desde el que la unidad esta detenida sin itinerario, o MIN_VALUE si trabaja. */
+    private long inactivaDesde = 0L;
 
     /**
      * @param indice posicion de la unidad en la flota, que es la referencia que viaja en los
@@ -391,6 +395,33 @@ public final class UnidadEnCurso {
     /** Averia que inmoviliza a la unidad, o {@code null} si esta operativa. */
     public TipoAveria averia() {
         return averia;
+    }
+
+    /** Acredita la pausa de alimentacion del turno que arranca en el instante dado. */
+    public void acreditarPausa(long inicioTurno) {
+        this.turnoPausaAcreditada = inicioTurno;
+    }
+
+    /** Indica si la unidad ya cumplio la pausa del turno que arranca en el instante dado. */
+    public boolean pausaAcreditadaEn(long inicioTurno) {
+        return turnoPausaAcreditada == inicioTurno;
+    }
+
+    /** Marca la unidad como detenida sin itinerario desde el instante dado, si no lo estaba ya. */
+    public void marcarInactiva(long minuto) {
+        if (inactivaDesde == Long.MIN_VALUE) {
+            inactivaDesde = minuto;
+        }
+    }
+
+    /** Marca la unidad como trabajando. */
+    public void marcarActiva() {
+        inactivaDesde = Long.MIN_VALUE;
+    }
+
+    /** Instante desde el que la unidad esta detenida sin itinerario, o MIN_VALUE si trabaja. */
+    public long inactivaDesde() {
+        return inactivaDesde;
     }
 
     public void averia(TipoAveria averia) {
