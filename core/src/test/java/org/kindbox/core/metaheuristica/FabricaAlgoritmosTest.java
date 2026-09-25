@@ -64,10 +64,14 @@ class FabricaAlgoritmosTest {
             assertEquals(78L, assertInstanceOf(BusquedaAdaptativaVecindadAmplia.class, algoritmo).semilla());
             assertEquals(BusquedaAdaptativaVecindadAmplia.NOMBRE, FabricaAlgoritmos.canonico(alias));
         }
-        for (String nombre : new String[]{"TABU", "", null}) {
+        for (String alias : List.of("TS", "tabu", "Busqueda_Tabu")) {
+            Algoritmo algoritmo = FabricaAlgoritmos.crear(alias, 79L, new Properties());
+            assertEquals(org.kindbox.core.metaheuristica.tabu.BusquedaTabu.NOMBRE, algoritmo.nombre(), alias);
+        }
+        for (String nombre : new String[]{"SIMPLEX", "", null}) {
             IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
                     () -> FabricaAlgoritmos.crear(nombre, 1L, new Properties()));
-            assertTrue(error.getMessage().contains("HGS y ALNS"), error.getMessage());
+            assertTrue(error.getMessage().contains("HGS, ALNS"), error.getMessage());
         }
     }
 
