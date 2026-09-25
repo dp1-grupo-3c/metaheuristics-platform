@@ -38,7 +38,15 @@ public final class PresupuestoComputo {
      */
     public static final double FRACCION_EFECTIVA = 0.60;
 
+    /**
+     * Reserva por defecto, en milisegundos, que la simulacion descuenta del presupuesto para
+     * que el algoritmo cierre la busqueda, materialice y valore el plan sin pasarse del reloj.
+     */
+    public static final long RESERVA_CIERRE_MS = 50L;
+
     private final long nanosPresupuesto;
+    /** Parte del presupuesto en que la busqueda ya debe estar detenida; cero sin reserva. */
+    private long nanosReserva;
     /** Tope de iteraciones del modo por iteraciones; cero en modo por reloj. */
     private final long limiteIteraciones;
     private final PerfilConvergencia perfil;
@@ -97,6 +105,28 @@ public final class PresupuestoComputo {
         return new PresupuestoComputo(milisegundos * 1_000_000L, 0L, true);
     }
 
+    /**
+     * Reserva los ultimos milisegundos del presupuesto para el cierre: {@link #agotado()} y
+     * {@link #fraccionConsumida()} se miden contra el presupuesto menos la reserva, de modo
+     * que la busqueda se detiene antes y el tiempo total, cierre incluido, queda dentro del
+     * presupuesto. La reserva nunca supera la mitad del presupuesto, para que uno pequeno no
+     * se quede sin busqueda. No tiene efecto en modo por iteraciones.
+     *
+     * @return este mismo presupuesto
+     */
+    public PresupuestoComputo conReserva(long milisegundos) {
+        if (milisegundos < 0) {
+            throw new IllegalArgumentException("La reserva no puede ser negativa: " + milisegundos);
+        }
+        this.nanosReserva = Math.min(milisegundos * 1_000_000L, nanosPresupuesto / 2);
+        return this;
+    }
+
+    /** Nanosegundos en que la busqueda debe estar detenida: el presupuesto menos la reserva. */
+    private long nanosBusqueda() {
+        return nanosPresupuesto - nanosReserva;
+    }
+
     /** Reinicia el cronometro y el contador. Se invoca al arrancar cada ejecucion del planificador. */
     public PresupuestoComputo arrancar() {
         this.nanosInicio = System.nanoTime();
@@ -134,7 +164,7 @@ public final class PresupuestoComputo {
         if (limiteIteraciones > 0L) {
             return Math.min(1.0, (double) iteraciones / limiteIteraciones);
         }
-        double f = (double) (System.nanoTime() - nanosInicio) / nanosPresupuesto;
+        double f = (double) (System.nanoTime() - nanosInicio) / nanosBusqueda();
         return Math.max(0.0, Math.min(1.0, f));
     }
 
@@ -146,7 +176,7 @@ public final class PresupuestoComputo {
         if (limiteIteraciones > 0L) {
             return cancelado || iteraciones >= limiteIteraciones;
         }
-        return cancelado || (System.nanoTime() - nanosInicio) >= nanosPresupuesto;
+        return cancelado || (System.nanoTime() - nanosInicio) >= nanosBusqueda();
     }
 
     /** Cancela la ejecucion en curso desde otro hilo. */

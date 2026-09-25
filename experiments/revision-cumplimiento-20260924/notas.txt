@@ -1,0 +1,13 @@
+rama-ALNS-dia: presupuesto 200 ms, semilla 20260924, sin incidencias; incumplidos=0, entregados=159, tiempoMs=13316.
+rama-HGS-dia: presupuesto 200 ms, semilla 20260924, sin incidencias; incumplidos=2, entregados=159, tiempoMs=13295.
+rama-ALNS-5d: presupuesto 200 ms, semilla 20260924, sin incidencias; incumplidos=1, entregados=771, tiempoMs=63721.
+rama-HGS-5d: presupuesto 200 ms, semilla 20260924, sin incidencias; incumplidos=4, entregados=769, tiempoMs=63936.
+propia-ALNS-5d: presupuesto 200 ms, semilla 20260924, sin incidencias; incumplidos=1, entregados=770, tiempoMs=63680.
+propia-HGS-5d: presupuesto 200 ms, semilla 20260924, sin incidencias; incumplidos=0, entregados=776, tiempoMs=63884.
+propia: prototipo exploratorio anterior al ajuste de comparacion cuantizada y compromisos por identidad; no es la version operativa final.
+Comparaciones operativas: presupuesto 2000 ms, semilla 20260924, septiembre 1–5; registros CSV por algoritmo.
+Operativa HGS: 5D, 2000 ms, 20260924, sin incidencias: 775 entregados, 20 pendientes, 0 incumplidos; 420 planes validos, 0 sobregiros.
+Operativa ALNS: 5D, 2000 ms, 20260924, sin incidencias: 775 entregados, 20 pendientes, 0 incumplidos; 420 planes validos, 0 sobregiros.
+
+Sensibilidad final: 24 corridas de 1 dia, 200 ms, fechas 1 y 6 de septiembre, tres semillas. Rama: HGS 3 incumplidos, ALNS 2. Adaptacion: HGS 1, ALNS 0. Dos ablaciones sin arranque vigente: 0 incumplidos cada una; resultado no concluyente sobre causalidad.
+Reactor ./mvnw -q install: 219 pruebas, 0 fallos, 0 errores, 0 omitidas.

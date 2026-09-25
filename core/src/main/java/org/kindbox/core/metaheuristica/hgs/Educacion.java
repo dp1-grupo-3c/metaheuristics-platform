@@ -7,6 +7,7 @@ import org.kindbox.core.evaluacion.ResumenesRuta;
 import org.kindbox.core.grafo.MatrizDistancias;
 import org.kindbox.core.metaheuristica.PresupuestoComputo;
 import org.kindbox.core.problema.InstanciaPlanificacion;
+import org.kindbox.core.problema.ValorObjetivo;
 import org.kindbox.core.util.Aleatorio;
 
 /**
@@ -76,6 +77,10 @@ public final class Educacion {
     private static final double EPSILON = 1e-7;
 
     private final InstanciaPlanificacion instancia;
+    /** Urgencia de cada pedido de la fotografia, para el nivel intermedio del objetivo. */
+    private final double[] urgenciaDe;
+    /** Urgencia de los pedidos contados en la ultima llamada a contarPedidos. */
+    private double ultimaUrgencia;
     private final TareasEntrega tareas;
     private final ProgramadorRuta programador;
     private final Aleatorio aleatorio;
@@ -168,6 +173,10 @@ public final class Educacion {
         this.cantidadesBuffer = new int[capacidad];
         this.ordenExploracion = new int[Math.max(1, cantidadTareas)];
         this.marcaPedido = new int[Math.max(1, instancia.cantidadPedidos())];
+        this.urgenciaDe = new double[Math.max(1, instancia.cantidadPedidos())];
+        for (int p = 0; p < instancia.cantidadPedidos(); p++) {
+            urgenciaDe[p] = ValorObjetivo.urgenciaDe(instancia.pedidoMinutoLimiteEfectivo(p) - instancia.minutoActual());
+        }
         this.libre = new boolean[rutas];
         this.rutaDeUnidad = new int[rutas];
         this.candidatosPorDistancia = Math.max(1, parametros.candidatosUnidadPorRuta());
@@ -318,19 +327,23 @@ public final class Educacion {
         individuo.desfase((int) Math.min(desfase, Integer.MAX_VALUE / 4));
         individuo.desviacionPlan(desviacion);
         individuo.pedidosNoAtendidos(contarPedidos());
+        individuo.urgencia(ultimaUrgencia);
     }
 
     /** Numero de pedidos distintos con al menos una tarea en el banco. Es H. */
     private int contarPedidos() {
         sello++;
         int total = 0;
+        double suma = 0.0;
         for (int i = 0; i < cantidadBanco; i++) {
             int pedido = tareas.pedido(banco[i]);
             if (marcaPedido[pedido] != sello) {
                 marcaPedido[pedido] = sello;
                 total++;
+                suma += urgenciaDe[pedido];
             }
         }
+        ultimaUrgencia = suma;
         return total;
     }
 

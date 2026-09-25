@@ -55,6 +55,20 @@ class FuncionObjetivoJerarquicaTest {
     }
 
     @Test
+    void laUrgenciaTieneOrdenTransitivoInclusoConErroresDeRedondeo() {
+        var valores = new ArrayList<>(List.of(new ValorObjetivo(1, 0.0, 3, 0),
+                new ValorObjetivo(1, 0.75e-9, 2, 0), new ValorObjetivo(1, 1.5e-9, 1, 0)));
+        valores.sort(null);
+        for (int i = 0; i < valores.size(); i++) {
+            for (int j = i + 1; j < valores.size(); j++) {
+                assertTrue(valores.get(i).compareTo(valores.get(j)) <= 0);
+            }
+        }
+        assertEquals(0, new ValorObjetivo(1, 0.02, 8, 0)
+                .compareTo(new ValorObjetivo(1, 0.02 + 1e-15, 8, 0)));
+    }
+
+    @Test
     @DisplayName("Una solucion con H menor gana siempre, sea cual sea su costo")
     void elOrdenEsLexicografico() {
         ValorObjetivo caraPeroCompleta = new ValorObjetivo(0, 1_000_000_000.0, 0.0);

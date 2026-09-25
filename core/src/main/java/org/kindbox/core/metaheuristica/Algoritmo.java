@@ -55,13 +55,9 @@ public interface Algoritmo {
     }
 
     /**
-     * Indica si el algoritmo sabe usar el plan vigente como solucion de partida en
-     * {@link #resolverDesde}. Es el segundo modo de arranque del apartado 7.3.5 del ISA, que
-     * solo describe la busqueda adaptativa de vecindad amplia: una busqueda de trayectoria
-     * parte de una solucion y puede partir de la vigente, mientras que la busqueda genetica
-     * hibrida reinicia su poblacion en cada ejecucion (apartado 11.4). El motor de simulacion
-     * lo consulta para no construir el plan de partida cuando nadie lo va a usar, y un
-     * envoltorio debe reenviarlo.
+     * Indica si el algoritmo sabe usar el plan vigente como solucion de partida.
+     * ALNS inicia su trayectoria desde el plan reparado; HGS conserva un respaldo factible
+     * y lo incorpora como individuo de su poblacion. Un envoltorio debe reenviar la capacidad.
      */
     default boolean admiteArranqueDesdePlanVigente() {
         return false;

@@ -1,0 +1,2 @@
+algoritmo,primerDia,dias,presupuestoMs,semilla,incidencias,planVigente,estado,minutoFinal,registrados,entregados,pendientes,incumplidos,paquetes,kilometros,costo,minutoPrimerIncumplimiento,tiempoMs,planificaciones,planesVerificados,sobregiros,maximoPlanMs,averias,mantenimientos
+HGS,2026-09-01,5,2000,20260924,false,true,CULMINADA,7200,795,775,20,0,4359,18014,120498.00,-1,816082,420,420,0,1951,0,0

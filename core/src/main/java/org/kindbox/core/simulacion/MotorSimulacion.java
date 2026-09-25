@@ -915,7 +915,10 @@ public final class MotorSimulacion {
                 abastecer(u, parada);
                 u.unidad().estado(EstadoUnidad.ABASTECIENDO);
             }
-            case ALIMENTACION -> u.unidad().estado(EstadoUnidad.EN_ALIMENTACION);
+            case ALIMENTACION -> {
+                u.unidad().estado(EstadoUnidad.EN_ALIMENTACION);
+                u.unidad().inicioTurnoAlimentacion(Turno.inicioDelTurno(minutoActual));
+            }
             default -> throw new IllegalStateException("Tipo de parada no contemplado: " + parada.tipo());
         }
         programarMovimiento(u, u.minutoSalidaParada(k), TipoEvento.FIN_SERVICIO, k);
@@ -1054,6 +1057,7 @@ public final class MotorSimulacion {
 
         PresupuestoComputo presupuesto = PresupuestoComputo
                 .deSimulacion(configuracion.saltoMinutos(), configuracion.factorAceleracion())
+                .conReserva(PresupuestoComputo.RESERVA_CIERRE_MS)
                 .arrancar();
         presupuestoVigente = presupuesto;
         if (cancelado) {
@@ -1136,7 +1140,7 @@ public final class MotorSimulacion {
                 // planifica desde el proximo nodo que alcanzara.
                 int indice = u.indiceRedireccion(minuto);
                 nodoRedireccion[i] = u.nodoEn(indice);
-                minutoDisponible[i] = Math.max(minuto, u.minutoLlegadaANodo(indice));
+                minutoDisponible[i] = Math.max(minuto, minutoEnRedireccion(u, indice, foto));
             } else {
                 nodoRedireccion[i] = u.unidad().nodo();
                 minutoDisponible[i] = Math.max(minuto, u.unidad().minutoDisponibleDesde());
@@ -1174,6 +1178,7 @@ public final class MotorSimulacion {
             // adelantaria su posicion en el visualizador.
             UnidadTransporte espejo = new UnidadTransporte(u.codigo(), u.unidad().tipo(), nodoRedireccion[i]);
             espejo.cargaABordo(u.unidad().cargaABordo());
+            espejo.inicioTurnoAlimentacion(u.unidad().inicioTurnoAlimentacion());
             espejo.minutoDisponibleDesde(minutoDisponible[i]);
             constructor.unidad(espejo);
         }
@@ -1187,6 +1192,30 @@ public final class MotorSimulacion {
         InstanciaPlanificacion instancia = constructor.construir();
         Solucion plan = conPlanVigente ? planVigenteAdaptado(instancia, planificables, nodoRedireccion) : null;
         return new Fotografia(instancia, planificables, nodoRedireccion, plan);
+    }
+
+    /**
+     * Instante en que la unidad en marcha alcanza el nodo de redireccion, derivado hacia atras
+     * desde la llegada comprometida a su proxima parada: esa llegada menos el viaje por los
+     * kilometros que quedan, con la misma formula con que el planificador los costeara.
+     *
+     * <p>Interpolar el tramo con redondeo hacia arriba y sumarle despues el viaje restante,
+     * tambien redondeado hacia arriba, da en la mitad de los casos un minuto mas que el tramo
+     * entero. Como el motor replanifica cada salto, la llegada prevista a una misma parada
+     * derivaba hacia adelante un minuto por replanificacion y un plan con poca holgura dejaba
+     * de ser factible sin que nada hubiese cambiado. Derivado asi, replanificar la misma ruta
+     * reproduce exactamente la misma llegada. Nunca es anterior al paso fisico por el nodo
+     * menos un minuto, que es el margen del redondeo, ni posterior a la interpolacion.</p>
+     */
+    private static long minutoEnRedireccion(UnidadEnCurso u, int indice, ParametrosOperacion.Instantanea foto) {
+        long interpolado = u.minutoLlegadaANodo(indice);
+        int parada = u.indiceParada();
+        int kmRestantes = u.desplazamientoParada(parada) - indice;
+        if (kmRestantes <= 0) {
+            return interpolado;
+        }
+        long desdeLlegada = u.minutoLlegadaParada(parada) - foto.minutosDeViaje(u.unidad().tipo(), kmRestantes);
+        return Math.min(interpolado, Math.max(interpolado - 1, desdeLlegada));
     }
 
     /**

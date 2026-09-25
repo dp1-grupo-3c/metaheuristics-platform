@@ -1,0 +1,464 @@
+{
+  "base": "babdc19",
+  "rama": "530aa1724bcabcb710e0d30583987e5a25cbb9f1",
+  "java": "openjdk version \"21.0.12\" 2026-07-21\nOpenJDK Runtime Environment (build 21.0.12+8)\nOpenJDK 64-Bit Server VM (build 21.0.12+8, mixed mode, sharing)\n",
+  "plataforma": "Linux-7.2.6-1-cachyos-x86_64-with-glibc2.44",
+  "datos": [
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/ventas.v20260909/ventas.202601.txt",
+      "sha256": "cae246c825937f1adbb96757522fae554a640c062cda98f45849ad5b8e9d1aef"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/ventas.v20260909/ventas.202602.txt",
+      "sha256": "12fe8a118c467190b9a8c6de752d4499f3aef2e70dfa068fe35f340ffb9d18da"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/ventas.v20260909/ventas.202603.txt",
+      "sha256": "77c52f2264143f43dd8874f4cc75f747e36b688e7c0a596c85efa9d9240c5dbf"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/ventas.v20260909/ventas.202604.txt",
+      "sha256": "708be1af9039bd10450c4bc989ba4ad4ba391fabc3dac56cece6a5dd8104cb55"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/ventas.v20260909/ventas.202605.txt",
+      "sha256": "2991d5381be92c4a79405743043fd337f612c8f585bc3ed2856b059ca0007d12"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/ventas.v20260909/ventas.202606.txt",
+      "sha256": "28f19f0916aa11680c93405df0b4a29d384fa97ba956b314f291f466c1ee80cd"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/ventas.v20260909/ventas.202607.txt",
+      "sha256": "9ea7a7e0ea1f43aef3e1b1c7dd43f52e8b80e70dd1da5c7237caffc0d2825d02"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/ventas.v20260909/ventas.202608.txt",
+      "sha256": "b6d153cdfa186c87893cff8ed19b382394f8e4a98764501e2a923861cfafd0b8"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/ventas.v20260909/ventas.202609.txt",
+      "sha256": "45a097c1b95bf1ad3f27d32ddffdc4ee8014640d7d379ca3df7bcd8b6f73c49a"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/ventas.v20260909/ventas.202610.txt",
+      "sha256": "47e775722acbc690abc8e393f69a72b311df7fadad29eab724063efc0f2d482f"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/ventas.v20260909/ventas.202611.txt",
+      "sha256": "c7b376c117077b965fac6f75e66743d46658a7ecf1e247be73856deff0d782c7"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/ventas.v20260909/ventas.202612.txt",
+      "sha256": "824603a3464fa1a65858438eacc1067a6c43a5760bdb18c6e5ed8b26140b6ad6"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/ventas.v20260909/ventas.202701.txt",
+      "sha256": "374c41b57389541710c28a2858c584b57cbbd54ca212c13aaaae27fc57ef3f18"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/ventas.v20260909/ventas.202702.txt",
+      "sha256": "aa51d66859b5f3da7af336e5b76f61c2060fb8f2ee3cf94e8f5e328d67698fd6"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/ventas.v20260909/ventas.202703.txt",
+      "sha256": "4e5ca10e25e606ccfdac1614b30ff511e1c92ad44730b1c88b70f2319d666f9b"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/ventas.v20260909/ventas.202704.txt",
+      "sha256": "24293defa42d5b42d498b0a9a2c0921af8e92e5db73b168dab9bb5cf1035505e"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/ventas.v20260909/ventas.202705.txt",
+      "sha256": "30f0c80a8281ac04d3dbe7d8a057670204444a8b18bd69d82030a4c7d95966d4"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/ventas.v20260909/ventas.202706.txt",
+      "sha256": "abef57398082a9bb6bc6a733aeaf7f99120fc8d065babf8a58bf6f31ad6f08f4"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/ventas.v20260909/ventas.202707.txt",
+      "sha256": "134d027620b1c00321f9915a5aaec5eeac15fcfd398e26e1e6174e5a15ad5add"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/ventas.v20260909/ventas.202708.txt",
+      "sha256": "e35d81355b8062e5f9f724969bfa472bfe928fc66d65ba9a21d0e5595ee9ff34"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/ventas.v20260909/ventas.202709.txt",
+      "sha256": "aa733c57234a6cd96fa54e75e92d060fca7e20b6c4f64b9cd39e129f21490c5c"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/ventas.v20260909/ventas.202710.txt",
+      "sha256": "3e9509ba76a525f4931f39dc44742f7424d834808bd584cb867737e4992274cc"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/ventas.v20260909/ventas.202711.txt",
+      "sha256": "98fc43dd2c134fac9d1b235b18eb96b2b2ccc93e49e02acb509b332e8120da30"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/ventas.v20260909/ventas.202712.txt",
+      "sha256": "5e46f48aaea11be361bd97feabdc463979474f43ab6af1def97af29e6d168600"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/ventas.v20260909/ventas.202801.txt",
+      "sha256": "c67dfcc4b7462004ceb916d45053968dd9d3af46667fdf7069c19786d0b5c022"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/ventas.v20260909/ventas.202802.txt",
+      "sha256": "41e7b845c0236b867744fcf161775fb75a0a04eb0b4983eaf733a00f1aea5c85"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/ventas.v20260909/ventas.202803.txt",
+      "sha256": "5c35edcc0e4165f442130020b21cb6a026863eb44650d1567981c5fdb62bc454"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/ventas.v20260909/ventas.202804.txt",
+      "sha256": "f7845e00c22c7fc85edad7a96adf466fdade047a64f98a38b7cadf1f566de864"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/ventas.v20260909/ventas.202805.txt",
+      "sha256": "5f8228122d2bf9308ece08fa7238bd98210acebd6957e01b78437d983b913053"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/ventas.v20260909/ventas.202806.txt",
+      "sha256": "925f5bb93cbc643b87a15d76e646482892d47dd2d4b22a8b6651c6f2d9a57300"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/ventas.v20260909/ventas.202807.txt",
+      "sha256": "4f8c72fb4e564644f36746ecc78eb576291c576c1a2172e624098129f3920009"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/ventas.v20260909/ventas.202808.txt",
+      "sha256": "3577cbec1309d8ea367232107b6e249d3fef5b01a8584905adf61d4f451b6583"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/ventas.v20260909/ventas.202809.txt",
+      "sha256": "1482fa12828a3bc1b250a0310dcbff4efd08fcac9ff02676b185253c230ec65d"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/ventas.v20260909/ventas.202810.txt",
+      "sha256": "baeb928b12c4f31bbb5e76e173d26773435ed7a7d89ab2ae500ffa7e2b1298b7"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/ventas.v20260909/ventas.202811.txt",
+      "sha256": "8879295f9ac38714676f6a355902eb0ec48b31fb1a22355aed8218fed0b81feb"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/ventas.v20260909/ventas.202812.txt",
+      "sha256": "b1c1a1e1f3019e3f15bf44a0dc60da2d46980e96298684771ec335c4b7f89821"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/bloqueos.v20260909/bloqueo.2601.txt",
+      "sha256": "57e086ee7053b5bcc5f1e203a8eeb774cce1d6bea74612e9ea9c4d9e2e28ff41",
+      "sha256Expandido": "e2c4dc85182d03c5631f207cf4b60b25aeeb12509448b68bd4bcc696efcac914"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/bloqueos.v20260909/bloqueo.2602.txt",
+      "sha256": "385f9d46d6961f6772f0e3fb14c6aea41dba835244245e49713b446f86220fd2",
+      "sha256Expandido": "fcc9ff56e0689a2ce0b9a1d3e15a4dfb3fa413dce8e372b27aed147dbd6a9509"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/bloqueos.v20260909/bloqueo.2603.txt",
+      "sha256": "5b0a773b2cdccbfe291ad5da2462b3c5012669e0a1b0c1b96ae270f43e8b0580",
+      "sha256Expandido": "b48a009e25ce1a7ec7b3dcd0e6516f9615ee937d37385bfc7e9f50ecf3ad4906"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/bloqueos.v20260909/bloqueo.2604.txt",
+      "sha256": "74ad508a72906f0e72022e77152d0bfa7e38cf921ff500667b0deea95df1e015",
+      "sha256Expandido": "fc90d22098862e95815c3c44044e199e0ab6f87be9a0d02efb6444cc21bba901"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/bloqueos.v20260909/bloqueo.2605.txt",
+      "sha256": "b8d72a4713ef3d23ab29fec6c5d9952ea553a980a901b3619233b8af4fcfb3ac",
+      "sha256Expandido": "90803bad115a524fe4d6302512926a2d0837f116fbb10ef6fb9f124ebb3c909a"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/bloqueos.v20260909/bloqueo.2606.txt",
+      "sha256": "4c779a2b82098f0ea861028ae60cd11e5c0ed1683dc1e8138faa841efd364e2f",
+      "sha256Expandido": "eec25e74582c8b895f8c457eb0988cfd2c666ef53319124041ca2bfe4a3bcdf0"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/bloqueos.v20260909/bloqueo.2607.txt",
+      "sha256": "d41da1bfd7c8c838cb703a64f3f7bf47673927f8b1dbb34bd56c748923f08ebb",
+      "sha256Expandido": "a26abd89464ce1255dc1c99bcecd6ad723cec22db32a940a9d1cf2e6cf9cdbe4"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/bloqueos.v20260909/bloqueo.2608.txt",
+      "sha256": "0739d29e6ee5bcd95a2079a330ca75763fbead88483d0f8122ba0698c160dfdc",
+      "sha256Expandido": "e3a7932887604ecca0df56e93c78f8d577ef4b733cdb4203ea7bea87c704864e"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/bloqueos.v20260909/bloqueo.2609.txt",
+      "sha256": "b8d9ed2fd9f5011c1e05f5a5f6588b283367d7395a7bcc57ef6887d4ded60e12",
+      "sha256Expandido": "98f32a34d3c07075b1206c81348aba4a91a27486d1b1a45e1f99a666b288c896"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/bloqueos.v20260909/bloqueo.2610.txt",
+      "sha256": "f69f1c8a1b9577d465b44feb74a0e4481c9fa8f0b529ed2db8d9360a91d348bc",
+      "sha256Expandido": "82cfc29dea0aa2eb03927c78e83954b6969a20fc50bdc790efd09949f1fd5515"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/bloqueos.v20260909/bloqueo.2611.txt",
+      "sha256": "c2b5a18f546efd538cebcc6eada28a6a74058342359d3bf17366f6819e17a457",
+      "sha256Expandido": "017d69bb0815eaddf66b4a3b0168b02be5b0fb5757e489819ef43ef617428c42"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/bloqueos.v20260909/bloqueo.2612.txt",
+      "sha256": "b3cef28e85143e30415a5ec2a0fb4a017d6c6ed5f7f1d610bee832fd141deeed",
+      "sha256Expandido": "ba7f58258355f82eca2d4da5cde366f1e8026d3c45b35005c8a5723836bc3098"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/bloqueos.v20260909/bloqueo.2701.txt",
+      "sha256": "4f427b20a2491ddd947770b2002fc971f96ec2a03ffb109053c31d4e9051884a",
+      "sha256Expandido": "22b11ae56fd8141b9c21ff57f34e999dcb0f2aba527f51e4d5d4ace859545096"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/bloqueos.v20260909/bloqueo.2702.txt",
+      "sha256": "8ba93ac488db85a61b0445838539f97e0241b6965682bb52705e7b37a7bad2c5",
+      "sha256Expandido": "dc2abb949a2ab830452555594cc48a344d65f1dc031135cd3704526a515f894e"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/bloqueos.v20260909/bloqueo.2703.txt",
+      "sha256": "46ddb8d64a1e3be96a6eec5e908a8daaed3f17d999067d3c3c9f9e8a11e1a834",
+      "sha256Expandido": "bd58348ca12b44d4f7b595ed00066eedcaa9fc0b35c2ff23c515598d45b87bb4"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/bloqueos.v20260909/bloqueo.2704.txt",
+      "sha256": "1b060f91abffb92dda7eb676c5313bc5f7db3500f2f75699e2b11baf7b6def68",
+      "sha256Expandido": "9a94d4f77837174f7fceaae5c0c087d2a228fdaa7f31c40c9fb685cf12edd177"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/bloqueos.v20260909/bloqueo.2705.txt",
+      "sha256": "b9972aa60a28f113b8825852b6c1a2eced8312361eac09f6bc3329b22b83648c",
+      "sha256Expandido": "05fcd61c194c7ad3f970d275398faf1161cdeaf22eece5a22e42648f3576a471"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/bloqueos.v20260909/bloqueo.2706.txt",
+      "sha256": "2de96ac1d066217ae5f64c335634268e1f79f9b5fb86fb1b8724b11490d4ddc1",
+      "sha256Expandido": "665f4ed0156a5528574910a6eba1e4b0ba8fb1d6165eccb8c9475c43092e12d7"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/bloqueos.v20260909/bloqueo.2707.txt",
+      "sha256": "9d24dcd212c0711783aad29a3ff33de4668e088e93aaba5f270b7c1377705c5c",
+      "sha256Expandido": "baa5aebb15e3eb48af867fed9b3f10674911bb34dc4c676a1bd3e8366fc6da24"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/bloqueos.v20260909/bloqueo.2708.txt",
+      "sha256": "dbf96849a75af071a710bff2b5e2e41037aabf24f4448abc3a9c086ec407abad",
+      "sha256Expandido": "ba1a4038dc9214c32a29b8628ad2cbba1881b04888c88e34df08602c5cb4888d"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/bloqueos.v20260909/bloqueo.2709.txt",
+      "sha256": "facba92213ff1eb5834f9ae835c3354780c26a2aad2fda046869af17af6d53b6",
+      "sha256Expandido": "a04f642d3449104a1e8a2aae0f2b8f1d06ea85001f4ff628ef36e7a56c9c77aa"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/bloqueos.v20260909/bloqueo.2710.txt",
+      "sha256": "01c9d5d6e9205a6b49c739e7801f1c2db16ce084d8dbf4b3fd02b47a2ebc5b58",
+      "sha256Expandido": "94aeda099992b40610fe351dcdb83a3f66f064866370cb212670f70136fe785b"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/bloqueos.v20260909/bloqueo.2711.txt",
+      "sha256": "067339f3c84ecb148cde5cd60bb28876d193defc70e9689f50c6ebded93260cd",
+      "sha256Expandido": "8ff173079ea7361303542ed962694784e3682dd463b5510109b6228136e21883"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/bloqueos.v20260909/bloqueo.2712.txt",
+      "sha256": "bddb5da577b0fccfdd83af8a9d35d456c360e4d1525a5b160706894dedd49083",
+      "sha256Expandido": "1931d4421f63092f707711a1ba98f2352d296911533da8fc5cb569b6d48d78ac"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/bloqueos.v20260909/bloqueo.2801.txt",
+      "sha256": "610797b6b83ea5e8f2bffd5fa97670621b09f3ac6b3ad0a0760c2aedf9b27c6c",
+      "sha256Expandido": "98506352d9317f13dd5640adf0d20ddfe493289af08ca62f323bec8bac253eaf"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/bloqueos.v20260909/bloqueo.2802.txt",
+      "sha256": "f2f33b4e1da8ef686159e24eb803e84c5339c6872e3612e7562ce86cc24cd3f0",
+      "sha256Expandido": "e1790849bde00ed571a939700b55c8df78d6cff3acaafe92702dabf7a8c9e27f"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/bloqueos.v20260909/bloqueo.2803.txt",
+      "sha256": "5d7ac4f18695ed76de0ba0462840f8dd7d426e7fd3380333075073cd885db745",
+      "sha256Expandido": "0b1931ddfbe0c94bf423a9c9589e7b5ad72585f4fff5a9e7f127f46b0a4b5a47"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/bloqueos.v20260909/bloqueo.2804.txt",
+      "sha256": "80c846eb3caebae3578f9c4339c8c83fb92ae35e4c0ede6c7ea0575955b7c981",
+      "sha256Expandido": "365f685d065250a85f47e269db49bae109ab12072341ff7b53592e9348c30c9d"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/bloqueos.v20260909/bloqueo.2805.txt",
+      "sha256": "d0af8d7aebb241019ce7de9b7b3693056cff6aff29674de8c4a7b5b271dc295a",
+      "sha256Expandido": "c67047a8a0532f837a0585181c1fad8019d8fd33fa1ad55f99f13f81a76dbe09"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/bloqueos.v20260909/bloqueo.2806.txt",
+      "sha256": "9c90c255c0462409ee4c92b46d1e938b070436ea4231501e387fa40b2ce92486",
+      "sha256Expandido": "5ffbedbfc7623f32db6a307d060ee327b86cef93d193853f8a38a02690c80e8a"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/bloqueos.v20260909/bloqueo.2807.txt",
+      "sha256": "f65408986369cec569c22363bd6b755be2ddac6ddedfb082e414b4cedc5d6ab1",
+      "sha256Expandido": "4dc9b3d9d6c4cecaac36ec50e9301e8da6a9720c17340ad8d75e92a148371827"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/bloqueos.v20260909/bloqueo.2808.txt",
+      "sha256": "8ee5fb7fb7593c2426123cff044ed117af2bba85ba8e579fe8e619cc78a190ed",
+      "sha256Expandido": "5e07773e98512a7013045f6b6720bc466c91080384cb096d67fa11dd920beaec"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/bloqueos.v20260909/bloqueo.2809.txt",
+      "sha256": "9353785ea79433702f094988c8d22c9cf92cfa1417d283a9db086690bbb6a805",
+      "sha256Expandido": "a89582a99ffce5bceec88209c66ac006fb6418dc3e7a4f9ac489dd4a21df362d"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/bloqueos.v20260909/bloqueo.2810.txt",
+      "sha256": "9743c6532ea2248925bb2542ab77962fa56d866c6d2cea4347520c48a6902bdb",
+      "sha256Expandido": "b698abf8031d4f33edca4b01734ba65fb84ef1939d1086a6a2d914d1eba4ceba"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/bloqueos.v20260909/bloqueo.2811.txt",
+      "sha256": "4da5b48526938f68ddc5022e47a0511e48fd2021f50cc4215a046d70f2f5c6f2",
+      "sha256Expandido": "7f78b147f10256f32520af7ae99309814f6f0d5c277039921067ea49eac21802"
+    },
+    {
+      "archivo": "c.1inf54.26-2.data_publicada/bloqueos.v20260909/bloqueo.2812.txt",
+      "sha256": "f096b5c10d6895c9a824924a65c88ef267e66bc555b0b0f1bccae68cdf5601a2",
+      "sha256Expandido": "6c1ce7869f369e1ae1c8cd7fc8408c11de09f1e202acd425415cdc9b8c57a71d"
+    }
+  ],
+  "clasesCandidatas": {
+    "org/kindbox/experiments/CompararCumplimiento.class": "1b20152f0e6abdf571b704ee4e2abc7c2297c790869d786e344808aab8c6835d",
+    "org/kindbox/experiments/CompararCumplimiento$Auditor.class": "115082f7ccc0698b2cf97f6660919b1aaa1f7d244b570fc711567ada82f72d0d",
+    "org/kindbox/experiments/CompararCumplimiento$1.class": "ce36a09fbfb000e1481a51a22f1d028da5b526bb89ffe6e5bbd4488cd680c775",
+    "org/kindbox/core/datagen/GeneradorArchivoAverias.class": "3f3d375947175ebb934e3e31b2dee001ac3c9778725d168babcd259c0d0799e3",
+    "org/kindbox/core/datagen/GeneradorMantenimiento.class": "c0211ff6c747062d9acb13c02b4b9a72f1a2ccc18ce26ef0d003d9f804240a0c",
+    "org/kindbox/core/datagen/GeneradorBloqueos.class": "03d7fd2f911efef08917de74519cd675d6c4c8d23ffcfaf1d609438b8c63438d",
+    "org/kindbox/core/datagen/GeneradorVentas.class": "f3648eb8bf0c2af97e866d16afe0733511abff49f2da808f360f3befa0e6a52d",
+    "org/kindbox/core/datagen/PerfilDemanda.class": "9ae889e08b527eb398c881651af51b965129aec5c2b1c3b8df65ab9cdd1673d5",
+    "org/kindbox/core/simulacion/MotorSimulacion.class": "05703798a5bb57a04183f20f04d0a268697a9c6026b63b4f8b309a2b67bf0fc8",
+    "org/kindbox/core/simulacion/MotorSimulacion$1.class": "4219c80a2671e17588a0477105491c4b45d7982852f4e9d06e1d2ac21287cbfd",
+    "org/kindbox/core/simulacion/MotorSimulacion$Fotografia.class": "8b11ce782a600bea02dac13acdf39a157103dc9ae575e23f8cacf9eec920d382",
+    "org/kindbox/core/simulacion/EstadoSimulacion.class": "25096fed3b49e73d91248d0e228c8b569fe76c6b75d8c026f9829030b8053451",
+    "org/kindbox/core/simulacion/UnidadEnCurso.class": "103577646785b152078552a0cf961746261160336f11979efff8dcc9d132bbaf",
+    "org/kindbox/core/simulacion/ColaEventos.class": "9811aaac14db7b61b9ff245057145670b8a7fb1e1a079ed693c4fc4a7f5fb5d8",
+    "org/kindbox/core/simulacion/GeneradorAverias.class": "2cb0db6f69a7e1e6b0da93f4c8bb603d3a0517503edf865d329cc730249808b6",
+    "org/kindbox/core/simulacion/ConfiguracionEscenario.class": "3ca9897958aedb7cbb707dbb836d3e3224df9515483728dea9331b0dfaed0b2d",
+    "org/kindbox/core/simulacion/ResultadoSimulacion.class": "be1ef15c6a7afd9a528e6dbc58a11675208c2a4683d46695c062e94324dafdb5",
+    "org/kindbox/core/simulacion/MetricasSimulacion.class": "1b1d4f2ce335fa9f27f9b93403cb714e55ffe84571b74f387187e6d2e87d0c39",
+    "org/kindbox/core/simulacion/MetricasSimulacion$ActivacionSemaforo.class": "5691da1a28040b0d1e4a03939dac3b52c30d5734a76ad9ee5bf45b74b72ae7be",
+    "org/kindbox/core/simulacion/InstantaneaSimulacion.class": "a907d0521bb47a41be6ddcc8e2a511456204de194d36d9c040d4ed712b966898",
+    "org/kindbox/core/simulacion/ObservadorSimulacion.class": "d3d7f42b31fbae31f39f45a8c54012985f3cbeb885fe1140ba24bf2893dfcbc3",
+    "org/kindbox/core/simulacion/EstadoCorrida.class": "e9a667f61e09ec1c7de899ed0353b1f24ed21e4103a7930601abefadb1cf482e",
+    "org/kindbox/core/simulacion/VistaBloqueo.class": "ad865935724575a6337bd23f94cb2a5db400f3dec924197479ea7f4d08870634",
+    "org/kindbox/core/simulacion/ColorSemaforo.class": "129d83b121ff0ea91641606535c888baf0af584a29c23c6eef63773240dcd93e",
+    "org/kindbox/core/simulacion/VistaAlmacen.class": "01e68b97acfc01e06edbac88929d3174c7c232c5f321fcd9d32fd993fe4588c5",
+    "org/kindbox/core/simulacion/VistaUnidad.class": "52bcdba92e4806d5bb8e55db3b206d590ea06cdc068cace345819d8f7863d399",
+    "org/kindbox/core/simulacion/VistaUnidad$PedidoABordo.class": "c55220adabf729498b5e62250f5b8e0bba73d3abb56b10df6022bc566f84e2ba",
+    "org/kindbox/core/simulacion/Evento.class": "92ef81832b2ea1b895a9119534e7b54f987fca8b251a0b085194393a94a4e97d",
+    "org/kindbox/core/simulacion/TipoEvento.class": "4cb0f60604895ff0523f41fd0edea639946609db5f7c6db9e2a60dd09cf48b9b",
+    "org/kindbox/core/simulacion/ModoReloj.class": "700ceb0ed9273fe218f44d9c13d5ef1f6bf784abc779bb2609fbd54a479df748",
+    "org/kindbox/core/simulacion/TipoEscenario.class": "ef57e71b3d0603a25ac33789203c0422bc1cc2c3b4a92e32b642d7f24082d722",
+    "org/kindbox/core/metaheuristica/ResultadoPlanificacion.class": "8a6f60f00b80fe0360309611222e746571ab48056a5e6802a5248b5ceebc63cb",
+    "org/kindbox/core/metaheuristica/Algoritmo.class": "b41957236fca6b7d42108bf2c961cdbb53cc22c6e2a4a28c51b302fc8d04ba15",
+    "org/kindbox/core/metaheuristica/FabricaAlgoritmos.class": "60e9ddfb5e76939515565fda19936c778c2b2cd581cedf940629f42f645a0b3d",
+    "org/kindbox/core/metaheuristica/FabricaAlgoritmos$Tabla.class": "6c246f127a66bf67dc81765d67732e041587debf1fc28ab6791ade8656ef39f3",
+    "org/kindbox/core/metaheuristica/FabricaAlgoritmos$Valores.class": "32a750729491cf60e37ffb3811e41c04dd8f6aebbcaee235679d4e388efe992a",
+    "org/kindbox/core/metaheuristica/FabricaAlgoritmos$Ajuste.class": "a946af6ce106cab0000a93ad41300d86c5beefd4387d33483d47d8441c9959a5",
+    "org/kindbox/core/metaheuristica/FabricaAlgoritmos$Aplicacion.class": "08038c53349f341e59e4e4c11ab6a859eecd1a759fb51b8a40e47ee9d3aedd56",
+    "org/kindbox/core/metaheuristica/FabricaAlgoritmos$AsignacionBooleana.class": "8f580ebd281c4d2cd0081a34711ff3554e859d0a7c28f880066dfb555ac87888",
+    "org/kindbox/core/metaheuristica/FabricaAlgoritmos$Tipo.class": "1f9f4596257a9297f782c0e247cf00c35c9a51074c52c11e7052835cc2b45d6d",
+    "org/kindbox/core/metaheuristica/PerfilConvergencia.class": "06220979d03a2b2df84b2facaf6c39aa07e62d00c2239c14705878827e50f3c4",
+    "org/kindbox/core/metaheuristica/PerfilConvergencia$Medicion.class": "4b92cf3659f3bbd4deb00fb2644130b73ca71c2861d292c7ea9c143b4d4f951c",
+    "org/kindbox/core/metaheuristica/PresupuestoComputo.class": "6180ceee642047c2b4e75964a8dc0cfd0ec05c40946ecd871c4e077a899d041b",
+    "org/kindbox/core/util/Aleatorio.class": "e11ff4e84ee5d86064e28bce8bb8c15aa3e0b23d325b6328459533c2cd3318ed",
+    "org/kindbox/core/construccion/RecuperadorPlanVigente.class": "fcac803dd77759700c435a32ce91e46b772c6789c93f0475b200c557529f5e5a",
+    "org/kindbox/core/construccion/AhorrosClarkeWright.class": "07550f0570de2bb91df26436504267aa55ebd07723516e59844445ceaa3100d3",
+    "org/kindbox/core/construccion/HeuristicaConstructiva.class": "e25a731243bc6cd59df8095f3c970e26bbad7a8e106d7320e295f5006f8fdf8e",
+    "org/kindbox/core/io/LectorAverias.class": "9dae713aa76c792c4a360b46cfadd1c36f4ed9de035a7d08bb05138008efc2f8",
+    "org/kindbox/core/io/LectorAverias$AveriaProgramada.class": "8dc80e1e427b9f92ebf9387c625a73fa31056ae8de426c42b23f20c0f596deb0",
+    "org/kindbox/core/io/LectorMantenimiento.class": "514607944a8c01b0c5a18788c53cd26b2cc55f64c246a8900e7800cd1b1d7046",
+    "org/kindbox/core/io/LectorBloqueos.class": "639b318daa1c4e0d22fe06e1ed1fcdfc482c22e3571ac4f8377042bd54408c21",
+    "org/kindbox/core/io/LectorVentas.class": "837fa1710dac4e3c3764c4f43258b55e4203aa761c6bbb1114880a8d6503f2a9",
+    "org/kindbox/core/io/LectorFlota.class": "205c628211373bd916b91f689e9791765062694b285c48c3e3a6b3d4237adc76",
+    "org/kindbox/core/io/LectorFlota$FlotaLeida.class": "f3397206a17c269c0e5a11a1b5395f6e239854400e526e714618b62d172dc6de",
+    "org/kindbox/core/io/CalendarioEscenario.class": "14c91d1c2e792c6b01db56424ff31993c29450c8ae0ef69d6aa273048abfe112",
+    "org/kindbox/core/io/RepositorioDatos.class": "23c3391089826d80f52a87e55963cd9cc2d31e3df8ee03ddb7e2a93f671c7c9b",
+    "org/kindbox/core/io/RepositorioDatos$DatosEscenario.class": "47cc88ff844d57582872d6741b0bfdb3b1a25963c37fb464dc129c6f29eece91",
+    "org/kindbox/core/evaluacion/FuncionObjetivoJerarquica.class": "fba3c06af1a293ee50688e308ca9144c98cbfcf0ee468fe42152e6e77024eb98",
+    "org/kindbox/core/evaluacion/PruebaFactibilidadIndependiente.class": "e773b8fb901a316e314de85c88318f93c848bd79c81061d1e18dc7f603c5e9f2",
+    "org/kindbox/core/evaluacion/PruebaFactibilidadIndependiente$EstadoUnidad.class": "1704232c39057992a5ec9cc77d5c7565f31eaa9c78291340c4728b2a0065a44d",
+    "org/kindbox/core/evaluacion/PruebaFactibilidadIndependiente$Diagnostico.class": "0e12186eb12bd3c545c3a582c9c6a45d6ca2ae41a3a887916a1691dfeefd71c6",
+    "org/kindbox/core/evaluacion/PruebaFactibilidadIndependiente$Resultado.class": "1b2b9ef5053df4903fc0e31c9670a98bbd99dae2ee7005d6f11885cb7cac4737",
+    "org/kindbox/core/evaluacion/DatosSecuencia.class": "46b895c040f62867ec42332114e191f7ef9da255207d52d7c45948a04d1f0b49",
+    "org/kindbox/core/evaluacion/ResumenesRuta.class": "d4faf796cbad670aca7b018c99131319690298c260f683313f03ab1787ae0e22",
+    "org/kindbox/core/evaluacion/ProgramadorRuta.class": "1fb2202581cf7e8f37f154e789c0eef65cfa85e89a99c95d9059076619651212",
+    "org/kindbox/core/evaluacion/VerificadorRestricciones.class": "47d9b17a2e21bd3eee9aa0d2cd129e604fcdb08ce42e21845636bad5f88a7007",
+    "org/kindbox/core/evaluacion/VerificadorRestricciones$1.class": "88536da9d779d65f085eea5d7a2368dea93b2d47f0d1c7fda75d0d36c9addaf6",
+    "org/kindbox/core/evaluacion/Programacion.class": "66cbe310b81d0b40d2d5510d3c60853beb8e20da0c3311ed285b50df27763f25",
+    "org/kindbox/core/evaluacion/FuncionObjetivo.class": "4af321d787fd41c2f818da6bbd358ff5d5074d519f3364bd2ace004f49df7387",
+    "org/kindbox/core/evaluacion/VerificadorFactibilidad.class": "c2b4da5c257980c77cde29263655054f60f06f744018cafc7c3825e717f2f3a9",
+    "org/kindbox/core/evaluacion/ResultadoVerificacion.class": "d88d52a36d235c4bd3b5660d8fe39f7b8859de0b8acb8c450c957e660746de58",
+    "org/kindbox/core/evaluacion/ResultadoVerificacion$Acumulador.class": "415dc25bddb1ecb90a3663f5077803a9346e797f85d12ccf13c35e7a8d7d3ad0",
+    "org/kindbox/core/evaluacion/ResultadoVerificacion$Detalle.class": "bab6638ffeefa753ff52338c4eecce376e9b30e5d9748d2411ce9802844afb1f",
+    "org/kindbox/core/evaluacion/Infraccion.class": "2307c30c8b6142ffec82d8e01de4a236b34aaf5866aa5af37b0e75487ac5be5d",
+    "org/kindbox/core/grafo/MatrizDistanciasReticula.class": "2b8db165fa088105ebb5ea6259643769bbbae4215c723cf9b9d9139c6e67dc54",
+    "org/kindbox/core/grafo/OraculoDistancias.class": "99f410221087fed7769a4f8676280a2c9e210c39b320fe67ef0babe848c58e82",
+    "org/kindbox/core/grafo/RegistroBloqueos.class": "5267111ae75eaddb0fd282737d57e36c7b72e8bb9cd9393ebe194cededf4cc1f",
+    "org/kindbox/core/grafo/MatrizDistancias.class": "61c24d10b1f4bc5a604a0fa35ad2b1b64b274216ff89d13bcb3fd6318548f004",
+    "org/kindbox/core/problema/ValorObjetivo.class": "51d5d6cb7a5b8176fdf7526a0b87c2da415cbf1bd76deeccea2f5031a80753c1",
+    "org/kindbox/core/problema/Solucion.class": "ec13a4a404e4528db2cd52cac24c7aa6723e41d64a1126a49857b3c57abb9c4b",
+    "org/kindbox/core/problema/InstanciaPlanificacion.class": "6c632f1ec04c2062261b5a740430834efad961eef01153f8bcea7e0afe31b861",
+    "org/kindbox/core/problema/InstanciaPlanificacion$Constructor.class": "3ff9687bf731298b3e84c452652bcf98f0cfad5b2c641070bb6922e84505387f",
+    "org/kindbox/core/problema/Ruta.class": "fe424b508ffca6eb2de419a7c16ade7fb28bb9c28449880fb76aff562b7ba14a",
+    "org/kindbox/core/problema/Parada.class": "a8080812bee3589a22ed6ba2e8a325cb349f801e02b21e537e479825a1328540",
+    "org/kindbox/core/problema/TipoParada.class": "da75dbbdb9bd9fd008e62fca9ae6436d146807b8d2837cfba71e7fc20557771d",
+    "org/kindbox/core/modelo/ParametrosOperacion.class": "f6c9e8beff777b61929a02059bb789b59e67e1919ab9ac0381ba40e6e543e5a4",
+    "org/kindbox/core/modelo/ParametrosOperacion$Instantanea.class": "359fc92dee4a2dccbdd63e84c1757aa5bf67e39f712908057bb4148c74e3f9d3",
+    "org/kindbox/core/modelo/Mantenimiento.class": "402b2b68f1bf12f6d81788dade7e90d5c6600ee6a461ea68f6815affa31fa89f",
+    "org/kindbox/core/modelo/Averia.class": "31b1f24f77cf08712f2b566b0ce50a1977f9b11ee884e2417a01328b4aae21c5",
+    "org/kindbox/core/modelo/Bloqueo.class": "a8970922dfb3093a43ab553e4c9b860ec82e9fd3ef978c856f74ec4c218d99d4",
+    "org/kindbox/core/modelo/UnidadTransporte.class": "9771b37e1d1a6f439d21f468f6b5b136059037535a8237dcadc010ecabe7859f",
+    "org/kindbox/core/modelo/EstadoUnidad.class": "293d8b83c57481c451eb0dbbd9e7aa2e7c002d5a505c215a97386bda6df3ff7e",
+    "org/kindbox/core/modelo/Almacen.class": "d277add96b86af74ae6602523bae658638730ad7e1251ba3e0387c15a2fe6af6",
+    "org/kindbox/core/modelo/Pedido.class": "e2677d59572868a48d457526187df5aba2ce0ab6689025b218ed736e0405ddd2",
+    "org/kindbox/core/modelo/TipoAveria.class": "881b0c20f6be697fe90aed1e4d6401a74584d7add318eb0d06d116bdd4f63e12",
+    "org/kindbox/core/modelo/Turno.class": "591f7ac920e11fb368c32cfa16ac1375a159ef16b7caca71ca20681fd64a341d",
+    "org/kindbox/core/modelo/TipoUnidad.class": "379d059fb5c047191fa0479d0d68d03019966a9448c0a4695f79ceb1baff4a51",
+    "org/kindbox/core/modelo/Ciudad.class": "a623ca946bd777b90c613d57573a6b95ccb9c76fb0692a533e76246113db5916",
+    "org/kindbox/core/metaheuristica/alns/BusquedaAdaptativaVecindadAmplia.class": "dc1ddecd0d76864b8f7c93bede4438eb8388cb21879d99f8863a8cb4f42cdaa9",
+    "org/kindbox/core/metaheuristica/alns/RemocionDeRutaCompleta.class": "cd46f3349d42a2687d2a41c1c5c403962242e2e65134293c0c5bc217668d748b",
+    "org/kindbox/core/metaheuristica/alns/CriterioAceptacion.class": "4c4dc3995cd6f46bfa2ab0f3b8b6f4c8cb83dca8c31158467c5de97fda579451",
+    "org/kindbox/core/metaheuristica/alns/CapaAdaptativa.class": "f5f9bcee852822cd45096016531bf0e31c37514050b909f4de0c997b3963d015",
+    "org/kindbox/core/metaheuristica/alns/RemocionPorCriticidad.class": "c213aa5ad49ce29cde370ae932d99fff63dc299983a1fd63a28900c1cd27816e",
+    "org/kindbox/core/metaheuristica/alns/InsercionVorazConParpadeo.class": "5f1e14650114def3a3b4cddcfe4f959377692d457c316b4792b266a128deb400",
+    "org/kindbox/core/metaheuristica/alns/InsercionPorArrepentimiento.class": "3c346245e610b4e75efdca0e16a2829c3c2ca7017183db5750ccd3129e7d5485",
+    "org/kindbox/core/metaheuristica/alns/MotorInsercion.class": "113cdd48358df804927bd6f8cc0534e69944d9911874c7b741b052aca9ec9d95",
+    "org/kindbox/core/metaheuristica/alns/InsercionVoraz.class": "6ad23fc1f22e0e158d02a67261c1b259c6252f856d1e61be235bdbb2abdc2c9b",
+    "org/kindbox/core/metaheuristica/alns/RemocionCadenasAdyacentes.class": "4557ef55146e127c810d67c5378503a270ca41a35e64fba18db96e4839a039a3",
+    "org/kindbox/core/metaheuristica/alns/RemocionPorAfinidad.class": "2a6fe9b3b78fa444f2a1e533b69c760f143049a2a3e66485197245c11b937138",
+    "org/kindbox/core/metaheuristica/alns/RemocionDelPeor.class": "35b005f3bf684eadc0a4bf73c42793309460cda37a526dbb6927e92ec47435dd",
+    "org/kindbox/core/metaheuristica/alns/RemocionAleatoria.class": "ed93492fc1f14b6b462eeea55c3e8cb37665932ce0bacf22d6cfb5f23b16502e",
+    "org/kindbox/core/metaheuristica/alns/OrdenPorClave.class": "e2bcd7dd9a9b08c31f89a7df1900e471b44a45fb2d99cc9ee5a49af3f17bf45d",
+    "org/kindbox/core/metaheuristica/alns/OperadorReconstruccion.class": "afc75409e855b469c761360468f282f370596483ec6d4092b16ef7db1c39701b",
+    "org/kindbox/core/metaheuristica/alns/PlanVigenteAlns.class": "dcf6a6a86eb3d0618baf36f281f9469f5f12d063dbd4a362735166df1bf807ef",
+    "org/kindbox/core/metaheuristica/alns/TareasAlns.class": "4cea8f2438c655d12d31e87c1e2be525678e753cdb17576afbbb681fefd68aa1",
+    "org/kindbox/core/metaheuristica/alns/EstadoAlns.class": "b1008c0146592909dfc284e88481a6218ab92ca4c79fc389e6e57ff6522316df",
+    "org/kindbox/core/metaheuristica/alns/OperadorDestruccion.class": "c4e34edd42ca16f3d4a073bce659bb8b514d3a8473eb9bc16b1c4799ec5bc759",
+    "org/kindbox/core/metaheuristica/alns/ParametrosAlns.class": "efa3c5085d711046f9dbfe6e2975c02e5bfe115aec5a09cae798090b0721b4ea",
+    "org/kindbox/core/metaheuristica/hgs/Educacion.class": "6112740acafd5a01118fd0ab900bf3937c437b444b0c4c3d727d22bc3469ac6e",
+    "org/kindbox/core/metaheuristica/hgs/Split.class": "a02027d4f92ac874147ec32363b516cb667ff2443b85765358dfb27081ddd5bd",
+    "org/kindbox/core/metaheuristica/hgs/BusquedaGeneticaHibrida.class": "223df7543deabf3e2e02684a6f4fbb67a7200ceb64ff0fa80dbf13cfd3bda683",
+    "org/kindbox/core/metaheuristica/hgs/BusquedaGeneticaHibrida$Corrida.class": "59f462445c8d2b0f8690001ba238ba64773dc69bece6e5372a8307dab5e31a7f",
+    "org/kindbox/core/metaheuristica/hgs/EstabilidadPlan.class": "84a6d4f47c2aee37eb205ef00a47c81f1aef15e4f685bf140eb97f979bc09af6",
+    "org/kindbox/core/metaheuristica/hgs/Poblacion.class": "204fbad3c0ef4156e8eba1598f48634d0446e138b6551937566d917976b8423b",
+    "org/kindbox/core/metaheuristica/hgs/Individuo.class": "1b8ffef5d5ff914d973e077201a383f601c6f295b0981081bedcdb319ea8df01",
+    "org/kindbox/core/metaheuristica/hgs/CruceOrdenado.class": "c7e0e6ea9ed73528ff62e8e5fdacb6d85515ea74109e115007966c20df7e390a",
+    "org/kindbox/core/metaheuristica/hgs/TareasEntrega.class": "b3b65078db43c367e64f1ef8e78ed1c594c1d0793d66d3ff5398035ceb5a56e7",
+    "org/kindbox/core/metaheuristica/hgs/ParametrosHgs.class": "3e04e07f484f6d36093afb919cf77e1ad23ae75e6feeb3ac2087961af506acb6"
+  },
+  "ejecucion": "Secuencial, heap maximo 640 MiB; presupuesto de pared. Preparacion y edicion ligeras en paralelo, sin otras corridas experimentales.",
+  "incidencias": "Desactivadas en las comparaciones de rendimiento; las pruebas unitarias existentes cubren averias y mantenimiento."
+}

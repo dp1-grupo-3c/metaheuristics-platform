@@ -20,10 +20,7 @@ import org.kindbox.core.problema.Solucion;
  * <p>Se exige que la busqueda adaptativa lo declare y lo implemente, que arrancar desde un
  * plan no devuelva jamas algo peor que ese plan, que la corrida siga siendo repetible con la
  * misma semilla y el mismo plan, y que un plan que no aporta nada, vacio o nulo, deje la
- * ejecucion exactamente igual que el arranque ordinario. Se exige tambien que la busqueda
- * genetica hibrida declare que no lo admite y que su implementacion por defecto ignore el plan
- * en lugar de fallar, que es lo que el motor de simulacion necesita para no tener que
- * distinguir algoritmos.</p>
+ * ejecucion exactamente igual que el arranque ordinario. La busqueda genetica conserva tambien un respaldo factible del plan vigente.</p>
  */
 class ArranqueDesdePlanVigenteTest {
 
@@ -83,20 +80,17 @@ class ArranqueDesdePlanVigenteTest {
     }
 
     @Test
-    @DisplayName("HGS no admite el arranque desde el plan vigente y lo ignora sin fallar")
-    void hgsIgnoraElPlanVigente() {
+    @DisplayName("HGS conserva una semilla factible y puede mejorarla sin perderla")
+    void hgsConservaElPlanVigente() {
         InstanciaPlanificacion instancia = InstanciasDePrueba.instanciaFlotaMixta(16);
         BusquedaGeneticaHibrida hgs = new BusquedaGeneticaHibrida(new AhorrosClarkeWright());
-        assertFalse(hgs.admiteArranqueDesdePlanVigente());
-
+        assertTrue(hgs.admiteArranqueDesdePlanVigente());
         Solucion plan = nuevoAlns().resolver(instancia, presupuesto(ITERACIONES_ALNS)).solucion();
-        ResultadoPlanificacion conPlan =
-                hgs.resolverDesde(instancia, presupuesto(ITERACIONES_HGS), SEMILLA, plan);
-        ResultadoPlanificacion sinPlan = hgs.resolver(instancia, presupuesto(ITERACIONES_HGS), SEMILLA);
-
-        assertEquals(sinPlan.solucion().h(), conPlan.solucion().h(), "H");
-        assertEquals(Double.doubleToLongBits(sinPlan.solucion().costo()),
-                Double.doubleToLongBits(conPlan.solucion().costo()), "costo");
-        assertEquals(sinPlan.iteraciones(), conPlan.iteraciones(), "iteraciones");
+        Solucion respaldo = org.kindbox.core.construccion.RecuperadorPlanVigente.recuperar(
+                instancia, plan, presupuesto(ITERACIONES_HGS));
+        ResultadoPlanificacion conPlan = hgs.resolverDesde(instancia, presupuesto(ITERACIONES_HGS), SEMILLA, plan);
+        assertFalse(respaldo.valor().mejorQue(conPlan.solucion().valor()));
+        assertTrue(new org.kindbox.core.evaluacion.VerificadorRestricciones()
+                .verificar(instancia, conPlan.solucion()).factible());
     }
 }

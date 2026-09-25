@@ -17,9 +17,8 @@ import org.kindbox.core.simulacion.ConfiguracionEscenario;
  * {@code -Dalns.*} llegan a {@code FabricaAlgoritmos}. Un valor que no sea {@code true} ni
  * {@code false} detiene el ejecutable.</p>
  *
- * <p>Solo lo aprovecha el algoritmo que lo admite, hoy la busqueda adaptativa de vecindad
- * amplia; con la busqueda genetica hibrida el ejecutable avisa de que el indicador no tiene
- * efecto, en lugar de dejar creer que la corrida mide algo que no mide.</p>
+ * <p>ALNS y HGS admiten el plan vigente. El indicador permite comparar ese arranque,
+ * activo por defecto, contra la construccion desde cero con {@code false}.</p>
  */
 final class OpcionArranque {
 

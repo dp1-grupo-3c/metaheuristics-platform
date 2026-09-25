@@ -1,5 +1,7 @@
 package org.kindbox.core.metaheuristica.hgs;
 
+import org.kindbox.core.construccion.RecuperadorPlanVigente;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -181,7 +183,16 @@ public final class BusquedaGeneticaHibrida implements Algoritmo {
     @Override
     public ResultadoPlanificacion resolver(InstanciaPlanificacion instancia, PresupuestoComputo presupuesto,
                                            long semillaEjecucion) {
-        return new Corrida(instancia, presupuesto, semillaEjecucion).ejecutar();
+        return new Corrida(instancia, presupuesto, semillaEjecucion, null).ejecutar();
+    }
+
+    @Override
+    public boolean admiteArranqueDesdePlanVigente() { return true; }
+
+    @Override
+    public ResultadoPlanificacion resolverDesde(InstanciaPlanificacion instancia, PresupuestoComputo presupuesto,
+                                                long semillaEjecucion, Solucion planVigente) {
+        return new Corrida(instancia, presupuesto, semillaEjecucion, planVigente).ejecutar();
     }
 
     /**
@@ -192,6 +203,7 @@ public final class BusquedaGeneticaHibrida implements Algoritmo {
     private final class Corrida {
 
         private final InstanciaPlanificacion instancia;
+        private final Solucion planVigente;
         private final PresupuestoComputo presupuesto;
         /** Semilla de esta ejecucion, la del constructor o la que fijo el invocante. */
         private final long semillaCorrida;
@@ -222,6 +234,7 @@ public final class BusquedaGeneticaHibrida implements Algoritmo {
         private int selloCota;
         private int cotaPedidos;
         private double cotaCosto;
+        private double cotaUrgencia;
 
         private Solucion mejorSolucion;
         private ValorObjetivo mejorValor = ValorObjetivo.PEOR;
@@ -230,7 +243,8 @@ public final class BusquedaGeneticaHibrida implements Algoritmo {
         private int descendientesRecientes;
         private int factiblesRecientes;
 
-        Corrida(InstanciaPlanificacion instancia, PresupuestoComputo presupuesto, long semillaCorrida) {
+        Corrida(InstanciaPlanificacion instancia, PresupuestoComputo presupuesto, long semillaCorrida, Solucion planVigente) {
+            this.planVigente = planVigente;
             this.instancia = instancia;
             this.presupuesto = presupuesto;
             this.semillaCorrida = semillaCorrida;
@@ -353,6 +367,16 @@ public final class BusquedaGeneticaHibrida implements Algoritmo {
          * tope por conteo no existe y la fase se comporta como siempre.</p>
          */
         private void construirElite() {
+            Solucion recuperada = planVigente == null ? null
+                    : RecuperadorPlanVigente.recuperar(instancia, planVigente, presupuesto);
+            if (recuperada != null) {
+                mejorSolucion = recuperada;
+                mejorValor = recuperada.valor();
+                cromosomaDesdeSolucion(recuperada, respaldo);
+                split.ejecutar(respaldo, pesoDesfase);
+                insertar(respaldo);
+                registrarMejor(respaldo);
+            }
             Solucion semillaConstructiva = null;
             if (heuristica != null) {
                 programador.reiniciarInventarios();
@@ -610,9 +634,12 @@ public final class BusquedaGeneticaHibrida implements Algoritmo {
         private boolean registrarMejor(Individuo individuo, boolean sondeo) {
             calcularCotaEntregable(individuo);
             if (mejorSolucion != null && !sondeo) {
+                double diferenciaUrgencia = cotaUrgencia - mejorValor.urgencia();
                 boolean mejora = cotaPedidos < mejorValor.pedidosNoAtendidos()
                         || (cotaPedidos == mejorValor.pedidosNoAtendidos()
-                            && cotaCosto < mejorValor.costo() - 1e-9);
+                            && (diferenciaUrgencia < -ValorObjetivo.TOLERANCIA_URGENCIA
+                                || (Math.abs(diferenciaUrgencia) <= ValorObjetivo.TOLERANCIA_URGENCIA
+                                    && cotaCosto < mejorValor.costo() - 1e-9)));
                 if (!mejora) {
                     return false;
                 }
@@ -645,7 +672,7 @@ public final class BusquedaGeneticaHibrida implements Algoritmo {
         }
 
         /**
-         * H y costo del individuo contando solo sus rutas sin desfase. Las tareas de las
+         * H, urgencia y costo del individuo contando solo sus rutas sin desfase. Las tareas de las
          * rutas con desfase se cuentan como no atendidas, que es el peor caso de la
          * materializacion.
          */
@@ -653,11 +680,14 @@ public final class BusquedaGeneticaHibrida implements Algoritmo {
             selloCota++;
             int pedidos = 0;
             double costo = 0.0;
+            double urgencia = 0.0;
             for (int i = 0; i < individuo.cantidadBanco(); i++) {
                 int pedido = tareas.pedido(individuo.banco()[i]);
                 if (marcaCota[pedido] != selloCota) {
                     marcaCota[pedido] = selloCota;
                     pedidos++;
+                    urgencia += ValorObjetivo.urgenciaDe(
+                            instancia.pedidoMinutoLimiteEfectivo(pedido) - instancia.minutoActual());
                 }
             }
             final int[] visitas = individuo.visitas();
@@ -673,10 +703,12 @@ public final class BusquedaGeneticaHibrida implements Algoritmo {
                     if (marcaCota[pedido] != selloCota) {
                         marcaCota[pedido] = selloCota;
                         pedidos++;
+                        urgencia += ValorObjetivo.urgenciaDe(instancia.pedidoMinutoLimiteEfectivo(pedido) - instancia.minutoActual());
                     }
                 }
             }
             cotaPedidos = pedidos;
+            cotaUrgencia = urgencia;
             cotaCosto = costo;
         }
 

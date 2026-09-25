@@ -56,6 +56,7 @@ public final class InstanciaPlanificacion {
     private final int[] unidadCarga;
     private final long[] unidadMinutoDisponible;
     private final long[] unidadMinutoFinTurno;
+    private final boolean[] unidadAlimentada;
 
     private final Map<Integer, Integer> indicePorIdPedido;
     private final Map<String, Integer> indicePorCodigoUnidad;
@@ -109,6 +110,7 @@ public final class InstanciaPlanificacion {
         this.unidadCarga = new int[cantidadUnidades];
         this.unidadMinutoDisponible = new long[cantidadUnidades];
         this.unidadMinutoFinTurno = new long[cantidadUnidades];
+        this.unidadAlimentada = new boolean[cantidadUnidades];
         this.indicePorCodigoUnidad = new HashMap<>(cantidadUnidades * 2);
         for (int i = 0; i < cantidadUnidades; i++) {
             UnidadTransporte u = c.unidades.get(i);
@@ -118,6 +120,7 @@ public final class InstanciaPlanificacion {
             unidadCarga[i] = u.cargaABordo();
             long arranque = Math.max(minutoActual, u.minutoDisponibleDesde());
             unidadMinutoDisponible[i] = arranque;
+            unidadAlimentada[i] = u.inicioTurnoAlimentacion() == Turno.inicioDelTurno(arranque);
             long horizonte = c.horizontes.get(i);
             unidadMinutoFinTurno[i] = horizonte > 0 ? horizonte : Turno.finDelTurno(arranque);
             indicePorCodigoUnidad.put(u.codigo(), i);
@@ -256,6 +259,17 @@ public final class InstanciaPlanificacion {
     /** Instante en que la unidad queda libre para arrancar su ruta. */
     public long unidadMinutoDisponible(int i) {
         return unidadMinutoDisponible[i];
+    }
+
+    /** La pausa de esta jornada ya fue iniciada y no debe repetirse al replanificar. */
+    public boolean unidadAlimentada(int i) { return unidadAlimentada[i]; }
+
+    /** Ultima llegada que permite completar el servicio sin cruzar el cierre de turno. */
+    public long pedidoMinutoLimiteEfectivo(int i) {
+        long limite = pedidoMinutoLimite[i];
+        long cierre = Turno.finDelTurno(limite);
+        int servicio = parametros.minutosAcondicionamiento();
+        return Math.min(limite, cierre - servicio);
     }
 
     /** Cierre del turno de la unidad. Ninguna ruta puede extenderse mas alla. */

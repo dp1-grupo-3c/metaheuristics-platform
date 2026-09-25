@@ -157,15 +157,17 @@ parametros completos del algoritmo, y avisa si el presupuesto cae fuera del rang
   -DarranqueDesdePlanVigente=true
 ```
 
-Por defecto cada replanificacion construye su solucion de partida con la heuristica de ahorros.
-Con `-DarranqueDesdePlanVigente=true` parte del plan vigente de la replanificacion anterior,
-recortado a la fotografia: solo los pedidos que siguen pendientes y las unidades que siguen
-disponibles, y cada ruta recortada por su cola hasta que vuelve a ser factible. Es el segundo
-modo de arranque del apartado 7.3.5 del ISA y la hipotesis experimental del apartado 11.4:
-partir del plan vigente deberia rebajar la tasa de reasignacion de pedidos entre
-replanificaciones. Vale para `CorrerEscenario`, `MedirEstabilidad` y la API, con el mismo
-nombre de propiedad; solo lo aprovecha ALNS, y con HGS el ejecutable avisa de que el indicador
-no tiene efecto. Un valor que no sea `true` ni `false` detiene el ejecutable.
+Por defecto los ejecutables y la API parten del plan vigente de la replanificacion anterior.
+ALNS lo repara y continua su busqueda; HGS lo reprograma como respaldo factible y lo incorpora
+a su poblacion, junto con la heuristica de ahorros. Se conservan solo pedidos pendientes y
+unidades disponibles. `-DarranqueDesdePlanVigente=false` recupera el arranque constructivo
+para comparaciones controladas. Un valor que no sea `true` ni `false` detiene el ejecutable.
+
+La prioridad compartida es H/U/S: cantidad de pedidos sin asignar, urgencia de esos pedidos
+y costo. La urgencia considera el cierre del turno sin cambiar el plazo contractual. La
+fotografia registra las pausas ya iniciadas para no repetirlas en la misma jornada.
+La evaluacion y sus limites se documentan en
+[`experiments/revision-cumplimiento-20260924/`](experiments/revision-cumplimiento-20260924/RESULTADOS.md).
 
 ### Medir la estabilidad del plan
 

@@ -11,10 +11,10 @@ import org.kindbox.core.problema.TipoParada;
 import org.kindbox.core.problema.ValorObjetivo;
 
 /**
- * Funcion objetivo jerarquica de dos niveles del apartado 2.5 del ISA.
+ * Funcion objetivo jerarquica H/U/S, con urgencia efectiva antes del costo.
  *
  * <p>El nivel 1, dominante, minimiza {@code H}, el numero de pedidos que quedan con
- * remanente sin asignar. El nivel 2, subordinado, minimiza {@code S}, la suma sobre las
+ * remanente sin asignar. A igual H se minimiza la urgencia de los no atendidos; despues se minimiza {@code S}, la suma sobre las
  * unidades de los kilometros recorridos por el costo por kilometro de su tipo. La
  * comparacion lexicografica vive en {@link ValorObjetivo}: una solucion con {@code H} mayor
  * que cero nunca se prefiere a una con {@code H} igual a cero, sea cual sea su costo.</p>
@@ -64,9 +64,11 @@ public final class FuncionObjetivoJerarquica implements FuncionObjetivo {
         }
 
         int pedidosNoAtendidos = 0;
+        double urgencia = 0.0;
         for (int i = 0; i < cantidadPedidos; i++) {
             if (entregado[i] < instancia.pedidoCantidad(i)) {
                 pedidosNoAtendidos++;
+                urgencia += ValorObjetivo.urgenciaDe(instancia.pedidoMinutoLimiteEfectivo(i) - instancia.minutoActual());
             }
         }
 
@@ -76,7 +78,7 @@ public final class FuncionObjetivoJerarquica implements FuncionObjetivo {
         }
 
         double penalizacion = PESO_ESTABILIDAD * desviacionDelPlanVigente(instancia, solucion);
-        return new ValorObjetivo(pedidosNoAtendidos, costo, penalizacion);
+        return new ValorObjetivo(pedidosNoAtendidos, urgencia, costo, penalizacion);
     }
 
     @Override

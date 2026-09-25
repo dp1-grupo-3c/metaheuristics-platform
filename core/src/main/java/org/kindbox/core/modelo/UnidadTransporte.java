@@ -17,11 +17,19 @@ public final class UnidadTransporte {
     private int nodo;
     private int cargaABordo;
     private long minutoDisponibleDesde;
+    private long inicioTurnoAlimentacion = Long.MIN_VALUE;
 
     public UnidadTransporte(String codigo, TipoUnidad tipo, int nodoInicial) {
         this.codigo = codigo;
         this.tipo = tipo;
         this.nodo = nodoInicial;
+    }
+
+    /** Jornada cuya pausa ya comenzo; el motor preserva su servicio hasta terminar. */
+    public long inicioTurnoAlimentacion() { return inicioTurnoAlimentacion; }
+
+    public void inicioTurnoAlimentacion(long minutoInicioTurno) {
+        inicioTurnoAlimentacion = minutoInicioTurno;
     }
 
     /** Crea la unidad deduciendo el tipo del prefijo de su codigo. */

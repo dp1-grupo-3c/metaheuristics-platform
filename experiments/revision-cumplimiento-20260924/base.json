@@ -1,0 +1,42 @@
+[
+  {
+    "algoritmo": "HGS",
+    "revision": "babdc19",
+    "primerDia": "2026-09-01",
+    "dias": 5,
+    "presupuestoMs": 2000,
+    "semilla": 20260924,
+    "incidencias": false,
+    "planVigente": false,
+    "pedidosRegistrados": 795.0,
+    "pedidosEntregados": 762.0,
+    "pedidosPendientes": 24.0,
+    "pedidosIncumplidos": 9.0,
+    "unidadesEntregadas": 4280.0,
+    "costoAcumulado": 112113.0,
+    "milisegundosReales": 837030.0,
+    "minutoPrimerIncumplimiento": 715.0,
+    "ejecucionesPlanificador": 420.0,
+    "kilometros": 16968
+  },
+  {
+    "algoritmo": "ALNS",
+    "revision": "babdc19",
+    "primerDia": "2026-09-01",
+    "dias": 5,
+    "presupuestoMs": 2000,
+    "semilla": 20260924,
+    "incidencias": false,
+    "planVigente": false,
+    "pedidosRegistrados": 795.0,
+    "pedidosEntregados": 763.0,
+    "pedidosPendientes": 23.0,
+    "pedidosIncumplidos": 9.0,
+    "unidadesEntregadas": 4265.0,
+    "costoAcumulado": 117191.0,
+    "milisegundosReales": 836913.0,
+    "minutoPrimerIncumplimiento": 914.0,
+    "ejecucionesPlanificador": 420.0,
+    "kilometros": 18130
+  }
+]

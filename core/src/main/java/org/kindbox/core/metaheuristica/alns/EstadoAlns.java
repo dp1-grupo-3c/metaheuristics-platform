@@ -64,6 +64,9 @@ import org.kindbox.core.problema.ValorObjetivo;
  */
 public final class EstadoAlns {
 
+    /** Holgura, en minutos, por debajo de la cual un pedido del plan vigente no puede soltarse. */
+    static final long HOLGURA_COMPROMISO = 120L;
+
     /** Holgura minima de filas de ruta, para instancias con turnos muy cortos. */
     private static final int CAPACIDAD_RUTA_MINIMA = 8;
 
@@ -100,6 +103,10 @@ public final class EstadoAlns {
     private final int[] tareasEnBancoDe;
     /** Pedidos con alguna tarea en el banco, que es exactamente la H del nivel 1. */
     private int pedidosPendientes;
+    /** Suma de la urgencia de los pedidos con alguna tarea en el banco. */
+    private double urgenciaBanco;
+    /** Urgencia de cada pedido en esta fotografia, precalculada. */
+    private final double[] urgenciaDe;
 
     /**
      * Unidad que el plan vigente asignaba a cada pedido, o {@code -1}. Es el arreglo que
@@ -157,6 +164,10 @@ public final class EstadoAlns {
         this.banco = new int[Math.max(1, cantidadTareas)];
         this.posicionEnBanco = new int[Math.max(1, cantidadTareas)];
         this.tareasEnBancoDe = new int[Math.max(1, cantidadPedidos)];
+        this.urgenciaDe = new double[Math.max(1, cantidadPedidos)];
+        for (int p = 0; p < cantidadPedidos; p++) {
+            urgenciaDe[p] = ValorObjetivo.urgenciaDe(instancia.pedidoMinutoLimiteEfectivo(p) - instancia.minutoActual());
+        }
         this.tareasEnUnidadVigenteDe = new int[Math.max(1, cantidadPedidos)];
         this.unidadVigenteDe = PlanVigenteAlns.ninguno(cantidadPedidos).unidades();
         this.pedidosConUnidadVigente = 0;
@@ -363,7 +374,24 @@ public final class EstadoAlns {
      * mismo criterio con que se aceptan los movimientos y no solo por costo.
      */
     public ValorObjetivo valor() {
-        return new ValorObjetivo(pedidosPendientes, costoTotal, pesoEstabilidad * desviacionVigente);
+        return new ValorObjetivo(pedidosPendientes, urgenciaBanco, costoTotal, pesoEstabilidad * desviacionVigente);
+    }
+
+    /**
+     * Detecta por identidad si se pierde un pedido urgente del mejor plan de referencia.
+     * Solo se protegen asignaciones vigentes a unidades disponibles y con holgura efectiva
+     * de hasta {@link #HOLGURA_COMPROMISO} minutos. No basta comparar cuantos hay en banco:
+     * dos bancos de igual tamano pueden dejar fuera pedidos diferentes.
+     */
+    public boolean pierdeCompromisosDe(EstadoAlns referencia) {
+        for (int p = 0; p < cantidadPedidos; p++) {
+            if (unidadVigenteDe[p] >= 0 && tareasEnBancoDe[p] > 0
+                    && referencia.tareasEnBancoDe[p] == 0
+                    && instancia.pedidoMinutoLimiteEfectivo(p) - instancia.minutoActual() <= HOLGURA_COMPROMISO) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -376,7 +404,7 @@ public final class EstadoAlns {
      * reportan sigue siendo la jerarquica de {@link ValorObjetivo}.
      */
     public double escalar(double penalizacionPorPedidoDelBanco) {
-        return costoTotal + penalizacionPorPedidoDelBanco * pedidosPendientes
+        return costoTotal + penalizacionPorPedidoDelBanco * (pedidosPendientes + urgenciaBanco)
                 + pesoEstabilidad * desviacionVigente;
     }
 
@@ -466,6 +494,7 @@ public final class EstadoAlns {
             tareasEnUnidadVigenteDe[p] = 0;
         }
         pedidosPendientes = 0;
+        urgenciaBanco = 0.0;
         desviacionVigente = pedidosConUnidadVigente;
         for (int t = 0; t < cantidadTareas; t++) {
             unidadDe[t] = -1;
@@ -611,6 +640,7 @@ public final class EstadoAlns {
         desviacionVigente = otro.desviacionVigente;
         tamanoBanco = otro.tamanoBanco;
         pedidosPendientes = otro.pedidosPendientes;
+        urgenciaBanco = otro.urgenciaBanco;
         costoTotal = otro.costoTotal;
         kilometrosTotales = otro.kilometrosTotales;
     }
@@ -839,6 +869,7 @@ public final class EstadoAlns {
         tamanoBanco++;
         if (tareasEnBancoDe[tareas.pedido(tarea)]++ == 0) {
             pedidosPendientes++;
+            urgenciaBanco += urgenciaDe[tareas.pedido(tarea)];
         }
     }
 
@@ -853,6 +884,7 @@ public final class EstadoAlns {
         posicionEnBanco[tarea] = -1;
         if (--tareasEnBancoDe[tareas.pedido(tarea)] == 0) {
             pedidosPendientes--;
+            urgenciaBanco -= urgenciaDe[tareas.pedido(tarea)];
         }
     }
 

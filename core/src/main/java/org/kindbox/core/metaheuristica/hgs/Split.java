@@ -5,6 +5,7 @@ import org.kindbox.core.evaluacion.ProgramadorRuta;
 import org.kindbox.core.grafo.MatrizDistancias;
 import org.kindbox.core.modelo.TipoUnidad;
 import org.kindbox.core.problema.InstanciaPlanificacion;
+import org.kindbox.core.problema.ValorObjetivo;
 import org.kindbox.core.util.Aleatorio;
 
 /**
@@ -96,6 +97,10 @@ public final class Split {
     private static final double INFINITO = Double.MAX_VALUE / 4.0;
 
     private final InstanciaPlanificacion instancia;
+    /** Urgencia de cada pedido de la fotografia, para el nivel intermedio del objetivo. */
+    private final double[] urgenciaDe;
+    /** Urgencia de los pedidos contados en la ultima llamada a contarPedidos. */
+    private double ultimaUrgencia;
     private final TareasEntrega tareas;
     private final ProgramadorRuta programador;
     private final ParametrosHgs parametros;
@@ -207,6 +212,10 @@ public final class Split {
         this.pedidosBuffer = new int[m];
         this.cantidadesBuffer = new int[m];
         this.marcaPedido = new int[Math.max(1, instancia.cantidadPedidos())];
+        this.urgenciaDe = new double[Math.max(1, instancia.cantidadPedidos())];
+        for (int p = 0; p < instancia.cantidadPedidos(); p++) {
+            urgenciaDe[p] = ValorObjetivo.urgenciaDe(instancia.pedidoMinutoLimiteEfectivo(p) - instancia.minutoActual());
+        }
     }
 
     // ------------------------------------------------------------------ tipos
@@ -290,6 +299,7 @@ public final class Split {
         individuo.cantidadRutas(0);
         individuo.cantidadBanco(m);
         individuo.pedidosNoAtendidos(contarPedidos(banco, m));
+        individuo.urgencia(ultimaUrgencia);
         individuo.costo(0.0);
         individuo.desfase(0);
         individuo.desviacionPlan(0);
@@ -614,6 +624,7 @@ public final class Split {
         individuo.desfase((int) Math.min(desfaseTotal, Integer.MAX_VALUE / 4));
         individuo.desviacionPlan(desviacionTotal);
         individuo.pedidosNoAtendidos(contarPedidos(banco, cantidadBanco));
+        individuo.urgencia(ultimaUrgencia);
     }
 
     /** Ordenacion por insercion de las rutas por urgencia creciente; son pocas decenas. */
@@ -722,13 +733,16 @@ public final class Split {
     private int contarPedidos(int[] banco, int cantidad) {
         sello++;
         int total = 0;
+        double suma = 0.0;
         for (int i = 0; i < cantidad; i++) {
             int pedido = tareas.pedido(banco[i]);
             if (marcaPedido[pedido] != sello) {
                 marcaPedido[pedido] = sello;
                 total++;
+                suma += urgenciaDe[pedido];
             }
         }
+        ultimaUrgencia = suma;
         return total;
     }
 

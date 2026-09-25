@@ -377,7 +377,12 @@ public final class ProgramadorRuta {
         }
 
         final long finTurno = instancia.unidadMinutoFinTurno(indiceUnidad);
-        ubicarPausa(paradas, minutoInicio, instante, finTurno, parametros);
+        posicionPausa = -1;
+        inicioPausa = 0;
+        desplazamientoPausa = 0;
+        if (!instancia.unidadAlimentada(indiceUnidad)) {
+            ubicarPausa(paradas, minutoInicio, instante, finTurno, parametros);
+        }
 
         long minutoFin = instante + desplazamientoPausa;
         // El exceso sobre el cierre del turno es una violacion temporal mas, del mismo tipo

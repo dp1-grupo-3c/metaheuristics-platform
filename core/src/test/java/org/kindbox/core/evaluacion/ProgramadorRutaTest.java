@@ -47,6 +47,32 @@ class ProgramadorRutaTest {
     }
 
     @Test
+    void noRepitePausaEnLaMismaJornadaPeroLaRequiereEnLaSiguiente() {
+        var unidad = InstanciasDePrueba.unidad("TA01", 540);
+        unidad.inicioTurnoAlimentacion(Turno.inicioDelTurno(540));
+        var pedidos = List.of(InstanciasDePrueba.pedido(0, 27, 20, 5, 0, 36));
+        var foto = InstanciasDePrueba.fotografia(540, pedidos, List.of(unidad), 900,
+                InstanciasDePrueba.parametros());
+        var ruta = new ProgramadorRuta(foto).programar(0, new int[] {0}, new int[] {5}, 1, false);
+        assertTrue(ruta.factible());
+        assertTrue(ruta.ruta().paradas().stream().noneMatch(p -> p.tipo() == TipoParada.ALIMENTACION));
+        var siguiente = InstanciasDePrueba.fotografia(960, pedidos, List.of(unidad), 1380,
+                InstanciasDePrueba.parametros());
+        var nueva = new ProgramadorRuta(siguiente).programar(0, new int[] {0}, new int[] {5}, 1, false);
+        assertTrue(nueva.factible());
+        assertEquals(1, nueva.ruta().paradas().stream().filter(p -> p.tipo() == TipoParada.ALIMENTACION).count());
+        assertTrue(foto.unidadAlimentada(0), "la fotografia anterior es inmutable");
+    }
+
+    @Test
+    void urgenciaAnticipaCierreSinCambiarElPlazoContractual() {
+        var pedido = InstanciasDePrueba.pedido(0, 27, 20, 5, 395, 8);
+        var foto = conAuto(List.of(pedido), CIERRE_TURNO);
+        assertEquals(875, foto.pedidoMinutoLimite(0));
+        assertEquals(840, foto.pedidoMinutoLimiteEfectivo(0));
+    }
+
+    @Test
     @DisplayName("El desfase recoge los minutos de incumplimiento del plazo del pedido")
     void desfasePorIncumplimientoDePlazo() {
         // Limite a las 07:05 y llegada a las 07:09: cuatro minutos de incumplimiento.

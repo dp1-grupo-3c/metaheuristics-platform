@@ -1,0 +1,54 @@
+[
+  {
+    "variante": "rama",
+    "algoritmo": "HGS",
+    "dias": 5,
+    "presupuestoMs": 200,
+    "semilla": 20260924,
+    "pedidosRegistrados": 795.0,
+    "pedidosEntregados": 769.0,
+    "pedidosPendientes": 22.0,
+    "pedidosIncumplidos": 4.0,
+    "costoAcumulado": 119937.0,
+    "milisegundosReales": 63936.0
+  },
+  {
+    "variante": "rama",
+    "algoritmo": "ALNS",
+    "dias": 5,
+    "presupuestoMs": 200,
+    "semilla": 20260924,
+    "pedidosRegistrados": 795.0,
+    "pedidosEntregados": 771.0,
+    "pedidosPendientes": 23.0,
+    "pedidosIncumplidos": 1.0,
+    "costoAcumulado": 119761.0,
+    "milisegundosReales": 63721.0
+  },
+  {
+    "variante": "propia",
+    "algoritmo": "HGS",
+    "dias": 5,
+    "presupuestoMs": 200,
+    "semilla": 20260924,
+    "pedidosRegistrados": 795.0,
+    "pedidosEntregados": 776.0,
+    "pedidosPendientes": 19.0,
+    "pedidosIncumplidos": 0.0,
+    "costoAcumulado": 119889.0,
+    "milisegundosReales": 63884.0
+  },
+  {
+    "variante": "propia",
+    "algoritmo": "ALNS",
+    "dias": 5,
+    "presupuestoMs": 200,
+    "semilla": 20260924,
+    "pedidosRegistrados": 795.0,
+    "pedidosEntregados": 770.0,
+    "pedidosPendientes": 24.0,
+    "pedidosIncumplidos": 1.0,
+    "costoAcumulado": 131904.0,
+    "milisegundosReales": 63680.0
+  }
+]

@@ -78,6 +78,41 @@ class MotorSimulacionTest {
     private static final double VELOCIDAD_NUEVA = 10.0;
 
     @Test
+    void conservaLaPausaIniciadaAlReplanificarYLaReiniciaEnOtraJornada(@TempDir Path raiz) throws IOException {
+        var originales = escenario(raiz, PRIMER_DIA);
+        var datos = new RepositorioDatos.DatosEscenario(originales.calendario(), originales.primerDia(),
+                originales.ultimoDia(), originales.flota(), originales.pedidos(), originales.bloqueos(),
+                List.of(), originales.avisos());
+        Map<Long, Boolean> alimentacion = new HashMap<>();
+        Algoritmo planificador = new Algoritmo() {
+            public String nombre() { return "PRUEBA_PAUSA"; }
+            public ResultadoPlanificacion resolver(InstanciaPlanificacion instancia, PresupuestoComputo presupuesto) {
+                int unidad = instancia.indiceDeUnidad("TA01");
+                alimentacion.put(instancia.minutoActual(), instancia.unidadAlimentada(unidad));
+                Solucion solucion = Solucion.vacia(instancia);
+                if (instancia.minutoActual() == 0) {
+                    var pausa = new org.kindbox.core.problema.Parada(
+                            org.kindbox.core.problema.TipoParada.ALIMENTACION, instancia.unidadNodo(unidad),
+                            -1, -1, 0, 0, 60, 0);
+                    var ruta = new org.kindbox.core.problema.Ruta("TA01", TipoUnidad.AUTO,
+                            instancia.unidadNodo(unidad), 0, List.of(pausa));
+                    solucion = new Solucion(List.of(ruta), solucion.cantidadNoAtendida(), solucion.valor());
+                }
+                return new ResultadoPlanificacion(nombre(), solucion, null, 0, 0, 0, Map.of());
+            }
+        };
+        var configuracion = new ConfiguracionEscenario(TipoEscenario.SIMULACION_5D, PRIMER_DIA,
+                PRIMER_DIA, 30, FACTOR_LIBRE, ModoReloj.LIBRE, "PRUEBA_PAUSA", SEMILLA, 60, false, 0, false);
+        var resultado = new MotorSimulacion(datos, configuracion, new ParametrosOperacion(),
+                planificador, List.of()).ejecutar();
+        assertEquals(EstadoCorrida.CULMINADA, resultado.estado());
+        assertEquals(false, alimentacion.get(0L));
+        assertEquals(true, alimentacion.get(30L), "la pausa en curso se hereda sin repetirla");
+        assertEquals(true, alimentacion.get(90L), "la pausa terminada sigue registrada");
+        assertEquals(false, alimentacion.get(420L), "la jornada de manana exige su propia pausa");
+    }
+
+    @Test
     @DisplayName("La corrida de dos dias culmina el horizonte con el reparto de pedidos coherente")
     void laCorridaCulminaConLaParticionCoherente(@TempDir Path raiz) throws IOException {
         LocalDate ultimoDia = PRIMER_DIA.plusDays(1);
