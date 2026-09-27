@@ -11,6 +11,10 @@ skinparam class {
   BorderColor #4A5A6A
   ArrowColor #4A5A6A
   HeaderBackgroundColor #E8EEF4
+  BackgroundColor<<nuevo>> #DFF3DC
+  BorderColor<<nuevo>> #2E7D32
+  BackgroundColor<<modificar>> #FFF1CC
+  BorderColor<<modificar>> #B7791F
 }
 skinparam package {
   BackgroundColor #F6F8FA
@@ -22,3 +26,5 @@ skinparam note {
   BorderColor #C8B560
 }
 hide empty members
+hide <<nuevo>> stereotype
+hide <<modificar>> stereotype

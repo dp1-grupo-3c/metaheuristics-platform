@@ -1,0 +1,115 @@
+@startuml 3-comandos-contextos
+!include estilo.iuml
+title 3. Ingesta de comandos, gestion de contextos y persistencia
+
+package "Ingesta y diario de comandos" {
+  abstract class Comando <<nuevo>> {
+    # id : UUID
+    # idCorrida : String
+    # recibidoEn : Instant
+    + {abstract} aplicarEn(motor : MotorSimulacion) : void
+  }
+  class ComandoRegistrarPedido <<nuevo>> {
+    - pedido : Pedido
+  }
+  class ComandoRegistrarAveria <<nuevo>> {
+    - placa : String
+    - tipo : TipoAveria
+  }
+  class ComandoRegistrarBloqueo <<nuevo>> {
+    - bloqueo : Bloqueo
+  }
+  class IngestaComandos <<nuevo>> {
+    - pendientes : BlockingQueue<Comando>
+    + registrar(comando : Comando) : boolean
+    - entregar(comando : Comando) : void
+  }
+  class DiarioComandos <<nuevo>> {
+    + anotar(comando : Comando) : long
+    + yaRegistrado(id : UUID) : boolean
+    + desde(idCorrida, secuencia) : List<Comando>
+  }
+}
+
+package "Gestion de contextos" {
+  class GestorContextos <<nuevo>> {
+    - corridas : Map<String, Corrida>
+    + iniciar(configuracion) : Corrida
+    + cancelar(id : String) : void
+    + recuperarTrasReinicio() : void
+    + alCerrarDia(minuto, instantanea) : void
+    + alTerminar(resultado) : void
+  }
+  class Corrida <<modificar>> {
+    - id : String
+    - estado : EstadoCorrida
+    - ultimoPuntoControl : PuntoControl
+    + enCurso() : boolean
+  }
+  class PuntoControl <<record>> <<nuevo>> {
+    idCorrida : String
+    minutoSimulado : long
+    secuenciaDiario : long
+    estado : byte[]
+  }
+  class FabricaMotor {
+    + crear(datos, configuracion, algoritmo) : MotorSimulacion
+  }
+}
+
+package "Persistencia" {
+  interface RepositorioCorridas <<nuevo>> {
+    + guardar(corrida : ResumenCorrida) : void
+    + guardarResultado(id, resultado) : void
+    + listar() : List<ResumenCorrida>
+  }
+  interface RepositorioPlanes <<nuevo>> {
+    + guardar(idCorrida, minuto, plan : Solucion) : void
+  }
+  interface RepositorioPuntosControl <<nuevo>> {
+    + guardar(punto : PuntoControl) : void
+    + ultimo(idCorrida) : PuntoControl
+  }
+  interface RepositorioDiario <<nuevo>> {
+    + anotar(comando : Comando) : long
+    + leerDesde(idCorrida, secuencia) : List<Comando>
+  }
+}
+
+package "Lectura de archivos" {
+  class RepositorioDatos <<modificar>> {
+    + cargar(primerDia, ultimoDia) : DatosEscenario
+    + guardarArchivo(tipo, nombre, contenido) : void
+  }
+}
+
+class MotorSimulacion <<modificar>>
+interface ObservadorSimulacion <<modificar>>
+
+ComandoRegistrarPedido --|> Comando
+ComandoRegistrarAveria --|> Comando
+ComandoRegistrarBloqueo --|> Comando
+IngestaComandos --> DiarioComandos : anota y evita duplicados
+IngestaComandos ..> Comando
+IngestaComandos --> MotorSimulacion : entrega en orden
+DiarioComandos --> RepositorioDiario
+
+GestorContextos ..|> ObservadorSimulacion
+GestorContextos "1" *-- "0..*" Corrida
+GestorContextos --> FabricaMotor
+GestorContextos --> RepositorioDatos : lee escenario
+GestorContextos --> DiarioComandos : reaplica tras reinicio
+GestorContextos --> RepositorioCorridas
+GestorContextos --> RepositorioPlanes
+GestorContextos --> RepositorioPuntosControl
+Corrida --> "0..1" PuntoControl
+Corrida --> MotorSimulacion
+FabricaMotor ..> MotorSimulacion : crea
+
+note bottom of RepositorioCorridas
+  Las interfaces de repositorio se implementan
+  sobre la base de datos MySQL.
+end note
+
+!include leyenda.iuml
+@enduml

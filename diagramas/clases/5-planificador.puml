@@ -71,4 +71,5 @@ BusquedaGeneticaHibrida --> FuncionObjetivo
 BusquedaAdaptativaVecindadAmplia --> FuncionObjetivo
 BusquedaGeneticaHibrida ..> ProgramadorRuta
 BusquedaAdaptativaVecindadAmplia ..> ProgramadorRuta
+!include leyenda.iuml
 @enduml

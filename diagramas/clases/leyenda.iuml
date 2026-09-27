@@ -1,0 +1,5 @@
+legend bottom right
+  |<back:#E8EEF4>    </back>| Existe en el codigo |
+  |<back:#FFF1CC>    </back>| Existe, se debe modificar |
+  |<back:#DFF3DC>    </back>| Nuevo (diseno, aun no implementado) |
+endlegend

@@ -1,0 +1,69 @@
+@startuml 2-api-servicios
+!include estilo.iuml
+title 2. API REST y servicios de negocio
+
+package "API REST" {
+  class ControladorSimulaciones <<modificar>> {
+    + arrancar(solicitud) : ResumenCorrida
+    + cancelar(id) : ResumenCorrida
+    + registrarPedido(id, solicitud) : RespuestaComando
+    + registrarAveria(id, solicitud) : RespuestaComando
+    + registrarBloqueo(id, solicitud) : RespuestaComando
+  }
+  class ControladorReportes <<nuevo>> {
+    + metricas(id) : MetricasSimulacion
+    + resultado(id) : ResultadoSimulacion
+    + historial() : List<ResumenCorrida>
+  }
+  class ControladorArchivos <<nuevo>> {
+    + importar(tipo, archivo) : ResultadoImportacion
+  }
+  class ControladorParametros {
+    + vigentes() : VistaParametros
+    + velocidad(solicitud) : VistaParametros
+  }
+}
+
+package "Servicios de negocio" {
+  class ServicioSimulacion <<modificar>> {
+    + arrancar(solicitud) : ResumenCorrida
+    + cancelar(id) : ResumenCorrida
+  }
+  class ServicioPedidos <<nuevo>> {
+    + registrar(id, solicitud) : RespuestaComando
+    + listar(id, filtros) : PaginaPedidos
+  }
+  class ServicioIncidencias <<nuevo>> {
+    + registrarAveria(id, placa, tipo) : RespuestaComando
+    + registrarBloqueo(id, bloqueo) : RespuestaComando
+  }
+  class ServicioReportes <<nuevo>> {
+    + metricas(id) : MetricasSimulacion
+    + historial() : List<ResumenCorrida>
+  }
+  class ServicioImportacion <<nuevo>> {
+    + importar(tipo, nombre, contenido) : ResultadoImportacion
+  }
+}
+
+class GestorContextos <<nuevo>>
+class IngestaComandos <<nuevo>>
+interface RepositorioCorridas <<nuevo>>
+class RepositorioDatos <<modificar>>
+class ParametrosOperacion
+
+ControladorSimulaciones --> ServicioSimulacion
+ControladorSimulaciones --> ServicioPedidos
+ControladorSimulaciones --> ServicioIncidencias
+ControladorReportes --> ServicioReportes
+ControladorArchivos --> ServicioImportacion
+ControladorParametros --> ParametrosOperacion
+
+ServicioSimulacion --> GestorContextos : inicia / cancela corridas
+ServicioPedidos --> IngestaComandos : registra comandos
+ServicioIncidencias --> IngestaComandos : registra comandos
+ServicioReportes --> RepositorioCorridas : lee
+ServicioImportacion --> RepositorioDatos : guarda archivo
+
+!include leyenda.iuml
+@enduml

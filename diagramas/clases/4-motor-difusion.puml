@@ -1,0 +1,85 @@
+@startuml 4-motor-difusion
+!include estilo.iuml
+title 4. Motor de simulacion y difusion en tiempo real
+
+package "Motor de simulacion" {
+  class MotorSimulacion <<modificar>> {
+    - configuracion : ConfiguracionEscenario
+    - algoritmo : Algoritmo
+    - observadores : List<ObservadorSimulacion>
+    + ejecutar() : ResultadoSimulacion
+    + cancelar() : void
+    + recibir(comando : Comando) : void
+    + puntoControl() : PuntoControl
+    + restaurar(punto : PuntoControl) : void
+  }
+  interface ReceptorComandos <<nuevo>> {
+    + recibir(comando : Comando) : void
+  }
+  interface ObservadorSimulacion <<modificar>> {
+    + alTomarFotografia(instantanea) : void
+    + alCerrarDia(minuto, instantanea) : void
+    + alTerminar(resultado) : void
+  }
+  class EstadoSimulacion {
+    - pedidos : List<Pedido>
+    - almacenes : List<Almacen>
+    + entregar(pedido, cantidad, minuto) : boolean
+    + metricas() : MetricasSimulacion
+  }
+  class UnidadEnCurso {
+    - ruta : Ruta
+    + nodoActual(minuto) : int
+  }
+  class ColaEventos {
+    + programar(minuto, tipo) : Evento
+    + siguiente() : Evento
+  }
+  class Evento <<record>> {
+    minuto : long
+    tipo : TipoEvento
+  }
+  class GeneradorAverias {
+    + averiasDelTurno(minuto, unidades) : List<Averia>
+  }
+  class InstantaneaSimulacion <<record>> {
+    minutoSimulado : long
+    unidades : List<VistaUnidad>
+    metricas : MetricasSimulacion
+  }
+  class ResultadoSimulacion <<record>> {
+    estado : EstadoCorrida
+    metricas : MetricasSimulacion
+  }
+}
+
+package "Difusion en tiempo real" {
+  class DifusorInstantaneas {
+    - cola : BlockingQueue<MensajeVisualizador>
+    + publicar(tipo, idCorrida, carga) : void
+  }
+  class ManejadorWebSocketSimulacion {
+    - sesiones : List<WebSocketSession>
+    + difundir(tipo, idCorrida, texto) : void
+  }
+}
+
+interface Algoritmo
+class GestorContextos <<nuevo>>
+
+MotorSimulacion ..|> ReceptorComandos
+MotorSimulacion "1" *-- "1" EstadoSimulacion
+MotorSimulacion "1" *-- "1" ColaEventos
+MotorSimulacion *-- GeneradorAverias
+MotorSimulacion o-- "0..*" ObservadorSimulacion : notifica
+MotorSimulacion --> Algoritmo : solicita planes
+MotorSimulacion ..> InstantaneaSimulacion : genera
+MotorSimulacion ..> ResultadoSimulacion : genera
+EstadoSimulacion "1" *-- "1..*" UnidadEnCurso
+ColaEventos "1" *-- "0..*" Evento
+DifusorInstantaneas ..|> ObservadorSimulacion
+GestorContextos ..|> ObservadorSimulacion
+DifusorInstantaneas --> ManejadorWebSocketSimulacion
+
+!include leyenda.iuml
+@enduml

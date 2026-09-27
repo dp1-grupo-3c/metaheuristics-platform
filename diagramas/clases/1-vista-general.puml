@@ -1,41 +1,75 @@
 @startuml 1-vista-general
 !include estilo.iuml
+allowmixing
 hide members
-title 1. Vista general del backend de KindBox
+title 1. Vista general: clases principales por componente
 
-package "API (service)" {
-  class ControladorSimulaciones
-  class ServicioSimulacion
-  class Corrida
+package "API REST" as P_API {
+  class ControladorReportes <<nuevo>>
+  class ControladorSimulaciones <<modificar>>
+  class ControladorArchivos <<nuevo>>
+}
+package "Servicios de negocio" as P_SRV {
+  class ServicioSimulacion <<modificar>>
+  class ServicioPedidos <<nuevo>>
+  class ServicioImportacion <<nuevo>>
+  class ServicioReportes <<nuevo>>
+}
+package "Ingesta y diario de comandos" as P_ING {
+  class IngestaComandos <<nuevo>>
+  class DiarioComandos <<nuevo>>
+  abstract class Comando <<nuevo>>
+}
+package "Gestion de contextos" as P_CTX {
+  class GestorContextos <<nuevo>>
+  class Corrida <<modificar>>
+}
+package "Motor de simulacion" as P_MOT {
+  class MotorSimulacion <<modificar>>
+}
+package "Difusion en tiempo real" as P_DIF {
   class DifusorInstantaneas
 }
-
-package "Simulacion" {
-  class MotorSimulacion
-  class EstadoSimulacion
-}
-
-package "Planificador" {
+package "Planificador" as P_PLA {
   interface Algoritmo
-  class BusquedaGeneticaHibrida
-  class BusquedaAdaptativaVecindadAmplia
+}
+package "Persistencia" as P_PER {
+  interface RepositorioCorridas <<nuevo>>
+  interface RepositorioPuntosControl <<nuevo>>
+  interface RepositorioDiario <<nuevo>>
+}
+package "Lectura de archivos" as P_ARC {
+  class RepositorioDatos <<modificar>>
 }
 
-package "Dominio" {
-  class InstanciaPlanificacion
-  class Solucion
-  class RepositorioDatos
-}
+database "Base de datos\nMySQL" as BD
+folder "Archivos de\nentrada" as AR
 
 ControladorSimulaciones --> ServicioSimulacion
-ServicioSimulacion "1" *-- "0..*" Corrida
+ControladorSimulaciones --> ServicioPedidos
+ControladorArchivos --> ServicioImportacion
+ControladorReportes --> ServicioReportes
+ServicioReportes --> RepositorioCorridas : lee
+DiarioComandos --> RepositorioDiario : escribe
+ServicioPedidos --> IngestaComandos : registra comandos
+ServicioSimulacion --> GestorContextos
+ServicioImportacion --> RepositorioDatos
+IngestaComandos --> DiarioComandos
+IngestaComandos ..> Comando
+IngestaComandos --> MotorSimulacion : entrega comandos
+GestorContextos "1" *-- "0..*" Corrida
 Corrida --> MotorSimulacion
-MotorSimulacion ..> DifusorInstantaneas : notifica
-MotorSimulacion *-- EstadoSimulacion
-MotorSimulacion --> Algoritmo : replanifica con
-BusquedaGeneticaHibrida ..|> Algoritmo
-BusquedaAdaptativaVecindadAmplia ..|> Algoritmo
-Algoritmo ..> InstanciaPlanificacion : recibe
-Algoritmo ..> Solucion : devuelve
-ServicioSimulacion --> RepositorioDatos : carga datos
+GestorContextos ..> MotorSimulacion : crea
+MotorSimulacion ..> GestorContextos : notifica cierre de dia
+MotorSimulacion ..> DifusorInstantaneas : publica instantaneas
+MotorSimulacion --> Algoritmo : solicita planes
+GestorContextos --> RepositorioCorridas
+GestorContextos --> RepositorioPuntosControl
+GestorContextos --> RepositorioDatos : lee escenario
+RepositorioCorridas ..> BD
+RepositorioPuntosControl ..> BD
+RepositorioDiario ..> BD
+RepositorioDatos ..> AR
+
+!include leyenda.iuml
 @enduml

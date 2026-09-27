@@ -1,6 +1,6 @@
-@startuml 4-dominio
+@startuml 6-dominio
 !include estilo.iuml
-title 4. Dominio: flota, pedidos y plan de rutas
+title 6. Dominio: flota, pedidos y plan de rutas
 
 class UnidadTransporte {
   - codigo : String
@@ -88,4 +88,5 @@ Averia ..> UnidadTransporte : afecta
 Solucion "1" *-- "0..*" Ruta
 Solucion --> ValorObjetivo
 Ruta "1" *-- "1..*" Parada
+!include leyenda.iuml
 @enduml
