@@ -1,0 +1,41 @@
+@startuml 1-vista-general
+!include estilo.iuml
+hide members
+title 1. Vista general del backend de KindBox
+
+package "API (service)" {
+  class ControladorSimulaciones
+  class ServicioSimulacion
+  class Corrida
+  class DifusorInstantaneas
+}
+
+package "Simulacion" {
+  class MotorSimulacion
+  class EstadoSimulacion
+}
+
+package "Planificador" {
+  interface Algoritmo
+  class BusquedaGeneticaHibrida
+  class BusquedaAdaptativaVecindadAmplia
+}
+
+package "Dominio" {
+  class InstanciaPlanificacion
+  class Solucion
+  class RepositorioDatos
+}
+
+ControladorSimulaciones --> ServicioSimulacion
+ServicioSimulacion "1" *-- "0..*" Corrida
+Corrida --> MotorSimulacion
+MotorSimulacion ..> DifusorInstantaneas : notifica
+MotorSimulacion *-- EstadoSimulacion
+MotorSimulacion --> Algoritmo : replanifica con
+BusquedaGeneticaHibrida ..|> Algoritmo
+BusquedaAdaptativaVecindadAmplia ..|> Algoritmo
+Algoritmo ..> InstanciaPlanificacion : recibe
+Algoritmo ..> Solucion : devuelve
+ServicioSimulacion --> RepositorioDatos : carga datos
+@enduml

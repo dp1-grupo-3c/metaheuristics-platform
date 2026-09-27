@@ -1,0 +1,74 @@
+@startuml 5-planificador
+!include estilo.iuml
+title 5. Planificador: metaheuristicas HGS y ALNS
+
+interface Algoritmo {
+  + nombre() : String
+  + resolver(instancia, presupuesto) : ResultadoPlanificacion
+}
+
+class FabricaAlgoritmos {
+  + {static} crear(nombre, semilla) : Algoritmo
+}
+
+class PresupuestoComputo {
+  + agotado() : boolean
+}
+
+class ResultadoPlanificacion <<record>> {
+  algoritmo : String
+  solucion : Solucion
+  milisegundos : long
+}
+
+package "HGS" {
+  class BusquedaGeneticaHibrida
+  class Poblacion {
+    + insertar(individuo) : boolean
+    + mejor() : Individuo
+  }
+  class Individuo {
+    + valor() : ValorObjetivo
+  }
+}
+
+package "ALNS" {
+  class BusquedaAdaptativaVecindadAmplia
+  interface OperadorDestruccion {
+    + destruir(estado, grado, aleatorio) : int
+  }
+  interface OperadorReconstruccion {
+    + reconstruir(estado, aleatorio, presupuesto) : void
+  }
+}
+
+package "Componentes comunes" {
+  interface HeuristicaConstructiva {
+    + construir(instancia, programador, aleatorio) : Solucion
+  }
+  class AhorrosClarkeWright
+  interface FuncionObjetivo {
+    + evaluar(instancia, solucion) : ValorObjetivo
+  }
+  class ProgramadorRuta {
+    + programar(unidad, pedidos, ...) : Programacion
+  }
+}
+
+FabricaAlgoritmos ..> Algoritmo : crea
+Algoritmo ..> PresupuestoComputo
+Algoritmo ..> ResultadoPlanificacion
+BusquedaGeneticaHibrida ..|> Algoritmo
+BusquedaAdaptativaVecindadAmplia ..|> Algoritmo
+BusquedaGeneticaHibrida *-- "2" Poblacion : factibles / infactibles
+Poblacion "1" *-- "0..*" Individuo
+BusquedaAdaptativaVecindadAmplia ..> "6" OperadorDestruccion
+BusquedaAdaptativaVecindadAmplia ..> "3" OperadorReconstruccion
+AhorrosClarkeWright ..|> HeuristicaConstructiva
+BusquedaGeneticaHibrida --> HeuristicaConstructiva
+BusquedaAdaptativaVecindadAmplia --> HeuristicaConstructiva
+BusquedaGeneticaHibrida --> FuncionObjetivo
+BusquedaAdaptativaVecindadAmplia --> FuncionObjetivo
+BusquedaGeneticaHibrida ..> ProgramadorRuta
+BusquedaAdaptativaVecindadAmplia ..> ProgramadorRuta
+@enduml

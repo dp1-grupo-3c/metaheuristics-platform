@@ -1,0 +1,91 @@
+@startuml 4-dominio
+!include estilo.iuml
+title 4. Dominio: flota, pedidos y plan de rutas
+
+class UnidadTransporte {
+  - codigo : String
+  - tipo : TipoUnidad
+  - estado : EstadoUnidad
+  - cargaABordo : int
+  + capacidadLibre() : int
+}
+
+enum TipoUnidad {
+  AUTO
+  MOTO
+  BICICLETA
+}
+
+class Pedido <<record>> {
+  id : int
+  idCliente : String
+  cantidad : int
+  plazoHoras : int
+  + minutoLimite() : long
+}
+
+class Almacen <<record>> {
+  nombre : String
+  central : boolean
+  capacidad : int
+}
+
+class Bloqueo <<record>> {
+  nodos : int[]
+  minutoInicio : long
+  minutoFin : long
+}
+
+class Averia <<record>> {
+  codigoUnidad : String
+  tipo : TipoAveria
+  minutoAveria : long
+}
+
+class ParametrosOperacion {
+  - velocidades : Map<TipoUnidad, Double>
+  - umbralSemaforoAmbar : int
+  - umbralSemaforoVerde : int
+}
+
+class InstanciaPlanificacion {
+  - minutoActual : long
+  + cantidadPedidos() : int
+  + cantidadUnidades() : int
+}
+
+class Solucion {
+  - rutas : List<Ruta>
+  - valor : ValorObjetivo
+}
+
+class Ruta <<record>> {
+  codigoUnidad : String
+  paradas : List<Parada>
+  + kilometros() : int
+  + costo() : double
+}
+
+class Parada <<record>> {
+  tipo : TipoParada
+  idPedido : int
+  cantidad : int
+  minutoLlegada : long
+}
+
+class ValorObjetivo <<record>> {
+  pedidosNoAtendidos : int
+  costo : double
+}
+
+UnidadTransporte --> TipoUnidad
+InstanciaPlanificacion ..> Pedido : pendientes
+InstanciaPlanificacion ..> UnidadTransporte : disponibles
+InstanciaPlanificacion ..> Almacen
+InstanciaPlanificacion ..> Bloqueo : distancias
+InstanciaPlanificacion --> ParametrosOperacion
+Averia ..> UnidadTransporte : afecta
+Solucion "1" *-- "0..*" Ruta
+Solucion --> ValorObjetivo
+Ruta "1" *-- "1..*" Parada
+@enduml
