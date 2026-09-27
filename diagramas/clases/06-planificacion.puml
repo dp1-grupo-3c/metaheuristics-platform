@@ -1,0 +1,181 @@
+@startuml 06-planificacion
+!include estilo.iuml
+title KindBox - Backend: planificador (core.metaheuristica, core.evaluacion, core.construccion)
+
+package "core.metaheuristica" {
+  interface Algoritmo {
+    + nombre() : String
+    + resolver(instancia : InstanciaPlanificacion, presupuesto : PresupuestoComputo) : ResultadoPlanificacion
+    + resolver(instancia, presupuesto, semilla : long) : ResultadoPlanificacion
+    + admiteArranqueDesdePlanVigente() : boolean
+    + resolverDesde(instancia, presupuesto, semilla, planVigente : Solucion) : ResultadoPlanificacion
+  }
+  class FabricaAlgoritmos <<utilidad>> {
+    + {static} nombres() : List<String>
+    + {static} canonico(nombre : String) : String
+    + {static} crear(nombre : String, semilla : long) : Algoritmo
+    + {static} crear(nombre, semilla, propiedades : Properties) : Algoritmo
+    + {static} validar(propiedades : Properties) : void
+  }
+  class PresupuestoComputo {
+    - nanosPresupuesto : long
+    - nanosReserva : long
+    - limiteIteraciones : long
+    - nanosInicio : long
+    - iteraciones : long
+    - cancelado : boolean
+    + {static} deSimulacion(saltoMinutos : int, factorAceleracion : double) : PresupuestoComputo
+    + {static} deMilisegundos(ms : long) : PresupuestoComputo
+    + {static} deIteraciones(n : long) : PresupuestoComputo
+    + arrancar() : PresupuestoComputo
+    + conReserva(ms : long) : PresupuestoComputo
+    + agotado() : boolean
+    + fraccionConsumida() : double
+    + contarIteracion() : void
+    + cancelar() : void
+  }
+  class ResultadoPlanificacion <<record>> {
+    algoritmo : String
+    solucion : Solucion
+    perfil : PerfilConvergencia
+    milisegundos : long
+    iteraciones : long
+    semilla : long
+    pesosOperadores : Map<String, Double>
+    + iteracionesPorSegundo() : double
+  }
+  class BusquedaGeneticaHibrida <<HGS>> {
+    - heuristica : HeuristicaConstructiva
+    - parametros : ParametrosHgs
+    - funcionObjetivo : FuncionObjetivo
+    - semilla : long
+  }
+  class BusquedaAdaptativaVecindadAmplia <<ALNS>> {
+    - constructiva : HeuristicaConstructiva
+    - parametros : ParametrosAlns
+    - objetivo : FuncionObjetivo
+    - semilla : long
+  }
+  class PerfilConvergencia {
+    - mediciones : List<Medicion>
+    + registrar(fraccion, milisegundos, valor, iteraciones) : void
+    + mediciones() : List<Medicion>
+  }
+  note bottom of BusquedaGeneticaHibrida : Detalle en 07-hgs
+  note bottom of BusquedaAdaptativaVecindadAmplia : Detalle en 08-alns
+}
+
+package "core.evaluacion" {
+  interface FuncionObjetivo {
+    + {static} PENALIZACION_PEDIDO_NO_ATENDIDO : double
+    + {static} PESO_ESTABILIDAD : double
+    + evaluar(instancia, solucion : Solucion) : ValorObjetivo
+    + costoRuta(ruta : Ruta) : double
+    + desviacionDelPlanVigente(instancia, solucion) : int
+  }
+  class FuncionObjetivoJerarquica
+  class ProgramadorRuta {
+    - instancia : InstanciaPlanificacion
+    - inventario : int[]
+    - ultimaFactible : boolean
+    - ultimoDesfase : int
+    - ultimosKilometros : int
+    - ultimoCosto : double
+    + reiniciarInventarios() : void
+    + inventarioDisponible(indiceAlmacen : int) : int
+    + programar(unidad, pedidos, cantidades, longitud, consumirInventario) : Programacion
+    + evaluar(unidad, pedidos, cantidades, longitud) : boolean
+    + cotaInferiorKilometros(unidad, pedidos, longitud) : int
+  }
+  class Programacion <<record>> {
+    factible : boolean
+    desfaseMinutos : int
+    kilometros : int
+    costo : double
+    atendidos : int
+    unidadesEntregadas : int
+    minutoFin : long
+    ruta : Ruta
+    + costoPenalizado(peso : double) : double
+  }
+  class DatosSecuencia <<record>> {
+    duracion : int
+    desfase : int
+    inicioMasTemprano : int
+    inicioMasTardio : int
+    carga : int
+    kilometros : int
+    paradas : int
+    + {static} deParada(...) : DatosSecuencia
+    + {static} concatenar(a, b, minutosDeViaje, km) : DatosSecuencia
+  }
+  class ResumenesRuta {
+    + preparar(unidad : int, pedidos : int[], longitud : int) : void
+    + desfaseInsertando(posicion : int, pedido : int) : long
+    + iniciar(unidad : int) : void
+    + anadir(pedido : int) : boolean
+    + cerrar() : long
+  }
+}
+
+package "core.construccion" {
+  interface HeuristicaConstructiva {
+    + nombre() : String
+    + construir(instancia, programador : ProgramadorRuta, aleatorio : Aleatorio) : Solucion
+    + construir(instancia, programador, aleatorio, presupuesto) : Solucion
+  }
+  class AhorrosClarkeWright {
+    - granularidad : int
+    - ruido : double
+    - objetivo : FuncionObjetivo
+    + {static} completo() : AhorrosClarkeWright
+    + {static} granular() : AhorrosClarkeWright
+    + {static} conRuido(granularidad : int, ruido : double) : AhorrosClarkeWright
+  }
+  class RecuperadorPlanVigente <<utilidad>> {
+    + {static} recuperar(instancia, anterior : Solucion, presupuesto) : Solucion
+  }
+}
+
+package "core (ver otros diagramas)" #EEEEEE {
+  class InstanciaPlanificacion
+  class Solucion
+  class Ruta
+  class ValorObjetivo
+  class Aleatorio
+  class MotorSimulacion
+}
+
+MotorSimulacion --> Algoritmo : planificador
+MotorSimulacion ..> PresupuestoComputo : deSimulacion()
+FabricaAlgoritmos ..> Algoritmo : <<crea>>
+FabricaAlgoritmos ..> AhorrosClarkeWright : <<crea>>
+BusquedaGeneticaHibrida ..|> Algoritmo
+BusquedaAdaptativaVecindadAmplia ..|> Algoritmo
+BusquedaGeneticaHibrida --> "1" HeuristicaConstructiva
+BusquedaAdaptativaVecindadAmplia --> "1" HeuristicaConstructiva
+BusquedaGeneticaHibrida --> FuncionObjetivo
+BusquedaAdaptativaVecindadAmplia --> FuncionObjetivo
+BusquedaGeneticaHibrida ..> RecuperadorPlanVigente
+Algoritmo ..> ResultadoPlanificacion
+Algoritmo ..> PresupuestoComputo
+Algoritmo ..> InstanciaPlanificacion
+ResultadoPlanificacion *-- Solucion
+ResultadoPlanificacion --> PerfilConvergencia
+PresupuestoComputo --> "0..1" PerfilConvergencia
+
+FuncionObjetivoJerarquica ..|> FuncionObjetivo
+FuncionObjetivo ..> ValorObjetivo
+ProgramadorRuta --> InstanciaPlanificacion
+ProgramadorRuta ..> Programacion : <<crea>>
+Programacion --> "0..1" Ruta
+ResumenesRuta ..> DatosSecuencia
+
+AhorrosClarkeWright ..|> HeuristicaConstructiva
+AhorrosClarkeWright --> FuncionObjetivoJerarquica
+HeuristicaConstructiva ..> ProgramadorRuta
+HeuristicaConstructiva ..> Solucion : <<crea>>
+HeuristicaConstructiva ..> Aleatorio
+RecuperadorPlanVigente ..> ProgramadorRuta
+RecuperadorPlanVigente ..> Solucion
+@enduml

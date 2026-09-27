@@ -1,0 +1,162 @@
+@startuml 07-hgs
+!include estilo.iuml
+title KindBox - Backend: core.metaheuristica.hgs (Busqueda Genetica Hibrida)
+
+package "core.metaheuristica.hgs" {
+  class BusquedaGeneticaHibrida {
+    - heuristica : HeuristicaConstructiva
+    - parametros : ParametrosHgs
+    - funcionObjetivo : FuncionObjetivo
+    - semilla : long
+    + nombre() : String
+    + resolver(instancia, presupuesto) : ResultadoPlanificacion
+    + resolver(instancia, presupuesto, semilla) : ResultadoPlanificacion
+    + admiteArranqueDesdePlanVigente() : boolean
+    + resolverDesde(instancia, presupuesto, semilla, planVigente) : ResultadoPlanificacion
+  }
+  class "BusquedaGeneticaHibrida.Corrida" as CorridaHgs <<inner>> {
+    - instancia : InstanciaPlanificacion
+    - planVigente : Solucion
+    - presupuesto : PresupuestoComputo
+    - aleatorio : Aleatorio
+    - programador : ProgramadorRuta
+    - tareas : TareasEntrega
+    - estabilidad : EstabilidadPlan
+    - split : Split
+    - educacion : Educacion
+    - cruce : CruceOrdenado
+    - factibles : Poblacion
+    - infactibles : Poblacion
+    - mejorSolucion : Solucion
+    - mejorValor : ValorObjetivo
+  }
+  class ParametrosHgs {
+    - tamanoMinimoPoblacion : int
+    - tamanoGeneracion : int
+    - individuosElite : int
+    - vecinosProximosDiversidad : int
+    - proporcionObjetivoFactibles : double
+    - granularidadVecindario : int
+    - pasadasEducacionMaximas : int
+    - probabilidadReparacion : double
+    - penalizacionDesfaseInicial : double
+    - pesoEstabilidad : double
+    - maximoGeneraciones : long
+    - filtroCotaInferior : boolean
+    ...
+    + {static} porDefecto() : ParametrosHgs
+  }
+  class Poblacion {
+    - parametros : ParametrosHgs
+    - individuos : Individuo[]
+    - distancia : double[][]
+    - cantidad : int
+    + insertar(nuevo : Individuo) : boolean
+    + mejor() : Individuo
+    + actualizarAptitudes() : void
+    + seleccionarSupervivientes() : void
+  }
+  class Individuo {
+    - permutacion : int[]
+    - tipo : byte[]
+    - rutaInicio / rutaLongitud / rutaUnidad : int[]
+    - banco : int[]
+    - pedidosNoAtendidos : int
+    - costo : double
+    - desfase : int
+    - desviacionPlan : int
+    - aptitud : double
+    - contribucionDiversidad : double
+    + factible() : boolean
+    + valor() : ValorObjetivo
+    + mejorQue(otro : Individuo, pesoEstabilidad : double) : boolean
+    + distancia(otro : Individuo) : double
+    + copiarDe(otro : Individuo) : void
+  }
+  class TareasEntrega {
+    - instancia : InstanciaPlanificacion
+    + cantidad() : int
+    + pedido(tarea : int) : int
+    + cantidadUnidades(tarea : int) : int
+    + limite(tarea : int) : long
+    + vecinos(tarea : int) : int[]
+  }
+  class Split {
+    - instancia : InstanciaPlanificacion
+    - tareas : TareasEntrega
+    - programador : ProgramadorRuta
+    - parametros : ParametrosHgs
+    - estabilidad : EstabilidadPlan
+    + ejecutar(individuo : Individuo, pesoDesfase : double) : void
+    + tipoAdmisible(tipo : int, tarea : int) : boolean
+  }
+  class Educacion {
+    - instancia : InstanciaPlanificacion
+    - tareas : TareasEntrega
+    - programador : ProgramadorRuta
+    - aleatorio : Aleatorio
+    - parametros : ParametrosHgs
+    - presupuesto : PresupuestoComputo
+    - estabilidad : EstabilidadPlan
+    - resumenes : ResumenesRuta
+    + educar(individuo : Individuo, pesoDesfase : double) : void
+  }
+  class CruceOrdenado {
+    - aleatorio : Aleatorio
+    + cruzar(primero : Individuo, segundo : Individuo, descendiente : Individuo) : void
+  }
+  class EstabilidadPlan {
+    - peso : double
+    + activa() : boolean
+    + unidadVigente(tarea : int) : int
+    + desviacion(unidad, secuencia, longitud) : int
+    + penalizacion(unidad, secuencia, longitud) : double
+  }
+}
+
+package "core (ver otros diagramas)" #EEEEEE {
+  interface Algoritmo
+  interface HeuristicaConstructiva
+  interface FuncionObjetivo
+  class ProgramadorRuta
+  class ResumenesRuta
+  class RecuperadorPlanVigente
+  class InstanciaPlanificacion
+  class Solucion
+  class PresupuestoComputo
+  class Aleatorio
+}
+
+BusquedaGeneticaHibrida ..|> Algoritmo
+BusquedaGeneticaHibrida --> HeuristicaConstructiva : poblacion inicial
+BusquedaGeneticaHibrida --> ParametrosHgs
+BusquedaGeneticaHibrida --> FuncionObjetivo
+BusquedaGeneticaHibrida +-- CorridaHgs
+BusquedaGeneticaHibrida ..> RecuperadorPlanVigente : arranque desde plan vigente
+CorridaHgs *-- "2" Poblacion : factibles / infactibles
+CorridaHgs *-- Split
+CorridaHgs *-- Educacion
+CorridaHgs *-- CruceOrdenado
+CorridaHgs *-- TareasEntrega
+CorridaHgs *-- EstabilidadPlan
+CorridaHgs *-- ProgramadorRuta
+CorridaHgs --> InstanciaPlanificacion
+CorridaHgs --> PresupuestoComputo
+CorridaHgs ..> Solucion : <<crea>>
+Poblacion "1" *-- "0..*" Individuo
+Poblacion --> ParametrosHgs
+Split --> TareasEntrega
+Split --> ProgramadorRuta
+Split --> EstabilidadPlan
+Split ..> Individuo
+Educacion --> TareasEntrega
+Educacion --> ProgramadorRuta
+Educacion --> EstabilidadPlan
+Educacion --> ResumenesRuta
+Educacion --> Aleatorio
+Educacion ..> Individuo
+CruceOrdenado --> Aleatorio
+CruceOrdenado ..> Individuo
+TareasEntrega --> InstanciaPlanificacion
+EstabilidadPlan ..> TareasEntrega
+@enduml

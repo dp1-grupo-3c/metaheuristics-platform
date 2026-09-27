@@ -1,0 +1,253 @@
+@startuml 02-service
+!include estilo.iuml
+left to right direction
+title KindBox - Backend: modulo service (API REST y WebSocket)
+
+package "org.kindbox.service" {
+  class AplicacionKindBox <<SpringBootApplication>> {
+    + {static} main(args : String[]) : void
+  }
+}
+
+package "service.configuracion" {
+  class PropiedadesKindBox <<ConfigurationProperties>> {
+    - directorioDatos : String
+    - primerDiaPorDefecto : LocalDate
+    - diasPorDefecto : int
+    - duracionMinutosPorDefecto : int
+    - saltoMinutosPorDefecto : int
+    - minutosEntreFotografiasPorDefecto : int
+    - algoritmoPorDefecto : String
+    - semillaPorDefecto : long
+    - generarAveriasPorDefecto : boolean
+    - averiasPorUnidadPorTurno : double
+    - corridasEnMemoria : int
+    - capacidadColaDifusion : int
+    - tamanoPaginaPedidos : int
+    - tamanoMaximoPaginaPedidos : int
+    + validar() : void
+  }
+  class ConfiguracionWeb <<Configuration>> {
+    - propiedades : PropiedadesKindBox
+    + addCorsMappings(registro : CorsRegistry) : void
+    + repositorioDatos() : RepositorioDatos <<Bean>>
+    + parametrosOperacion() : ParametrosOperacion <<Bean>>
+  }
+  class ConfiguracionWebSocket <<Configuration>> {
+    + {static} RUTA_SIMULACION : String
+    + {static} BUFFER_TEXTO_BYTES : int
+    - manejador : ManejadorWebSocketSimulacion
+    + registerWebSocketHandlers(registro) : void
+    + contenedorWebSocket() : ServletServerContainerFactoryBean <<Bean>>
+  }
+}
+
+package "service.web" {
+  class ControladorSimulaciones <<RestController>> {
+    - servicio : ServicioSimulacion
+    + arrancar(solicitud : SolicitudSimulacion) : ResponseEntity<ResumenCorrida>
+    + listar() : List<ResumenCorrida>
+    + detalle(id : String) : DetalleCorrida
+    + metricas(id : String) : MetricasSimulacion
+    + resultado(id : String) : ResultadoSimulacion
+    + cancelar(id : String) : ResumenCorrida
+    + pedidos(id, busqueda, pagina, tamano, soloActivos) : PaginaPedidos
+    + registrarAveria(id : String, solicitud : SolicitudAveria) : RespuestaAveria
+    + cargarAverias(id : String, archivo : MultipartFile) : ResultadoCargaAverias
+  }
+  class ControladorParametros <<RestController>> {
+    - parametros : ParametrosOperacion
+    + vigentes() : VistaParametros
+    + velocidad(solicitud : SolicitudVelocidad) : VistaParametros
+    + semaforo(solicitud : SolicitudSemaforo) : VistaParametros
+  }
+  class ControladorAlmacenes <<RestController>> {
+    - servicio : ServicioSimulacion
+    + almacenes() : List<VistaAlmacen>
+  }
+  class ControladorSalud <<RestController>> {
+    - repositorio : RepositorioDatos
+    - servicio : ServicioSimulacion
+    - fabrica : FabricaMotor
+    - algoritmos : RegistroAlgoritmos
+    - manejador : ManejadorWebSocketSimulacion
+    + salud() : RespuestaSalud
+  }
+  class ManejadorDeErrores <<RestControllerAdvice>> {
+    + noEncontrado(e, peticion) : ResponseEntity<RespuestaError>
+    + conflicto(e, peticion) : ResponseEntity<RespuestaError>
+    + solicitudInvalida(e, peticion) : ResponseEntity<RespuestaError>
+    + errorDeDatos(e, peticion) : ResponseEntity<RespuestaError>
+    + errorInterno(e, peticion) : ResponseEntity<RespuestaError>
+  }
+  class ManejadorWebSocketSimulacion <<Component>> {
+    - sesiones : List<WebSocketSession>
+    - estadoInicial : EstadoInicial
+    + afterConnectionEstablished(sesion) : void
+    + afterConnectionClosed(sesion, estado) : void
+    + difundir(tipo : String, idCorrida : String, texto : String) : void
+    + clientesConectados() : int
+  }
+  class DifusorInstantaneas <<Component>> {
+    - manejador : ManejadorWebSocketSimulacion
+    - mapeador : ObjectMapper
+    - cola : BlockingQueue<MensajeVisualizador>
+    - hilo : Thread
+    - activo : boolean
+    + observadorDe(idCorrida : String) : ObservadorSimulacion
+    + publicar(tipo : String, idCorrida : String, carga : Object) : void
+  }
+  class ObservadorDifusor <<inner>>
+  abstract class TextWebSocketHandler <<Spring>>
+}
+
+package "service.simulacion" {
+  class ServicioSimulacion <<Service>> {
+    - repositorio : RepositorioDatos
+    - parametros : ParametrosOperacion
+    - fabrica : FabricaMotor
+    - algoritmos : RegistroAlgoritmos
+    - publicador : PublicadorDeEstado
+    - propiedades : PropiedadesKindBox
+    - corridas : Map<String, Corrida>
+    - ejecutor : ExecutorService
+    - despachador : ScheduledExecutorService
+    + arrancar(solicitud : SolicitudSimulacion) : ResumenCorrida
+    + listar() : List<ResumenCorrida>
+    + corridaActiva() : Corrida
+    + requerir(id : String) : Corrida
+    + detalle(id : String) : DetalleCorrida
+    + metricas(id : String) : MetricasSimulacion
+    + resultado(id : String) : ResultadoSimulacion
+    + cancelar(id : String) : ResumenCorrida
+    + pedidos(id, busqueda, pagina, tamano, soloActivos) : PaginaPedidos
+    + almacenes() : List<VistaAlmacen>
+    + registrarAveria(id, placa, tipo) : RespuestaAveria
+    + cargarAverias(id, nombreArchivo, contenido) : ResultadoCargaAverias
+    + resumen(corrida : Corrida) : ResumenCorrida
+  }
+  class Corrida {
+    - id : String
+    - configuracion : ConfiguracionEscenario
+    - datos : DatosEscenario
+    - duracionMinutosReales : int
+    - motor : MotorSimulacion
+    - estado : EstadoCorrida
+    - instantanea : InstantaneaSimulacion
+    - resultado : ResultadoSimulacion
+    - entregados : Set<Integer>
+    - averiasProgramadas : Queue<AveriaProgramada>
+    - averiasAplicadas : Deque<String>
+    - error : String
+    + enCurso() : boolean
+    + anotarAveria(renglon : String) : void
+    + alTomarFotografia(nueva) : void
+    + alEntregarPedido(...) : void
+    + alAveriarse(...) : void
+    + alTerminar(resultadoFinal) : void
+  }
+  interface PublicadorDeEstado {
+    + observadorDe(idCorrida : String) : ObservadorSimulacion
+    + publicar(tipo : String, idCorrida : String, carga : Object) : void
+  }
+  class FabricaMotor <<Component>> {
+    + descripcion() : String
+    + crear(datos, configuracion, parametros, algoritmo, observadores) : MotorSimulacion
+  }
+  class RegistroAlgoritmos <<Component>> {
+    + nombres() : List<String>
+    + crear(nombre : String, semilla : long) : Algoritmo
+    + canonico(nombre : String) : String
+  }
+}
+
+package "service.io" {
+  class AnalizadorAverias {
+    - lector : LectorAverias
+    - mesDelEscenario : YearMonth
+    - minutoFin : long
+    + analizar(contenido, nombreArchivo, codigosDeFlota) : Lectura
+  }
+  class "AnalizadorAverias.Lectura" as Lectura <<record>> {
+    averias : List<AveriaProgramada>
+    avisos : List<String>
+  }
+}
+
+package "service.dto" {
+  class SolicitudSimulacion <<record>>
+  class ResumenCorrida <<record>>
+  class DetalleCorrida <<record>>
+  class PaginaPedidos <<record>>
+  class RespuestaAveria <<record>>
+  class ResultadoCargaAverias <<record>>
+  class VistaParametros <<record>>
+  class RespuestaSalud <<record>>
+  class MensajeVisualizador <<record>>
+  class RespuestaError <<record>>
+}
+note bottom of ResumenCorrida : Atributos de los DTO y jerarquia\nde excepciones en 03-service-dto-errores
+
+package "core (ver otros diagramas)" #EEEEEE {
+  interface ObservadorSimulacion
+  class MotorSimulacion
+  class RepositorioDatos
+  class ParametrosOperacion
+  class FabricaAlgoritmos
+  interface Algoritmo
+  class LectorAverias
+}
+
+' --- Arranque y configuracion
+AplicacionKindBox ..> PropiedadesKindBox : habilita
+ConfiguracionWeb --> PropiedadesKindBox
+ConfiguracionWeb ..> RepositorioDatos : <<crea bean>>
+ConfiguracionWeb ..> ParametrosOperacion : <<crea bean>>
+ConfiguracionWebSocket --> ManejadorWebSocketSimulacion
+
+' --- Controladores
+ControladorSimulaciones --> ServicioSimulacion
+ControladorAlmacenes --> ServicioSimulacion
+ControladorParametros --> ParametrosOperacion
+ControladorSalud --> ServicioSimulacion
+ControladorSalud --> RepositorioDatos
+ControladorSalud --> FabricaMotor
+ControladorSalud --> RegistroAlgoritmos
+ControladorSalud --> ManejadorWebSocketSimulacion
+
+' --- Servicio y corridas
+ServicioSimulacion --> RepositorioDatos
+ServicioSimulacion --> ParametrosOperacion
+ServicioSimulacion --> FabricaMotor
+ServicioSimulacion --> RegistroAlgoritmos
+ServicioSimulacion --> PublicadorDeEstado
+ServicioSimulacion --> PropiedadesKindBox
+ServicioSimulacion "1" *-- "0..*" Corrida : corridas
+ServicioSimulacion ..> AnalizadorAverias : usa
+Corrida ..|> ObservadorSimulacion
+Corrida "1" --> "0..1" MotorSimulacion : motor
+FabricaMotor ..> MotorSimulacion : <<crea>>
+RegistroAlgoritmos ..> FabricaAlgoritmos : delega
+RegistroAlgoritmos ..> Algoritmo : <<crea>>
+AnalizadorAverias --> LectorAverias
+AnalizadorAverias ..> Lectura
+
+' --- Difusion WebSocket
+DifusorInstantaneas ..|> PublicadorDeEstado
+DifusorInstantaneas --> ManejadorWebSocketSimulacion
+DifusorInstantaneas +-- ObservadorDifusor
+ObservadorDifusor ..|> ObservadorSimulacion
+DifusorInstantaneas "1" o-- "0..*" MensajeVisualizador : cola
+ManejadorWebSocketSimulacion --|> TextWebSocketHandler
+
+' --- Uso de DTO
+ControladorSimulaciones ..> SolicitudSimulacion
+ControladorSimulaciones ..> ResumenCorrida
+ControladorSimulaciones ..> DetalleCorrida
+ControladorSimulaciones ..> PaginaPedidos
+ControladorSimulaciones ..> RespuestaAveria
+ControladorSimulaciones ..> ResultadoCargaAverias
+ControladorParametros ..> VistaParametros
+ControladorSalud ..> RespuestaSalud
+ManejadorDeErrores ..> RespuestaError
+@enduml

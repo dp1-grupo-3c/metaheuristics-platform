@@ -1,0 +1,324 @@
+@startuml 05-simulacion
+!include estilo.iuml
+title KindBox - Backend: core.simulacion (motor dirigido por eventos)
+
+package "core.simulacion" {
+  class MotorSimulacion {
+    - datos : DatosEscenario
+    - configuracion : ConfiguracionEscenario
+    - parametros : ParametrosOperacion
+    - algoritmo : Algoritmo
+    - observadores : List<ObservadorSimulacion>
+    - calendario : CalendarioEscenario
+    - estado : EstadoSimulacion
+    - cola : ColaEventos
+    - generadorAverias : GeneradorAverias
+    - oraculo : OraculoDistancias
+    - candado : ReentrantLock
+    - averiasManuales : Queue<int[]>
+    + ejecutar() : ResultadoSimulacion
+    + cancelar() : void
+    + cancelado() : boolean
+    + instantanea() : InstantaneaSimulacion
+    + registrarAveria(codigoUnidad : String, tipo : TipoAveria) : void
+    + estadoCorrida() : EstadoCorrida
+    + minutoActual() : long
+    + minutoFin() : long
+    + resultado() : ResultadoSimulacion
+    + estado() : EstadoSimulacion
+    + agregarObservador(o : ObservadorSimulacion) : void
+    + quitarObservador(o : ObservadorSimulacion) : void
+    - procesar(evento : Evento) : String
+    - replanificar() : void
+    - construirInstancia() : Fotografia
+    - comprometer(solucion : Solucion) : void
+    - averiar(...) : void
+    - intentarTrasvase(...) : void
+  }
+
+  class ConfiguracionEscenario <<record>> {
+    tipo : TipoEscenario
+    primerDia : LocalDate
+    ultimoDia : LocalDate
+    saltoMinutos : int
+    factorAceleracion : double
+    modoReloj : ModoReloj
+    algoritmo : String
+    semilla : long
+    minutosEntreFotografias : int
+    generarAverias : boolean
+    averiasPorUnidadPorTurno : double
+    arranqueDesdePlanVigente : boolean
+    + {static} simulacion5D(...) : ConfiguracionEscenario
+  }
+
+  class EstadoSimulacion {
+    - calendario : CalendarioEscenario
+    - bloqueos : RegistroBloqueos
+    - almacenes : List<Almacen>
+    - colorAlmacen : ColorSemaforo[]
+    - pedidos : List<Pedido>
+    - vencimientos : PriorityQueue<Integer>
+    - unidades : UnidadEnCurso[]
+    - activaciones : List<ActivacionSemaforo>
+    + inventario(indiceAlmacen : int) : int
+    + consumirInventario(indiceAlmacen : int, cantidad : int) : int
+    + recargarIntermedios() : void
+    + actualizarSemaforo(indiceAlmacen, parametros) : ColorSemaforo
+    + registrarPedido(indice : int) : void
+    + entregar(indice : int, cantidad : int, minuto : long) : boolean
+    + vencidosHasta(minuto : long) : List<Integer>
+    + pendientesEn(minuto : long) : int[]
+    + unidad(indice : int) : UnidadEnCurso
+    + metricas() : MetricasSimulacion
+    + vistasDeAlmacenes() : List<VistaAlmacen>
+    + vistasDeBloqueos(minuto : long) : List<VistaBloqueo>
+    + vistaDe(u : UnidadEnCurso, minuto : long) : VistaUnidad
+  }
+
+  class UnidadEnCurso {
+    - indice : int
+    - unidad : UnidadTransporte
+    - ruta : Ruta
+    - camino : int[]
+    - indiceParada : int
+    - sirviendo : boolean
+    - secuenciaMovimiento : long
+    - misionTrasvase : boolean
+    - unidadAsistida : int
+    - averia : TipoAveria
+    + asignarItinerario(ruta, camino, desplazamientoParada, ...) : void
+    + limpiarItinerario(nodo : int) : void
+    + llegarA(k : int) : void
+    + partirHacia(k : int, minuto : long) : void
+    + terminarItinerario() : void
+    + nodoActual(minuto : long) : int
+    + vigente(evento : Evento) : boolean
+    + marcarMisionTrasvase(indiceUnidadAveriada : int) : void
+    + caminoRecorrido(minuto : long) : int[]
+    + caminoPendiente(minuto : long) : int[]
+  }
+
+  class ColaEventos {
+    - cola : PriorityQueue<Evento>
+    - secuencia : long
+    + programar(minuto, tipo, referencia, dato) : Evento
+    + siguiente() : Evento
+    + asomar() : Evento
+    + proximoMinuto() : long
+    + vacia() : boolean
+  }
+  class Evento <<record>> {
+    minuto : long
+    tipo : TipoEvento
+    secuencia : long
+    referencia : int
+    dato : int
+    + compareTo(otro : Evento) : int
+  }
+
+  class GeneradorAverias {
+    - semilla : long
+    - probabilidadPorUnidadPorTurno : double
+    + {static} deConfiguracion(c : ConfiguracionEscenario) : GeneradorAverias
+    + activo() : boolean
+    + averiasDelTurno(minutoDelTurno : long, unidades : List<UnidadTransporte>) : List<Averia>
+    + averiaDe(unidad : UnidadTransporte, minutoDelTurno : long) : Averia
+  }
+
+  interface ObservadorSimulacion {
+    + alTomarFotografia(instantanea : InstantaneaSimulacion) : void
+    + alReplanificar(minuto, algoritmo, pedidosPendientes, ...) : void
+    + alEntregarPedido(minuto, idPedido, codigoUnidad, cantidad, ...) : void
+    + alAveriarse(minuto, codigoUnidad, tipoAveria, x, y, carga) : void
+    + alCambiarSemaforo(minuto, nombreAlmacen, color, disponible) : void
+    + alTerminar(resultado : ResultadoSimulacion) : void
+  }
+
+  class InstantaneaSimulacion <<record>> {
+    minutoSimulado : long
+    fechaHoraSimulada : LocalDateTime
+    estado : EstadoCorrida
+    milisegundosReales : long
+    unidades : List<VistaUnidad>
+    almacenes : List<VistaAlmacen>
+    bloqueosVigentes : List<VistaBloqueo>
+    pedidosPendientes : int
+    metricas : MetricasSimulacion
+  }
+  class VistaUnidad <<record>> {
+    codigo : String
+    tipo : TipoUnidad
+    estado : EstadoUnidad
+    x, y : int
+    cargaABordo : int
+    capacidad : int
+    caminoRecorrido : int[]
+    caminoPendiente : int[]
+    destinoX, destinoY : int
+    minutosHastaDestino : long
+    pedidosABordo : List<PedidoABordo>
+    tipoAveria : int
+  }
+  class "VistaUnidad.PedidoABordo" as PedidoABordo <<record>> {
+    idPedido : int
+    enLaUnidad : int
+    totalDelPedido : int
+  }
+  class VistaAlmacen <<record>> {
+    id : int
+    nombre : String
+    x, y : int
+    central : boolean
+    disponible : int
+    capacidad : int
+    color : ColorSemaforo
+  }
+  class VistaBloqueo <<record>> {
+    nodos : int[]
+    minutoInicio : long
+    minutoFin : long
+  }
+  class MetricasSimulacion <<record>> {
+    pedidosRegistrados : int
+    pedidosEntregados : int
+    pedidosPendientes : int
+    pedidosConEntregaParcial : int
+    unidadesEntregadas : int
+    pedidosIncumplidos : int
+    costoAcumulado : double
+    kilometrosPorTipo : Map<String, Integer>
+    minutosEntregaPorPlazo : Map<Integer, Double>
+    entregasPorPlazo : Map<Integer, Integer>
+    activacionesSemaforo : List<ActivacionSemaforo>
+    averiasPorTipo : Map<Integer, Integer>
+    ejecucionesPlanificador : long
+    milisegundosPlanificador : long
+  }
+  class "MetricasSimulacion.ActivacionSemaforo" as ActivacionSemaforo <<record>> {
+    minuto : long
+    nombreAlmacen : String
+    color : ColorSemaforo
+    disponible : int
+  }
+  class ResultadoSimulacion <<record>> {
+    configuracion : ConfiguracionEscenario
+    estado : EstadoCorrida
+    minutoFinal : long
+    fechaHoraFinal : LocalDateTime
+    milisegundosReales : long
+    metricas : MetricasSimulacion
+    minutoPrimerIncumplimiento : long
+    pedidoDelPrimerIncumplimiento : int
+    mensaje : String
+  }
+
+  enum TipoEscenario {
+    DIA_A_DIA
+    SIMULACION_5D
+    COLAPSO
+  }
+  enum ModoReloj {
+    ACOMPASADO
+    LIBRE
+  }
+  enum EstadoCorrida {
+    PREPARADA
+    EN_CURSO
+    CULMINADA
+    CANCELADA
+    COLAPSADA
+    FALLIDA
+  }
+  enum ColorSemaforo {
+    VERDE
+    AMBAR
+    ROJO
+  }
+  enum TipoEvento {
+    RECARGA_ALMACENES
+    ACTIVACION_BLOQUEO
+    DESACTIVACION_BLOQUEO
+    CAMBIO_TURNO
+    INICIO_MANTENIMIENTO
+    FIN_MANTENIMIENTO
+    LLEGADA_PEDIDO
+    AVERIA
+    TRASLADO_A_CENTRAL
+    FIN_AVERIA
+    LLEGADA_A_PARADA
+    FIN_SERVICIO
+    REPLANIFICACION
+    FOTOGRAFIA
+    FIN_ESCENARIO
+  }
+}
+
+package "core (ver otros diagramas)" #EEEEEE {
+  class DatosEscenario
+  class ParametrosOperacion
+  class CalendarioEscenario
+  class RegistroBloqueos
+  class OraculoDistancias
+  class MatrizDistanciasReticula
+  class InstanciaPlanificacion
+  class Solucion
+  class Ruta
+  class UnidadTransporte
+  class Almacen
+  class Pedido
+  class Averia
+  interface Algoritmo
+  class PresupuestoComputo
+}
+
+' --- composicion del motor
+MotorSimulacion --> "1" ConfiguracionEscenario
+MotorSimulacion --> "1" DatosEscenario
+MotorSimulacion --> "1" ParametrosOperacion
+MotorSimulacion --> "1" Algoritmo : planificador
+MotorSimulacion "1" o-- "0..*" ObservadorSimulacion : notifica
+MotorSimulacion "1" *-- "1" EstadoSimulacion
+MotorSimulacion "1" *-- "1" ColaEventos
+MotorSimulacion "1" *-- "1" GeneradorAverias
+MotorSimulacion --> OraculoDistancias
+MotorSimulacion ..> MatrizDistanciasReticula : <<crea>>
+MotorSimulacion ..> InstanciaPlanificacion : <<crea fotografia>>
+MotorSimulacion ..> PresupuestoComputo : <<crea>>
+MotorSimulacion ..> Solucion : plan vigente
+MotorSimulacion ..> InstantaneaSimulacion : <<crea>>
+MotorSimulacion ..> ResultadoSimulacion : <<crea>>
+
+ConfiguracionEscenario --> TipoEscenario
+ConfiguracionEscenario --> ModoReloj
+
+EstadoSimulacion --> CalendarioEscenario
+EstadoSimulacion --> RegistroBloqueos
+EstadoSimulacion o-- "3" Almacen
+EstadoSimulacion o-- "0..*" Pedido
+EstadoSimulacion "1" *-- "1..*" UnidadEnCurso
+EstadoSimulacion --> ColorSemaforo
+EstadoSimulacion ..> MetricasSimulacion : <<crea>>
+
+UnidadEnCurso --> "1" UnidadTransporte
+UnidadEnCurso --> "0..1" Ruta : itinerario
+UnidadEnCurso ..> Evento
+
+ColaEventos "1" *-- "0..*" Evento
+Evento --> TipoEvento
+GeneradorAverias ..> Averia : <<crea>>
+
+InstantaneaSimulacion *-- "0..*" VistaUnidad
+InstantaneaSimulacion *-- "0..*" VistaAlmacen
+InstantaneaSimulacion *-- "0..*" VistaBloqueo
+InstantaneaSimulacion *-- MetricasSimulacion
+InstantaneaSimulacion --> EstadoCorrida
+VistaUnidad *-- "0..*" PedidoABordo
+VistaAlmacen --> ColorSemaforo
+MetricasSimulacion *-- "0..*" ActivacionSemaforo
+ResultadoSimulacion --> ConfiguracionEscenario
+ResultadoSimulacion *-- MetricasSimulacion
+ResultadoSimulacion --> EstadoCorrida
+ObservadorSimulacion ..> InstantaneaSimulacion
+ObservadorSimulacion ..> ResultadoSimulacion
+@enduml

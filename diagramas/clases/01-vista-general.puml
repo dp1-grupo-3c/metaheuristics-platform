@@ -1,0 +1,148 @@
+@startuml 01-vista-general
+!include estilo.iuml
+hide members
+hide circle
+title KindBox - Backend: vista general de clases en ejecucion (service + core)
+
+package "service (Spring Boot)" as S {
+  package "web" as SW {
+    class ControladorSimulaciones
+    class ControladorParametros
+    class ControladorAlmacenes
+    class ControladorSalud
+    class ManejadorDeErrores
+    class ManejadorWebSocketSimulacion
+    class DifusorInstantaneas
+  }
+  package "simulacion" as SS {
+    class ServicioSimulacion
+    class Corrida
+    interface PublicadorDeEstado
+    class FabricaMotor
+    class RegistroAlgoritmos
+  }
+  package "configuracion" as SC {
+    class PropiedadesKindBox
+    class ConfiguracionWeb
+    class ConfiguracionWebSocket
+  }
+  package "io / dto / error" as SD {
+    class AnalizadorAverias
+    class "DTO (Solicitud*, Respuesta*, Resumen*, ...)" as DTO
+    class "Excepciones (RecursoNoEncontrado, ...)" as EXC
+  }
+}
+
+package "core" as C {
+  package "simulacion" as CS {
+    class MotorSimulacion
+    class EstadoSimulacion
+    class UnidadEnCurso
+    class ColaEventos
+    class GeneradorAverias
+    interface ObservadorSimulacion
+    class "InstantaneaSimulacion / ResultadoSimulacion / MetricasSimulacion" as Vistas
+  }
+  package "metaheuristica" as CM {
+    interface Algoritmo
+    class FabricaAlgoritmos
+    class PresupuestoComputo
+    class BusquedaGeneticaHibrida
+    class BusquedaAdaptativaVecindadAmplia
+  }
+  package "evaluacion / construccion" as CE {
+    interface FuncionObjetivo
+    class ProgramadorRuta
+    interface HeuristicaConstructiva
+    class AhorrosClarkeWright
+  }
+  package "problema" as CP {
+    class InstanciaPlanificacion
+    class Solucion
+    class Ruta
+    class Parada
+  }
+  package "grafo" as CG {
+    class RegistroBloqueos
+    interface MatrizDistancias
+    class MatrizDistanciasReticula
+  }
+  package "io" as CI {
+    class RepositorioDatos
+    class "Lectores (Flota, Ventas, Bloqueos, Mantenimiento, Averias)" as Lectores
+  }
+  package "modelo" as CMo {
+    class ParametrosOperacion
+    class UnidadTransporte
+    class Pedido
+    class Almacen
+    class Bloqueo
+    class "TipoUnidad / Turno / TipoAveria / EstadoUnidad" as Enums
+  }
+}
+
+ControladorSimulaciones --> ServicioSimulacion
+ControladorAlmacenes --> ServicioSimulacion
+ControladorSalud --> ServicioSimulacion
+ControladorParametros --> ParametrosOperacion
+ManejadorDeErrores ..> EXC
+ConfiguracionWeb ..> RepositorioDatos : <<bean>>
+ConfiguracionWeb ..> ParametrosOperacion : <<bean>>
+ConfiguracionWebSocket --> ManejadorWebSocketSimulacion
+ServicioSimulacion "1" *-- "0..*" Corrida
+ServicioSimulacion --> FabricaMotor
+ServicioSimulacion --> RegistroAlgoritmos
+ServicioSimulacion --> PublicadorDeEstado
+ServicioSimulacion --> RepositorioDatos
+ServicioSimulacion --> PropiedadesKindBox
+ServicioSimulacion ..> AnalizadorAverias
+ServicioSimulacion ..> DTO
+DifusorInstantaneas ..|> PublicadorDeEstado
+DifusorInstantaneas --> ManejadorWebSocketSimulacion
+Corrida ..|> ObservadorSimulacion
+Corrida --> MotorSimulacion
+FabricaMotor ..> MotorSimulacion : <<crea>>
+RegistroAlgoritmos ..> FabricaAlgoritmos
+
+MotorSimulacion *-- EstadoSimulacion
+MotorSimulacion *-- ColaEventos
+MotorSimulacion *-- GeneradorAverias
+MotorSimulacion o-- ObservadorSimulacion
+MotorSimulacion --> Algoritmo
+MotorSimulacion --> ParametrosOperacion
+MotorSimulacion ..> InstanciaPlanificacion : fotografia
+MotorSimulacion ..> PresupuestoComputo
+MotorSimulacion ..> MatrizDistanciasReticula
+MotorSimulacion ..> Vistas
+EstadoSimulacion *-- UnidadEnCurso
+EstadoSimulacion --> RegistroBloqueos
+UnidadEnCurso --> UnidadTransporte
+UnidadEnCurso --> Ruta
+
+FabricaAlgoritmos ..> Algoritmo : <<crea>>
+BusquedaGeneticaHibrida ..|> Algoritmo
+BusquedaAdaptativaVecindadAmplia ..|> Algoritmo
+BusquedaGeneticaHibrida --> HeuristicaConstructiva
+BusquedaAdaptativaVecindadAmplia --> HeuristicaConstructiva
+BusquedaGeneticaHibrida --> FuncionObjetivo
+BusquedaAdaptativaVecindadAmplia --> FuncionObjetivo
+BusquedaGeneticaHibrida ..> ProgramadorRuta
+BusquedaAdaptativaVecindadAmplia ..> ProgramadorRuta
+AhorrosClarkeWright ..|> HeuristicaConstructiva
+Algoritmo ..> Solucion
+ProgramadorRuta --> InstanciaPlanificacion
+
+InstanciaPlanificacion --> MatrizDistancias
+MatrizDistanciasReticula ..|> MatrizDistancias
+Solucion *-- Ruta
+Ruta *-- Parada
+RegistroBloqueos o-- Bloqueo
+
+RepositorioDatos ..> Lectores
+Lectores ..> Pedido
+Lectores ..> Bloqueo
+Lectores ..> UnidadTransporte
+UnidadTransporte --> Enums
+EstadoSimulacion o-- Almacen
+EstadoSimulacion o-- Pedido
+@enduml

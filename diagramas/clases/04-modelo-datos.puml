@@ -1,0 +1,346 @@
+@startuml 04-modelo-datos
+!include estilo.iuml
+title KindBox - Backend: core.modelo, core.problema, core.io, core.grafo y core.util
+
+package "core.modelo" {
+  enum TipoUnidad {
+    AUTO
+    MOTO
+    BICICLETA
+    --
+    - prefijo : String
+    - etiqueta : String
+    - capacidad : int
+    - velocidadPorDefecto : double
+    - costoPorKm : double
+    + {static} porPrefijo(prefijo : String) : TipoUnidad
+    + {static} porCodigo(codigo : String) : TipoUnidad
+  }
+  enum EstadoUnidad {
+    DISPONIBLE
+    EN_RUTA
+    ENTREGANDO
+    EN_ALIMENTACION
+    ABASTECIENDO
+    AVERIADA
+    EN_MANTENIMIENTO
+  }
+  enum TipoAveria {
+    TIPO_1
+    TIPO_2
+    TIPO_3
+    --
+    - codigo : int
+    - minutosEnElLugar : int
+    - trasladaAlmacenCentral : boolean
+    + minutoReincorporacion(minutoAveria : long) : long
+    + {static} porCodigo(codigo : int) : TipoAveria
+  }
+  enum Turno {
+    MANANA
+    TARDE
+    NOCHE
+    --
+    - inicioMinutoDia : int
+    - finMinutoDia : int
+    + {static} enMinuto(minuto : long) : Turno
+    + {static} inicioDelTurno(minuto : long) : long
+    + {static} finDelTurno(minuto : long) : long
+  }
+  class UnidadTransporte {
+    - codigo : String
+    - tipo : TipoUnidad
+    - estado : EstadoUnidad
+    - nodo : int
+    - cargaABordo : int
+    - minutoDisponibleDesde : long
+    - inicioTurnoAlimentacion : long
+    + capacidad() : int
+    + capacidadLibre() : int
+    + planificable(minutoActual : long) : boolean
+    + {static} de(codigo : String, nodoInicial : int) : UnidadTransporte
+  }
+  class Pedido <<record>> {
+    id : int
+    idCliente : String
+    nodoDestino : int
+    cantidad : int
+    minutoRegistro : long
+    plazoHoras : int
+    + minutoLimite() : long
+    + holgura(minutoActual : long) : long
+    + esPriorizado() : boolean
+  }
+  class Almacen <<record>> {
+    id : int
+    nombre : String
+    nodo : int
+    central : boolean
+    capacidad : int
+    + {static} crearCentral() : Almacen
+    + {static} todos() : List<Almacen>
+  }
+  class Bloqueo <<record>> {
+    nodos : int[]
+    minutoInicio : long
+    minutoFin : long
+    + cantidadTramos() : int
+    + vigenteEn(minuto : long) : boolean
+  }
+  class Averia <<record>> {
+    codigoUnidad : String
+    tipo : TipoAveria
+    minutoAveria : long
+    nodo : int
+    + minutoReincorporacion() : long
+    + minutoTrasladoAlmacenCentral() : long
+  }
+  class Mantenimiento <<record>> {
+    fecha : LocalDate
+    codigoUnidad : String
+    + tipoUnidad() : TipoUnidad
+  }
+  class Ciudad <<utilidad>> {
+    + {static} LARGO_KM : int = 70
+    + {static} ANCHO_KM : int = 50
+    + {static} nodo(x : int, y : int) : int
+    + {static} x(nodo : int) : int
+    + {static} y(nodo : int) : int
+    + {static} distanciaManhattan(a : int, b : int) : int
+  }
+  class ParametrosOperacion {
+    - velocidades : Map<TipoUnidad, Double>
+    - minutosAcondicionamiento : int
+    - minutosAlimentacion : int
+    - minutosSeparacionCambioTurno : int
+    - minutosTrasvase : int
+    - umbralSemaforoVerde : int
+    - umbralSemaforoAmbar : int
+    - version : long
+    + velocidad(tipo : TipoUnidad) : double
+    + velocidad(tipo : TipoUnidad, kmPorHora : double) : void
+    + umbralesSemaforo(ambar : int, verde : int) : void
+    + instantanea() : Instantanea
+  }
+  class "ParametrosOperacion.Instantanea" as ParamInstantanea <<record>> {
+    velocidadKmH : double[]
+    minutosAcondicionamiento : int
+    minutosAlimentacion : int
+    minutosSeparacionCambioTurno : int
+    minutosTrasvase : int
+    umbralSemaforoAmbar : int
+    umbralSemaforoVerde : int
+    version : long
+  }
+}
+
+package "core.problema" {
+  class InstanciaPlanificacion {
+    - minutoActual : long
+    - parametros : ParametrosOperacion.Instantanea
+    - matriz : MatrizDistancias
+    - almacenes : (id, nombre, nodo, inventario, central)[]
+    - pedidos : (id, cliente, nodo, cantidad, limite, plazo)[]
+    - unidades : (codigo, tipo, nodo, carga, disponible, finTurno)[]
+    - asignacionVigente : Map<Integer, String>
+    + cantidadPedidos() : int
+    + cantidadUnidades() : int
+    + cantidadAlmacenes() : int
+    + pedidoMinutoLimiteEfectivo(i : int) : long
+    + minutosDeViaje(tipo, puntoOrigen, puntoDestino) : int
+    + asignacionVigente() : Map<Integer, String>
+    + {static} constructor() : Constructor
+  }
+  class "InstanciaPlanificacion.Constructor" as ConstructorInstancia <<builder>>
+  class Solucion {
+    - rutas : List<Ruta>
+    - cantidadNoAtendida : Map<Integer, Integer>
+    - valor : ValorObjetivo
+    + rutasConEntregas() : List<Ruta>
+    + h() : int
+    + costo() : double
+    + kilometros() : int
+    + asignacion() : Map<Integer, String>
+    + conValor(v : ValorObjetivo) : Solucion
+    + {static} vacia(instancia) : Solucion
+  }
+  class Ruta <<record>> {
+    codigoUnidad : String
+    tipoUnidad : TipoUnidad
+    nodoInicial : int
+    minutoInicio : long
+    paradas : List<Parada>
+    + kilometros() : int
+    + costo() : double
+    + cantidadEntregas() : int
+    + minutoFin() : long
+  }
+  class Parada <<record>> {
+    tipo : TipoParada
+    nodo : int
+    idPedido : int
+    idAlmacen : int
+    cantidad : int
+    minutoLlegada : long
+    minutoSalida : long
+    kmDesdeAnterior : int
+    + {static} entrega(...) : Parada
+    + {static} abastecimiento(...) : Parada
+    + {static} alimentacion(...) : Parada
+  }
+  enum TipoParada {
+    ABASTECIMIENTO
+    ENTREGA
+    ALIMENTACION
+  }
+  class ValorObjetivo <<record>> {
+    pedidosNoAtendidos : int
+    urgencia : double
+    costo : double
+    penalizacion : double
+    + h() : int
+    + s() : double
+    + compareTo(otro : ValorObjetivo) : int
+    + mejorQue(otro : ValorObjetivo) : boolean
+  }
+}
+
+package "core.grafo" {
+  interface MatrizDistancias {
+    + {static} INALCANZABLE : int
+    + cantidadPuntos() : int
+    + nodo(punto : int) : int
+    + km(origen : int, destino : int) : int
+    + vecinosCercanos(punto : int) : int[]
+    + camino(origen : int, destino : int) : int[]
+  }
+  class MatrizDistanciasReticula {
+    - nodoPorPunto : int[]
+    - distancia : int[]
+    - vecinos : int[][]
+    - oraculo : OraculoDistancias
+    + {static} construir(nodosPorPunto, aristaBloqueada) : MatrizDistanciasReticula
+  }
+  class OraculoDistancias {
+    + distanciasDesde(origen, aristaBloqueada, distancia, predecesor) : void
+    + caminoDesdePredecesores(pred, origen, destino) : int[]
+  }
+  class RegistroBloqueos {
+    - bloqueos : Bloqueo[]
+    - instantesCambio : long[]
+    - mascara : boolean[]
+    + mascaraBloqueada(minuto : long) : boolean[]
+    + proximoCambio(minuto : long) : long
+    + vigentes(minuto : long) : List<Bloqueo>
+    + bloqueada(nodoA, nodoB, minuto) : boolean
+    + {static} vacio() : RegistroBloqueos
+  }
+}
+
+package "core.io" {
+  class RepositorioDatos {
+    - raiz : Path
+    + cargar(primerDia : LocalDate, ultimoDia : LocalDate) : DatosEscenario
+    + cargarMes(mes : YearMonth) : DatosEscenario
+  }
+  class "RepositorioDatos.DatosEscenario" as DatosEscenario <<record>> {
+    calendario : CalendarioEscenario
+    primerDia : LocalDate
+    ultimoDia : LocalDate
+    flota : FlotaLeida
+    pedidos : List<Pedido>
+    bloqueos : List<Bloqueo>
+    mantenimientos : List<Mantenimiento>
+    avisos : List<String>
+  }
+  class CalendarioEscenario {
+    - inicio : LocalDateTime
+    + aMinutos(instante : LocalDateTime) : long
+    + aFecha(minutos : long) : LocalDateTime
+    + aDia(minutos : long) : LocalDate
+    + {static} desde(dia : LocalDate) : CalendarioEscenario
+  }
+  class LectorFlota {
+    + leer(archivo : Path) : FlotaLeida
+    + flotaPorDefecto() : FlotaLeida
+  }
+  class "LectorFlota.FlotaLeida" as FlotaLeida <<record>> {
+    unidades : List<UnidadTransporte>
+    capacidades : Map<TipoUnidad, Integer>
+    velocidades : Map<TipoUnidad, Double>
+    costos : Map<TipoUnidad, Double>
+  }
+  class LectorVentas {
+    + leer(archivo : Path, mes : YearMonth, primerId : int) : List<Pedido>
+  }
+  class LectorBloqueos {
+    + leer(archivo : Path, mes : YearMonth) : List<Bloqueo>
+  }
+  class LectorMantenimiento {
+    + leer(archivo : Path) : List<Mantenimiento>
+  }
+  class LectorAverias {
+    + leer(archivo : Path, mes : YearMonth) : List<AveriaProgramada>
+  }
+  class "LectorAverias.AveriaProgramada" as AveriaProgramada <<record>> {
+    minutoAveria : long
+    codigoUnidad : String
+    tipo : TipoAveria
+  }
+}
+
+package "core.util" {
+  class Aleatorio {
+    - semilla : long
+    + siguienteEntero(cota : int) : int
+    + siguienteDouble() : double
+    + barajar(arreglo : int[]) : void
+    + ruleta(pesos : double[]) : int
+    + {static} derivarSemilla(maestra : long, flujo : long) : long
+  }
+}
+
+' --- modelo
+UnidadTransporte --> "1" TipoUnidad
+UnidadTransporte --> "1" EstadoUnidad
+Averia --> TipoAveria
+TipoAveria ..> Turno
+ParametrosOperacion ..> ParamInstantanea : <<crea>>
+Mantenimiento ..> TipoUnidad
+
+' --- problema
+InstanciaPlanificacion +-- ConstructorInstancia
+ConstructorInstancia ..> InstanciaPlanificacion : <<construye>>
+InstanciaPlanificacion --> "1" ParamInstantanea
+InstanciaPlanificacion --> "1" MatrizDistancias
+Solucion "1" *-- "0..*" Ruta
+Solucion --> "1" ValorObjetivo
+Ruta "1" *-- "0..*" Parada
+Ruta --> TipoUnidad
+Parada --> TipoParada
+
+' --- grafo
+MatrizDistanciasReticula ..|> MatrizDistancias
+MatrizDistanciasReticula --> OraculoDistancias
+RegistroBloqueos "1" o-- "0..*" Bloqueo
+MatrizDistanciasReticula ..> Ciudad
+
+' --- io
+RepositorioDatos ..> DatosEscenario : <<crea>>
+RepositorioDatos ..> LectorFlota
+RepositorioDatos ..> LectorVentas
+RepositorioDatos ..> LectorBloqueos
+RepositorioDatos ..> LectorMantenimiento
+DatosEscenario --> CalendarioEscenario
+DatosEscenario *-- FlotaLeida
+DatosEscenario o-- "0..*" Pedido
+DatosEscenario o-- "0..*" Bloqueo
+DatosEscenario o-- "0..*" Mantenimiento
+FlotaLeida o-- "1..*" UnidadTransporte
+LectorFlota ..> FlotaLeida
+LectorVentas --> CalendarioEscenario
+LectorBloqueos --> CalendarioEscenario
+LectorAverias --> CalendarioEscenario
+LectorAverias ..> AveriaProgramada
+AveriaProgramada --> TipoAveria
+@enduml

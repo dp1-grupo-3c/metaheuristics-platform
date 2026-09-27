@@ -1,0 +1,24 @@
+' Estilo comun de los diagramas de clases de KindBox
+set separator none
+skinparam dpi 110
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam defaultFontName "DejaVu Sans"
+skinparam defaultFontSize 11
+skinparam class {
+  BackgroundColor #FDFDFD
+  BorderColor #4A5A6A
+  ArrowColor #4A5A6A
+  HeaderBackgroundColor #E8EEF4
+}
+skinparam package {
+  BackgroundColor #F6F8FA
+  BorderColor #8A9AAA
+  FontStyle bold
+}
+skinparam note {
+  BackgroundColor #FFF8DC
+  BorderColor #C8B560
+}
+hide empty members

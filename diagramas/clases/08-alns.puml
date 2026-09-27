@@ -1,0 +1,162 @@
+@startuml 08-alns
+!include estilo.iuml
+title KindBox - Backend: core.metaheuristica.alns (Busqueda Adaptativa de Vecindad Amplia)
+
+package "core.metaheuristica.alns" {
+  class BusquedaAdaptativaVecindadAmplia {
+    - constructiva : HeuristicaConstructiva
+    - parametros : ParametrosAlns
+    - objetivo : FuncionObjetivo
+    - semilla : long
+    + nombre() : String
+    + resolver(instancia, presupuesto) : ResultadoPlanificacion
+    + resolver(instancia, presupuesto, semilla) : ResultadoPlanificacion
+    + admiteArranqueDesdePlanVigente() : boolean
+    + resolverDesde(instancia, presupuesto, semilla, planVigente) : ResultadoPlanificacion
+  }
+  class ParametrosAlns {
+    - fraccionMinimaDestruccion : double
+    - fraccionMaximaDestruccion : double
+    - maximoAbsolutoDestruccion : int
+    - longitudSegmento : int
+    - tasaReaccion : double
+    - puntajeNuevaMejor / Mejora / Aceptada : double
+    - fraccionTemperaturaInicial : double
+    - fraccionTemperaturaFinal : double
+    - factorPenalizacionBanco : double
+    - factorPenalizacionEstabilidad : double
+    - iteracionesParaReinicio : long
+    - filtroCotaInferior : boolean
+    ...
+    + {static} porDefecto() : ParametrosAlns
+  }
+  class EstadoAlns {
+    - instancia : InstanciaPlanificacion
+    - tareas : TareasAlns
+    - programador : ProgramadorRuta
+    - rutaTarea : int[][]
+    - kilometrosRuta : int[]
+    - costoRuta : double[]
+    - banco : int[]
+    - tamanoBanco : int
+    - desviacionVigente : int
+    + insertar(unidad : int, posicion : int, tarea : int) : boolean
+    + quitar(tarea : int) : void
+    + vaciarRuta(unidad : int) : int
+    + copiarDesde(otro : EstadoAlns) : void
+    + cargarDesde(plan : Solucion) : void
+    + configurarEstabilidad(plan : PlanVigenteAlns, peso : double) : void
+    + valor() : ValorObjetivo
+    + escalar(penalizacionPorPedido : double) : double
+    + materializar() : Solucion
+  }
+  class TareasAlns {
+    + cantidad() : int
+    + pedido(tarea : int) : int
+    + unidades(tarea : int) : int
+    + limite(tarea : int) : long
+    + holgura(tarea : int) : long
+  }
+  class PlanVigenteAlns {
+    + unidadDe(pedido : int) : int
+    + pedidosConUnidad() : int
+    + {static} ninguno(cantidadPedidos : int) : PlanVigenteAlns
+  }
+  class CapaAdaptativa {
+    - pesosDestruccion : double[]
+    - pesosReconstruccion : double[]
+    - puntajeDestruccion : double[]
+    - puntajeReconstruccion : double[]
+    + elegirDestruccion(aleatorio : Aleatorio) : int
+    + elegirReconstruccion(aleatorio : Aleatorio) : int
+    + registrar(destruccion, reconstruccion, resultado) : void
+    + reiniciar() : void
+  }
+  class CriterioAceptacion {
+    + calibrar(valorInicial : double) : void
+    + temperatura(fraccionConsumida : double) : double
+    + aceptar(candidato, vigente, fraccionConsumida, aleatorio) : boolean
+  }
+  class MotorInsercion {
+    - instancia : InstanciaPlanificacion
+    - tareas : TareasAlns
+    - matriz : MatrizDistancias
+    - resumenes : ResumenesRuta
+    + podasCotaInferior() : long
+  }
+
+  interface OperadorDestruccion {
+    + nombre() : String
+    + destruir(estado : EstadoAlns, grado : int, aleatorio : Aleatorio) : int
+  }
+  class RemocionAleatoria
+  class RemocionDelPeor
+  class RemocionPorAfinidad
+  class RemocionCadenasAdyacentes
+  class RemocionPorCriticidad
+  class RemocionDeRutaCompleta
+
+  interface OperadorReconstruccion {
+    + nombre() : String
+    + reconstruir(estado : EstadoAlns, aleatorio : Aleatorio, presupuesto : PresupuestoComputo) : void
+  }
+  class InsercionVoraz
+  class InsercionPorArrepentimiento
+  class InsercionVorazConParpadeo
+}
+
+package "core (ver otros diagramas)" #EEEEEE {
+  interface Algoritmo
+  interface HeuristicaConstructiva
+  interface FuncionObjetivo
+  class ProgramadorRuta
+  class ResumenesRuta
+  interface MatrizDistancias
+  class InstanciaPlanificacion
+  class Solucion
+  class PresupuestoComputo
+}
+
+BusquedaAdaptativaVecindadAmplia ..|> Algoritmo
+BusquedaAdaptativaVecindadAmplia --> HeuristicaConstructiva : solucion inicial
+BusquedaAdaptativaVecindadAmplia --> ParametrosAlns
+BusquedaAdaptativaVecindadAmplia --> FuncionObjetivo
+BusquedaAdaptativaVecindadAmplia ..> EstadoAlns : vigente / candidato / mejor
+BusquedaAdaptativaVecindadAmplia ..> TareasAlns : <<crea>>
+BusquedaAdaptativaVecindadAmplia ..> MotorInsercion : <<crea>>
+BusquedaAdaptativaVecindadAmplia ..> CapaAdaptativa : <<crea>>
+BusquedaAdaptativaVecindadAmplia ..> CriterioAceptacion : <<crea>>
+BusquedaAdaptativaVecindadAmplia ..> PlanVigenteAlns : <<crea>>
+BusquedaAdaptativaVecindadAmplia ..> "6" OperadorDestruccion : <<crea>>
+BusquedaAdaptativaVecindadAmplia ..> "3" OperadorReconstruccion : <<crea>>
+BusquedaAdaptativaVecindadAmplia ..> PresupuestoComputo
+
+EstadoAlns --> InstanciaPlanificacion
+EstadoAlns --> TareasAlns
+EstadoAlns --> ProgramadorRuta
+EstadoAlns ..> PlanVigenteAlns
+EstadoAlns ..> Solucion : materializar()
+TareasAlns ..> InstanciaPlanificacion
+CapaAdaptativa --> ParametrosAlns
+CriterioAceptacion --> ParametrosAlns
+MotorInsercion --> TareasAlns
+MotorInsercion --> MatrizDistancias
+MotorInsercion --> ResumenesRuta
+MotorInsercion ..> EstadoAlns
+
+RemocionAleatoria ..|> OperadorDestruccion
+RemocionDelPeor ..|> OperadorDestruccion
+RemocionPorAfinidad ..|> OperadorDestruccion
+RemocionCadenasAdyacentes ..|> OperadorDestruccion
+RemocionPorCriticidad ..|> OperadorDestruccion
+RemocionDeRutaCompleta ..|> OperadorDestruccion
+OperadorDestruccion ..> EstadoAlns
+
+InsercionVoraz ..|> OperadorReconstruccion
+InsercionPorArrepentimiento ..|> OperadorReconstruccion
+InsercionVorazConParpadeo ..|> OperadorReconstruccion
+InsercionVoraz --> MotorInsercion
+InsercionPorArrepentimiento --> MotorInsercion
+InsercionVorazConParpadeo --> MotorInsercion
+OperadorReconstruccion ..> EstadoAlns
+@enduml
