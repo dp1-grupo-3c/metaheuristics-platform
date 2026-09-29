@@ -271,7 +271,7 @@ public final class ResumenesRuta {
 
     private void fijarFin(long[] destino, int id, int unidad) {
         DatosSecuencia.fijar(destino, id, 0L, DatosSecuencia.SIN_ESPERA_LARGO,
-                instancia.unidadMinutoFinTurno(unidad));
+                instancia.unidadMinutoFinHorizonte(unidad));
     }
 
     private void asegurarCapacidad(int longitudRuta) {

@@ -153,8 +153,8 @@ public final class VerificadorRestricciones implements VerificadorFactibilidad {
                 ? Math.max(ruta.minutoInicio(), instancia.unidadMinutoDisponible(unidad))
                 : ruta.minutoInicio();
         final long finTurno = unidad >= 0
-                ? instancia.unidadMinutoFinTurno(unidad)
-                : Turno.finDelTurno(minutoInicio);
+                ? instancia.unidadMinutoFinHorizonte(unidad)
+                : Long.MAX_VALUE;
 
         int carga = unidad >= 0 ? instancia.unidadCarga(unidad) : 0;
         if (carga > capacidad) {
@@ -216,9 +216,19 @@ public final class VerificadorRestricciones implements VerificadorFactibilidad {
             }
         }
 
+        if (unidad >= 0 && instancia.unidadRetornaAlCentral(unidad)) {
+            int nodoFinal = paradas.isEmpty() ? instancia.unidadNodo(unidad) : paradas.getLast().nodo();
+            boolean enCentral = false;
+            for (int a = 0; a < instancia.cantidadAlmacenes(); a++) {
+                if (instancia.almacenEsCentral(a) && instancia.almacenNodo(a) == nodoFinal) enCentral = true;
+            }
+            if (!enCentral) acumulador.agregar(Infraccion.HORIZONTE_EXCEDIDO, codigo, paradas.size() - 1,
+                    "la ruta debe terminar en el central antes del mantenimiento");
+        }
+
         if (instante > finTurno) {
-            acumulador.agregar(Infraccion.TURNO_EXCEDIDO, codigo, paradas.size() - 1,
-                    "la ruta termina en el minuto " + instante + " y el turno cierra en el " + finTurno);
+            acumulador.agregar(Infraccion.HORIZONTE_EXCEDIDO, codigo, paradas.size() - 1,
+                    "la ruta termina en el minuto " + instante + " y el horizonte operativo termina en el " + finTurno);
         }
     }
 

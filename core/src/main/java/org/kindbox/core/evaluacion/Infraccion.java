@@ -11,8 +11,8 @@ public enum Infraccion {
     PLAZO_INCUMPLIDO("La entrega de cada pedido ocurre en un instante anterior o igual a su fecha y hora limite"),
     /** La carga a bordo excede la capacidad de la unidad en algun tramo. */
     CAPACIDAD_EXCEDIDA("La carga a bordo de una unidad no excede su capacidad en ningun tramo de su ruta"),
-    /** La ruta se extiende mas alla del cierre del turno. */
-    TURNO_EXCEDIDO("Ninguna ruta se extiende mas alla del cierre del turno de la unidad"),
+    /** La ruta excede su limite operativo o no reserva el retorno por mantenimiento. */
+    HORIZONTE_EXCEDIDO("La ruta respeta el horizonte operativo y su retorno por mantenimiento"),
     /** Falta la hora de alimentacion o esta mal ubicada dentro de la jornada. */
     ALIMENTACION_INVALIDA("Cada unidad dispone de una hora continua de alimentacion dentro de la jornada, "
             + "separada al menos una hora de cada cambio de turno"),

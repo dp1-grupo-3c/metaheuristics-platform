@@ -48,7 +48,7 @@ import org.kindbox.core.problema.Ruta;
  * <p>La pausa es exigible <b>por jornada</b> y no por ruta. Una ruta es solo el tramo de la
  * jornada que alcanza a planificarse en esta iteracion, de modo que cuando el turno ya
  * arranco hace mas de lo que permite la ventana, o cuando ninguna posicion admite la pausa
- * sin incumplir un plazo o el cierre del turno, la ruta se programa sin pausa y <b>no</b> se
+ * sin incumplir un plazo o el limite del horizonte operativo, la ruta se programa sin pausa y <b>no</b> se
  * marca infactible por ese motivo. {@code VerificadorRestricciones} sostiene la misma
  * interpretacion: comprueba que la pausa presente este bien ubicada, no que exista.</p>
  *
@@ -169,7 +169,7 @@ public final class ProgramadorRuta {
      */
     public Programacion programar(int indiceUnidad, int[] pedidos, int[] cantidades, int longitud,
                                   boolean consumirInventario) {
-        if (longitud <= 0) {
+        if (longitud <= 0 && !instancia.unidadRetornaAlCentral(indiceUnidad)) {
             return programacionVacia(indiceUnidad);
         }
         if (!ejecutar(indiceUnidad, pedidos, cantidades, longitud)) {
@@ -195,7 +195,7 @@ public final class ProgramadorRuta {
      * @return {@code false} si la secuencia no admite ninguna ruta con esta unidad
      */
     public boolean evaluar(int indiceUnidad, int[] pedidos, int[] cantidades, int longitud) {
-        if (longitud <= 0) {
+        if (longitud <= 0 && !instancia.unidadRetornaAlCentral(indiceUnidad)) {
             prepararResultadoVacio(indiceUnidad);
             return true;
         }
@@ -233,7 +233,7 @@ public final class ProgramadorRuta {
 
     // -------------------------------------------- resultado de la ultima corrida
 
-    /** Indica si la ultima programacion cumple plazos y cierre de turno. */
+    /** Indica si la ultima programacion cumple plazos y horizonte operativo. */
     public boolean ultimaFactible() {
         return ultimaFactible;
     }
@@ -376,21 +376,40 @@ public final class ProgramadorRuta {
             punto = puntoDestino;
         }
 
-        final long finTurno = instancia.unidadMinutoFinTurno(indiceUnidad);
+        if (instancia.unidadRetornaAlCentral(indiceUnidad)) {
+            int central = -1;
+            for (int a = 0; a < cantidadAlmacenes; a++) if (instancia.almacenEsCentral(a)) central = a;
+            if (central < 0) return false;
+            int kmRetorno = matriz.km(punto, instancia.puntoAlmacen(central));
+            if (kmRetorno >= MatrizDistancias.INALCANZABLE) return false;
+            instante += parametros.minutosDeViaje(tipo, kmRetorno);
+            kilometros += kmRetorno;
+            claseParada[paradas] = ABASTECIMIENTO;
+            nodoParada[paradas] = instancia.almacenNodo(central);
+            identificadorParada[paradas] = instancia.almacenId(central);
+            cantidadParada[paradas] = 0;
+            kmParada[paradas] = kmRetorno;
+            llegadaParada[paradas] = instante;
+            salidaParada[paradas] = instante;
+            limiteParada[paradas] = instancia.unidadMinutoFinHorizonte(indiceUnidad);
+            paradas++;
+        }
+
+        final long finHorizonte = instancia.unidadMinutoFinHorizonte(indiceUnidad);
         posicionPausa = -1;
         inicioPausa = 0;
         desplazamientoPausa = 0;
         if (!instancia.unidadAlimentada(indiceUnidad)) {
-            ubicarPausa(paradas, minutoInicio, instante, finTurno, parametros);
+            ubicarPausa(paradas, minutoInicio, instante, finHorizonte, parametros);
         }
 
         long minutoFin = instante + desplazamientoPausa;
-        // El exceso sobre el cierre del turno es una violacion temporal mas, del mismo tipo
+        // El exceso sobre el limite del horizonte operativo es una violacion temporal mas, del mismo tipo
         // que el incumplimiento de un plazo, y se acumula en el mismo desfase. Sin esto la
         // subpoblacion infactible de HGS (apartado 6.3.1 del ISA) no tendria por que
-        // descender: una ruta que se pasa del turno saldria infactible con desfase cero y
+        // descender: una ruta que se pasa del horizonte saldria infactible con desfase cero y
         // la penalizacion no distinguiria pasarse un minuto de pasarse tres horas.
-        desfase += Math.max(0L, minutoFin - finTurno);
+        desfase += Math.max(0L, minutoFin - finHorizonte);
 
         cantidadParadas = paradas;
         ultimasEntregas = longitud;
@@ -409,16 +428,16 @@ public final class ProgramadorRuta {
      *
      * <p>Insertar la pausa tras la parada {@code k} retrasa todas las paradas siguientes en
      * el mismo numero de minutos, de modo que la posicion es admisible cuando ese retraso
-     * cabe en la holgura de todas ellas y la ruta sigue cerrando dentro del turno. La holgura
+     * cabe en la holgura de todas ellas y la ruta sigue cerrando dentro del horizonte. La holgura
      * minima de cada sufijo se precalcula una sola vez, con lo que valorar una posicion
      * cuesta tiempo constante.</p>
      *
      * @param paradas      numero de paradas ya programadas
      * @param minutoInicio instante de arranque de la ruta
      * @param minutoFinSinPausa instante de fin antes de insertar la pausa
-     * @param finTurno     cierre del turno de la unidad
+     * @param finHorizonte     limite del horizonte operativo de la unidad
      */
-    private void ubicarPausa(int paradas, long minutoInicio, long minutoFinSinPausa, long finTurno,
+    private void ubicarPausa(int paradas, long minutoInicio, long minutoFinSinPausa, long finHorizonte,
                              ParametrosOperacion.Instantanea parametros) {
         posicionPausa = -1;
         inicioPausa = 0;
@@ -453,7 +472,7 @@ public final class ProgramadorRuta {
                 continue;
             }
             long desplazamiento = arranque + duracion - salidaPrevia;
-            if (minutoFinSinPausa + desplazamiento > finTurno) {
+            if (minutoFinSinPausa + desplazamiento > finHorizonte) {
                 continue;
             }
             if (desplazamiento > holguraSufijo[k]) {
@@ -562,7 +581,7 @@ public final class ProgramadorRuta {
      * de modo que una secuencia de {@code longitud} visitas produce hasta el doble de paradas.
      */
     private void asegurarCapacidad(int longitud) {
-        int necesario = longitud * 2;
+        int necesario = longitud * 2 + 1;
         if (claseParada.length >= necesario) {
             return;
         }

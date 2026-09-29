@@ -55,8 +55,9 @@ public final class InstanciaPlanificacion {
     private final int[] unidadNodo;
     private final int[] unidadCarga;
     private final long[] unidadMinutoDisponible;
-    private final long[] unidadMinutoFinTurno;
+    private final long[] unidadMinutoFinHorizonte;
     private final boolean[] unidadAlimentada;
+    private final boolean[] unidadRetornaAlCentral;
 
     private final Map<Integer, Integer> indicePorIdPedido;
     private final Map<String, Integer> indicePorCodigoUnidad;
@@ -109,8 +110,9 @@ public final class InstanciaPlanificacion {
         this.unidadNodo = new int[cantidadUnidades];
         this.unidadCarga = new int[cantidadUnidades];
         this.unidadMinutoDisponible = new long[cantidadUnidades];
-        this.unidadMinutoFinTurno = new long[cantidadUnidades];
+        this.unidadMinutoFinHorizonte = new long[cantidadUnidades];
         this.unidadAlimentada = new boolean[cantidadUnidades];
+        this.unidadRetornaAlCentral = new boolean[cantidadUnidades];
         this.indicePorCodigoUnidad = new HashMap<>(cantidadUnidades * 2);
         for (int i = 0; i < cantidadUnidades; i++) {
             UnidadTransporte u = c.unidades.get(i);
@@ -122,7 +124,16 @@ public final class InstanciaPlanificacion {
             unidadMinutoDisponible[i] = arranque;
             unidadAlimentada[i] = u.inicioTurnoAlimentacion() == Turno.inicioDelTurno(arranque);
             long horizonte = c.horizontes.get(i);
-            unidadMinutoFinTurno[i] = horizonte > 0 ? horizonte : Turno.finDelTurno(arranque);
+            long ultimoPlazo = arranque;
+            for (long limite : pedidoMinutoLimite) ultimoPlazo = Math.max(ultimoPlazo, limite);
+            // El relevo alcanza al vehiculo: el cambio de turno no corta su ruta.
+            unidadMinutoFinHorizonte[i] = horizonte >= 0 ? horizonte
+                    : Math.max(arranque + 1440, ultimoPlazo + parametros.minutosAcondicionamiento());
+            Long mantenimiento = c.mantenimientos.get(u.codigo());
+            if (mantenimiento != null && mantenimiento - arranque <= 1440) {
+                unidadRetornaAlCentral[i] = true;
+                unidadMinutoFinHorizonte[i] = Math.min(unidadMinutoFinHorizonte[i], mantenimiento);
+            }
             indicePorCodigoUnidad.put(u.codigo(), i);
         }
 
@@ -264,17 +275,17 @@ public final class InstanciaPlanificacion {
     /** La pausa de esta jornada ya fue iniciada y no debe repetirse al replanificar. */
     public boolean unidadAlimentada(int i) { return unidadAlimentada[i]; }
 
-    /** Ultima llegada que permite completar el servicio sin cruzar el cierre de turno. */
+    /** El mantenimiento del proximo dia exige reservar el retorno al central. */
+    public boolean unidadRetornaAlCentral(int i) { return unidadRetornaAlCentral[i]; }
+
+    /** Plazo contractual de llegada; el servicio y el relevo no lo anticipan. */
     public long pedidoMinutoLimiteEfectivo(int i) {
-        long limite = pedidoMinutoLimite[i];
-        long cierre = Turno.finDelTurno(limite);
-        int servicio = parametros.minutosAcondicionamiento();
-        return Math.min(limite, cierre - servicio);
+        return pedidoMinutoLimite[i];
     }
 
-    /** Cierre del turno de la unidad. Ninguna ruta puede extenderse mas alla. */
-    public long unidadMinutoFinTurno(int i) {
-        return unidadMinutoFinTurno[i];
+    /** Limite operativo explicito, por ejemplo el inicio de mantenimiento. */
+    public long unidadMinutoFinHorizonte(int i) {
+        return unidadMinutoFinHorizonte[i];
     }
 
     /** Punto de la matriz que corresponde a la posicion inicial de la unidad {@code i}. */
@@ -342,6 +353,12 @@ public final class InstanciaPlanificacion {
         private final List<Integer> cantidadesPendientes = new ArrayList<>();
         private final List<UnidadTransporte> unidades = new ArrayList<>();
         private final List<Long> horizontes = new ArrayList<>();
+        private final Map<String, Long> mantenimientos = new HashMap<>();
+
+        public Constructor mantenimiento(String codigoUnidad, long minutoInicio) {
+            mantenimientos.merge(codigoUnidad, minutoInicio, Math::min);
+            return this;
+        }
         private final Map<Integer, String> asignacionVigente = new HashMap<>();
 
         public Constructor minutoActual(long minuto) {
@@ -380,9 +397,8 @@ public final class InstanciaPlanificacion {
 
         /**
          * Agrega una unidad fijando de forma explicita el cierre de su horizonte de
-         * planificacion. Con {@code -1} se usa el cierre del turno en curso, que es la
-         * restriccion dura del apartado 2.6 del ISA; un valor mayor permite estudiar
-         * horizontes extendidos sin tocar el resto del planificador.
+         * planificacion. Con {@code -1} se cubre al menos un dia y el ultimo plazo mas el acondicionamiento.
+         * Los turnos admiten relevo sin detener el vehiculo (respuesta 12 del PO).
          */
         public Constructor unidad(UnidadTransporte unidad, long minutoFinHorizonte) {
             unidades.add(unidad);

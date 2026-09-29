@@ -224,7 +224,7 @@ class VerificadorRestriccionesTest {
                                 entregar(instancia, VENCIDO, 2, 520L, 580L))),
                 new Caso("capacidad excedida", Infraccion.CAPACIDAD_EXCEDIDA, instancia, verificador,
                         ruta(instancia, abastecer(instancia, TipoUnidad.AUTO.capacidad() + 6, ARRANQUE))),
-                new Caso("turno excedido", Infraccion.TURNO_EXCEDIDO, instancia, verificador,
+                new Caso("turno excedido", Infraccion.HORIZONTE_EXCEDIDO, instancia, verificador,
                         ruta(instancia,
                                 abastecer(instancia, 4, ARRANQUE),
                                 entregar(instancia, HOLGADO, 4, 850L, 910L))),

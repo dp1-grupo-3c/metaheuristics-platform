@@ -407,7 +407,7 @@ public final class MotorSimulacion {
                 continue;
             }
             cola.programar(Math.max(0L, inicio), TipoEvento.INICIO_MANTENIMIENTO, unidad, 0);
-            cola.programar(Math.min(minutoFin, inicio + Almacen.MINUTO_RECARGA_DIARIA),
+            cola.programar(Math.min(minutoFin, inicio + CalendarioEscenario.MINUTOS_POR_DIA),
                     TipoEvento.FIN_MANTENIMIENTO, unidad, 0);
         }
 
@@ -688,10 +688,10 @@ public final class MotorSimulacion {
         unidad.nodo(estado.central().nodo());
         unidad.cargaABordo(0);
         unidad.estado(EstadoUnidad.EN_MANTENIMIENTO);
-        unidad.minutoDisponibleDesde(minutoActual + Almacen.MINUTO_RECARGA_DIARIA);
+        unidad.minutoDisponibleDesde(minutoActual + CalendarioEscenario.MINUTOS_POR_DIA);
     }
 
-    /** La unidad vuelve a estar disponible a las 23:59 del dia programado. */
+    /** La unidad vuelve a estar disponible a las 00:00 del dia siguiente. */
     private void terminarMantenimiento(int indiceUnidad) {
         UnidadEnCurso u = estado.unidad(indiceUnidad);
         if (u.unidad().estado() != EstadoUnidad.EN_MANTENIMIENTO) {
@@ -1181,6 +1181,12 @@ public final class MotorSimulacion {
             espejo.inicioTurnoAlimentacion(u.unidad().inicioTurnoAlimentacion());
             espejo.minutoDisponibleDesde(minutoDisponible[i]);
             constructor.unidad(espejo);
+            for (Mantenimiento mantenimiento : datos.mantenimientos()) {
+                long inicio = calendario.aMinutos(mantenimiento.fecha());
+                if (mantenimiento.codigoUnidad().equals(u.codigo()) && inicio > minuto) {
+                    constructor.mantenimiento(u.codigo(), inicio);
+                }
+            }
         }
         for (UnidadEnCurso u : planificables) {
             for (Parada p : paradasPendientes(u)) {
@@ -1297,7 +1303,12 @@ public final class MotorSimulacion {
         }
         for (int i = 0; i < fotografia.unidades().size(); i++) {
             UnidadEnCurso u = fotografia.unidades().get(i);
-            comprometerUnidad(u, i, fotografia, porUnidad.get(u.codigo()));
+            Ruta ruta = porUnidad.get(u.codigo());
+            if ((ruta == null || ruta.paradas().isEmpty()) && fotografia.instancia().unidadRetornaAlCentral(i)) {
+                ruta = new org.kindbox.core.evaluacion.ProgramadorRuta(fotografia.instancia())
+                        .programar(i, new int[0], new int[0], 0, false).ruta();
+            }
+            comprometerUnidad(u, i, fotografia, ruta);
         }
     }
 

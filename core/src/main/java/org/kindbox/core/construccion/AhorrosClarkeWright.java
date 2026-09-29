@@ -356,7 +356,7 @@ public final class AhorrosClarkeWright implements HeuristicaConstructiva {
         for (int u = 0; u < unidades; u++) {
             int tipo = instancia.unidadTipo(u).ordinal();
             unidadesDeTipo[tipo]++;
-            long ventana = instancia.unidadMinutoFinTurno(u) - instancia.unidadMinutoDisponible(u);
+            long ventana = instancia.unidadMinutoFinHorizonte(u) - instancia.unidadMinutoDisponible(u);
             if (prototipoDeTipo[tipo] < 0 || ventana > ventanaDeTipo[tipo]) {
                 prototipoDeTipo[tipo] = u;
                 ventanaDeTipo[tipo] = ventana;

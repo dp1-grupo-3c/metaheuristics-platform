@@ -78,6 +78,28 @@ class MotorSimulacionTest {
     private static final double VELOCIDAD_NUEVA = 10.0;
 
     @Test
+    void mantenimientoIncluyeUltimoMinutoDelDia(@TempDir Path raiz) throws IOException {
+        var originales = escenario(raiz, PRIMER_DIA.plusDays(1));
+        var datos = new RepositorioDatos.DatosEscenario(originales.calendario(), originales.primerDia(),
+                originales.ultimoDia(), originales.flota(), List.of(), List.of(),
+                List.of(new org.kindbox.core.modelo.Mantenimiento(PRIMER_DIA, "TA01")), List.of());
+        Map<Long, org.kindbox.core.modelo.EstadoUnidad> estados = new HashMap<>();
+        var observador = new ObservadorSimulacion() {
+            @Override
+            public void alTomarFotografia(InstantaneaSimulacion foto) {
+                if (foto.minutoSimulado() == 1439 || foto.minutoSimulado() == 1440) {
+                    estados.put(foto.minutoSimulado(), foto.unidades().stream()
+                            .filter(u -> u.codigo().equals("TA01")).findFirst().orElseThrow().estado());
+                }
+            }
+        };
+        new MotorSimulacion(datos, configuracionSinAverias(PRIMER_DIA.plusDays(1)),
+                new ParametrosOperacion(), new PlanificadorConstructivo(), List.of(observador)).ejecutar();
+        assertEquals(org.kindbox.core.modelo.EstadoUnidad.EN_MANTENIMIENTO, estados.get(1439L));
+        assertEquals(org.kindbox.core.modelo.EstadoUnidad.DISPONIBLE, estados.get(1440L));
+    }
+
+    @Test
     void conservaLaPausaIniciadaAlReplanificarYLaReiniciaEnOtraJornada(@TempDir Path raiz) throws IOException {
         var originales = escenario(raiz, PRIMER_DIA);
         var datos = new RepositorioDatos.DatosEscenario(originales.calendario(), originales.primerDia(),

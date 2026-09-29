@@ -47,6 +47,30 @@ class ProgramadorRutaTest {
     }
 
     @Test
+    void mantenimientoReservaRetornoInclusoSinPedidos() {
+        var unidad = InstanciasDePrueba.unidadEn("TA01", 27, 20, 1300);
+        var pedido = InstanciasDePrueba.pedido(0, 27, 24, 2, 1200, 8);
+        var base = InstanciasDePrueba.fotografia(1300, List.of(pedido), List.of(unidad), -1,
+                InstanciasDePrueba.parametros());
+        var constructor = InstanciaPlanificacion.constructor().minutoActual(1300)
+                .parametros(base.parametros()).matriz(base.matriz()).pedido(pedido, 2)
+                .unidad(unidad).mantenimiento("TA01", 1440);
+        for (var almacen : org.kindbox.core.modelo.Almacen.todos()) {
+            constructor.almacen(almacen, almacen.central() ? Integer.MAX_VALUE : almacen.capacidad());
+        }
+        var foto = constructor.construir();
+        var programador = new ProgramadorRuta(foto);
+        for (int cantidad : new int[] {0, 1}) {
+            var resultado = programador.programar(0, new int[] {0}, new int[] {2}, cantidad, false);
+            assertTrue(resultado.factible());
+            assertEquals(org.kindbox.core.modelo.Almacen.crearCentral().nodo(),
+                    resultado.ruta().paradas().getLast().nodo());
+            assertTrue(resultado.minutoFin() <= 1440);
+            assertTrue(new VerificadorRestricciones().verificarRuta(foto, resultado.ruta()).factible());
+        }
+    }
+
+    @Test
     void noRepitePausaEnLaMismaJornadaPeroLaRequiereEnLaSiguiente() {
         var unidad = InstanciasDePrueba.unidad("TA01", 540);
         unidad.inicioTurnoAlimentacion(Turno.inicioDelTurno(540));
@@ -65,11 +89,23 @@ class ProgramadorRutaTest {
     }
 
     @Test
-    void urgenciaAnticipaCierreSinCambiarElPlazoContractual() {
+    void urgenciaRespetaPlazoAunqueElServicioCruceTurno() {
         var pedido = InstanciasDePrueba.pedido(0, 27, 20, 5, 395, 8);
         var foto = conAuto(List.of(pedido), CIERRE_TURNO);
         assertEquals(875, foto.pedidoMinutoLimite(0));
-        assertEquals(840, foto.pedidoMinutoLimiteEfectivo(0));
+        assertEquals(875, foto.pedidoMinutoLimiteEfectivo(0));
+    }
+
+    @Test
+    void relevoPermiteContinuarLaEntregaDespuesDelCambioDeTurno() {
+        var pedido = InstanciasDePrueba.pedido(0, 27, 20, 5, 395, 8);
+        var unidad = InstanciasDePrueba.unidad("TA01", 850);
+        var foto = InstanciasDePrueba.fotografia(850, List.of(pedido), List.of(unidad), -1,
+                InstanciasDePrueba.parametros());
+        var programacion = new ProgramadorRuta(foto).programar(0, new int[] {0}, new int[] {5}, 1, false);
+        assertTrue(programacion.factible());
+        assertTrue(programacion.minutoFin() > 900);
+        assertTrue(new VerificadorRestricciones().verificarRuta(foto, programacion.ruta()).factible());
     }
 
     @Test

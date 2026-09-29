@@ -229,7 +229,7 @@ public final class MotorInsercion {
             return false;
         }
         return llegada + instancia.parametros().minutosAcondicionamiento()
-                <= instancia.unidadMinutoFinTurno(unidad);
+                <= instancia.unidadMinutoFinHorizonte(unidad);
     }
 
     // ----------------------------------------------------------------- internos

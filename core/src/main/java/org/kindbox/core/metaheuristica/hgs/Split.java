@@ -771,7 +771,7 @@ public final class Split {
                     if (distancia >= MatrizDistancias.INALCANZABLE) {
                         continue;
                     }
-                    long margen = instancia.unidadMinutoFinTurno(u) - instancia.unidadMinutoDisponible(u);
+                    long margen = instancia.unidadMinutoFinHorizonte(u) - instancia.unidadMinutoDisponible(u);
                     if (distancia < mejorDistancia || (distancia == mejorDistancia && margen > mejorMargen)) {
                         mejorDistancia = distancia;
                         mejorMargen = margen;

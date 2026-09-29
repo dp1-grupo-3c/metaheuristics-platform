@@ -184,7 +184,7 @@ public final class EstadoAlns {
         int servicio = Math.max(1, instancia.parametros().minutosAcondicionamiento());
         int maximo = CAPACIDAD_RUTA_MINIMA;
         for (int u = 0; u < instancia.cantidadUnidades(); u++) {
-            long ventana = instancia.unidadMinutoFinTurno(u) - instancia.unidadMinutoDisponible(u);
+            long ventana = instancia.unidadMinutoFinHorizonte(u) - instancia.unidadMinutoDisponible(u);
             long cabidas = Math.max(0L, ventana / servicio) + 2L;
             if (cabidas > maximo) {
                 maximo = (int) Math.min(cabidas, cantidadTareas + 1L);
