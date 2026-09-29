@@ -107,7 +107,7 @@ prueba('Servidor real: rutas, bloqueos, parámetros en caliente y desenlace natu
     esperar(respuesta.status()).toBe(201);
     const corrida = await respuesta.json();
     await esperar(pagina.locator('#identidad')).toContainText(corrida.id);
-    await esperar.poll(() => pagina.locator('path.ruta').evaluateAll(rutas => rutas.some(ruta => ruta.getTotalLength() > 0)), { timeout: 60000 }).toBeTruthy();
+    await esperar.poll(() => pagina.locator('canvas').getAttribute('data-rutas'), { timeout: 60000 }).not.toBe('0');
     await pagina.screenshot({ path: 'test-results/rutas-reales.png' });
     const conflicto = await peticiones.post('/api/simulaciones', { data: {} });
     esperar(conflicto.status()).toBe(409);
@@ -128,13 +128,13 @@ prueba('Servidor real: rutas, bloqueos, parámetros en caliente y desenlace natu
     const detalle = await (await peticiones.get(`/api/simulaciones/${corrida.id}`)).json();
     esperar(['COLAPSADA', 'CULMINADA']).toContain(detalle.corrida.estado);
     esperar(detalle.resultado.metricas.ejecucionesPlanificador).toBeGreaterThan(0);
-    await esperar(pagina.locator('path.bloqueo')).toHaveCount(detalle.instantanea.bloqueosVigentes.length);
+    await esperar(pagina.locator('canvas')).toHaveAttribute('data-bloqueos', String(detalle.instantanea.bloqueosVigentes.length));
     const cantidadPedidos = await (await peticiones.get(`/api/simulaciones/${corrida.id}/pedidos?soloActivos=true&tamano=500`)).json();
     await esperar(pagina.locator('.marcador.pedido')).toHaveCount(cantidadPedidos.totalFilas, { timeout: 10000 });
     await pagina.screenshot({ path: 'test-results/desenlace-natural.png' });
 });
 
-prueba('Next exportado: rutas directas y orientación cartesiana de Leaflet', async ({ page: pagina }) => {
+prueba('Next exportado: rutas directas y orientación cartesiana del plano', async ({ page: pagina }) => {
     const paneles = { acceso: 'Sesión', panel: 'Métricas', pedidos: 'Pedidos', simulacion: 'KindBox Sim', reportes: 'Métricas', configuracion: 'KindBox Sim', seguimiento: 'Pedidos' };
     for (const [ruta, titulo] of Object.entries(paneles)) {
         const respuesta = await pagina.goto(`/${ruta}/`);
@@ -142,7 +142,7 @@ prueba('Next exportado: rutas directas y orientación cartesiana de Leaflet', as
         await esperar(pagina.locator('#estadoConexion')).toContainText('Conexión Estable');
         if (await pagina.locator('#dialogo').isVisible()) await pagina.keyboard.press('Escape');
         await esperar(pagina.locator('#tituloPanel')).toHaveText(titulo);
-        await esperar(pagina.locator('.leaflet-container')).toBeVisible();
+        await esperar(pagina.locator('.lienzoCiudad')).toBeVisible();
     }
     await pagina.getByRole('button', { name: 'Cerrar panel' }).click();
     const central = await pagina.locator('.marcador.almacen').filter({ hasText: 'Central' }).boundingBox();
@@ -155,4 +155,31 @@ prueba('Next exportado: rutas directas y orientación cartesiana de Leaflet', as
     await esperar.poll(() => pagina.locator('#escalaGrafica').evaluate(elemento => elemento.getBoundingClientRect().width)).toBeGreaterThan(escala);
     await pagina.keyboard.press('Home');
     await esperar.poll(() => pagina.locator('#escalaGrafica').evaluate(elemento => elemento.getBoundingClientRect().width)).toBeCloseTo(escala, 0);
+});
+
+prueba('Plano movil: arrastre, pellizco y seleccion sin biblioteca cartografica', async ({ page: pagina }) => {
+    await pagina.setViewportSize({ width: 390, height: 844 });
+    await pagina.goto('/');
+    await esperar(pagina.locator('#estadoConexion')).toContainText('Conexión Estable');
+    if (await pagina.locator('#dialogo').isVisible()) await pagina.keyboard.press('Escape');
+    await pagina.getByRole('button', { name: 'Cerrar panel' }).click();
+    const lienzo = pagina.locator('canvas');
+    await esperar(lienzo).toBeVisible();
+    const escala = () => pagina.locator('#escalaGrafica').evaluate(elemento => elemento.getBoundingClientRect().width);
+    const inicial = await escala();
+    const sesion = await pagina.context().newCDPSession(pagina);
+    await sesion.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 150, y: 450, id: 1 }, { x: 250, y: 450, id: 2 }] });
+    await sesion.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: 150, y: 450, id: 1 }, { x: 300, y: 450, id: 2 }] });
+    await esperar.poll(escala).toBeGreaterThan(inicial);
+    await sesion.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await pagina.getByRole('button', { name: 'Ver toda la ciudad' }).click();
+    const antes = await lienzo.evaluate(elemento => elemento.toDataURL());
+    await pagina.mouse.move(190, 500);
+    await pagina.mouse.down();
+    await pagina.mouse.move(230, 550, { steps: 5 });
+    await pagina.mouse.up();
+    await esperar.poll(() => lienzo.evaluate(elemento => elemento.toDataURL())).not.toBe(antes);
+    await pagina.getByRole('button', { name: 'Ver toda la ciudad' }).click();
+    esperar(await pagina.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+    await pagina.screenshot({ path: 'test-results/mapa-movil.png' });
 });

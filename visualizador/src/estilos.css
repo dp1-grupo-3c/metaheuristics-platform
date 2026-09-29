@@ -258,9 +258,14 @@ dialog::backdrop { background: rgb(0 0 0 / 40%); }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before { animation: none !important; scroll-behavior: auto !important; } }
 
-.lienzoLeaflet { position: absolute; inset: 0; z-index: 0; background: var(--mapa); font-family: inherit; }
-.leaflet-pane > svg { width: auto; height: auto; }
-.rotuloEje { color: var(--etiqueta); font-size: 12px; text-align: center; }
-.envolturaMarcador { background: none; border: 0; }
-.envolturaMarcador .marcador { left: 0; top: 0; }
-.mapa.desactualizado .lienzoLeaflet { opacity: .7; }
+.lienzoCiudad { position: absolute; inset: 0; width: 100%; height: 100%; background: var(--mapa); touch-action: none; }
+.marcadoresCiudad { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.marcadoresCiudad .marcador { pointer-events: auto; }
+.mapa.desactualizado .lienzoCiudad { opacity: .7; }
+
+@media (max-width: 600px) {
+    .marcador.unidad { width: 30px; height: 30px; min-height: 30px; padding: 3px; }
+    .marcador.unidad svg { width: 20px; height: 20px; }
+    .marcador.unidad .rotulo { display: none; }
+    .marcador.unidad.elegido .rotulo, .marcador.unidad:focus .rotulo { display: block; }
+}

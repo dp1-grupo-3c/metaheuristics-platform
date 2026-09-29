@@ -1,4 +1,3 @@
-import 'leaflet/dist/leaflet.css';
 import '../src/estilos.css';
 import ProveedorConsultas from './proveedorConsultas.jsx';
 

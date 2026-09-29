@@ -1,6 +1,6 @@
 # Visualizador KindBox
 
-Interfaz web de planificación y simulación para PaqRap. Vive junto al servidor en este repositorio, sin módulo Maven ni cambios en `core`, `service` o `experiments`.
+Interfaz web de planificación y simulación para PaqRap. Vive junto al servidor en este repositorio, sin módulo Maven propio.
 
 ## Levantar la aplicación
 
@@ -54,11 +54,11 @@ El visualizador está alineado con las tecnologías del diagrama de arquitectura
 
 - **Next.js y React:** App Router, páginas exportadas a `out/` y montaje del visualizador exclusivamente en el cliente. Las vistas existentes conservan su renderizador DOM dentro de un componente React con limpieza de eventos, canal y mapa al desmontarse. No se requiere servidor Next.js en producción.
 - **TanStack Query:** `QueryClientProvider`, caché por ruta REST, deduplicación de consultas simultáneas, registro de mutaciones e invalidación tras escrituras. Un `QueryObserver` gestiona el sondeo periódico. Los mensajes WebSocket se guardan por corrida y tipo; se descartan instantáneas atrasadas. Las mutaciones no se reintentan automáticamente para evitar duplicar corridas o averías.
-- **Leaflet con CRS.Simple:** administra la proyección, desplazamiento, zoom, marcadores y capas vectoriales de rutas y bloqueos. Se convierten los pares del servidor `(x,y)` al orden Leaflet `[y,x]`, con origen abajo a la izquierda. No se usan teselas geográficas, servicios externos ni claves.
+- **Canvas 2D:** dibuja retícula, rutas y bloqueos en un lienzo; conserva botones accesibles para almacenes, unidades y pedidos. Agrupa los cambios con requestAnimationFrame, admite arrastre, pellizco, rueda y teclado. Las coordenadas conservan el origen abajo a la izquierda. No necesita teselas ni servicios externos.
 
 Las rutas estáticas `/`, `/acceso/`, `/panel/`, `/pedidos/`, `/simulacion/`, `/reportes/`, `/configuracion/` y `/seguimiento/` abren el panel correspondiente. `/acceso/` informa que no hay autenticación; `/seguimiento/` permite consultar los pedidos disponibles, sin presentarse como una vista privada de cliente. Ambas requieren ampliar el backend para aplicar roles y privacidad.
 
-La compilación incorpora las dependencias del navegador. Node.js se usa en desarrollo y construcción; `servidor.mjs` es solo la herramienta local para servir Next.js o `out/` y reenviar REST/WebSocket. No forma parte del despliegue propuesto en la VM. [TanStack Query](https://tanstack.com/query/latest/docs/reference/QueryClient) · [Leaflet CRS.Simple](https://leafletjs.com/examples/crs-simple/crs-simple.html).
+La compilación incorpora las dependencias del navegador. Node.js se usa en desarrollo y construcción; `servidor.mjs` es solo la herramienta local para servir Next.js o `out/` y reenviar REST/WebSocket. No forma parte del despliegue propuesto en la VM. [TanStack Query](https://tanstack.com/query/latest/docs/reference/QueryClient).
 
 Los identificadores propios y los textos están en español. Se conservan las claves obligatorias de HTML, CSS, JavaScript, herramientas y protocolos. La paleta proviene de `61.std.gui.v01.docx`; la organización reproduce los paneles y reportes de `01.definicion.prototipo.v02.pdf` y `prototype-shots`.
 
@@ -93,4 +93,4 @@ Estos puntos impiden afirmar conformidad completa con los ítems V05, V06, V13 y
 
 ## Pendiente del resto de la arquitectura
 
-Esta migración se limita al visualizador. Permanecen pendientes la seguridad con sesión/CSRF/roles, MySQL/JPA/Flyway, ingesta idempotente, diario de comandos y puntos de control, latido y numeración de instantáneas, actualización a Spring Boot 4.1, instalación de Nginx/systemd en la VM, despliegue automatizado, respaldos y validación de límites de CPU/memoria. El backend continúa con Spring Boot 3.3.5 y Java 21. Estos elementos no se dan por implementados ni se modificaron en esta entrega.
+El despliegue inicial con Nginx/systemd, certificado autofirmado y acceso de equipo está en [la guía del servidor](../despliegue/README.md). Permanecen pendientes la seguridad con sesión/CSRF/roles, MySQL/JPA/Flyway, ingesta idempotente, diario de comandos y puntos de control, latido y numeración de instantáneas, actualización a Spring Boot 4.1, instalación verificada en la VM, respaldos y validación de límites de CPU/memoria. El backend continúa con Spring Boot 3.3.5 y Java 21. Estos elementos no se dan por implementados ni se modificaron en esta entrega.

@@ -28,3 +28,11 @@ No se ejecutó una simulación 5D completa de 30–60 minutos para esta entrega.
 Los cambios necesarios de backend para pausa, roles, umbrales por corrida, datos de conductor y medición de latencia se explican en el [README](README.md#diferencias-del-estándar-que-requieren-backend). La aplicación no inventa extremos para suplirlos.
 
 Las capturas de la última verificación se conservan en `evidencias/`; los archivos temporales y trazas de Playwright están excluidos de Git.
+
+
+## Actualización del mapa y despliegue, 28/09/2026
+
+El mapa ahora usa Canvas 2D, conserva botones accesibles y admite gestos táctiles.
+Se retiraron la dependencia y los estilos de Leaflet. La verificación actual, los
+resultados de humo del núcleo y los límites del despliegue están en
+[despliegue/VERIFICACION.md](../despliegue/VERIFICACION.md).
