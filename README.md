@@ -164,7 +164,7 @@ unidades disponibles. `-DarranqueDesdePlanVigente=false` recupera el arranque co
 para comparaciones controladas. Un valor que no sea `true` ni `false` detiene el ejecutable.
 
 La prioridad compartida es H/U/S: cantidad de pedidos sin asignar, urgencia de esos pedidos
-y costo. La urgencia considera el cierre del turno sin cambiar el plazo contractual. La
+y costo. La urgencia usa el plazo contractual de llegada; el relevo permite cruzar turnos. La
 fotografia registra las pausas ya iniciadas para no repetirlas en la misma jornada.
 La evaluacion y sus limites se documentan en
 [`experiments/revision-cumplimiento-20260924/`](experiments/revision-cumplimiento-20260924/RESULTADOS.md).
@@ -345,8 +345,19 @@ Proyecto academico del curso 1INF54, Pontificia Universidad Catolica del Peru.
 
 ## Visualizador web
 
-La interfaz KindBox usa **Next.js, TanStack Query y Leaflet (CRS.Simple)** y vive en [`visualizador/`](visualizador/README.md), fuera del reactor
+La interfaz KindBox usa **Next.js, TanStack Query y Canvas 2D** y vive en [`visualizador/`](visualizador/README.md), fuera del reactor
 Maven. Su compilación estática queda en `visualizador/out/`, apta para Nginx sin Node.js en la VM. Con el servicio encendido, ejecute `npm ci` y `npm run dev` en esa carpeta y abra
 http://localhost:5173. Incluye mapa cartesiano interactivo, monitoreo WebSocket, configuración,
 pedidos, métricas, averías y reportes. Su README documenta las pruebas contra el servicio,
 el despliegue y las funciones del estándar GUI que necesitan ampliar el contrato del backend.
+
+## Desplegar en el servidor del curso
+
+La guía completa está en [despliegue/README.md](despliegue/README.md): preparación de la
+data publicada, mantenimiento bimensual 2026–2028, paquete verificable, Nginx con
+certificado autofirmado y servicio systemd para la VM de 2 vCPU/2 GB. La interfaz
+se puede consultar desde celular. No hace falta Node.js en la VM.
+
+El mapa usa Canvas 2D, sin Leaflet. Next.js y TanStack Query permanecen. La instalación
+inicial usa acceso de equipo protegido por Nginx; la guía distingue los componentes
+implementados de los pendientes de la arquitectura final.

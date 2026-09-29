@@ -1,0 +1,26 @@
+[Unit]
+Description=Servicio de planificacion KindBox
+After=network.target
+
+[Service]
+Type=simple
+User=kindbox
+Group=kindbox
+WorkingDirectory=/opt/kindbox/actual
+EnvironmentFile=/etc/kindbox/entorno
+ExecStart=/usr/bin/java -Xms128m -Xmx640m -XX:+UseSerialGC -XX:ActiveProcessorCount=2 -jar /opt/kindbox/actual/servicio.jar
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+SuccessExitStatus=143
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+MemoryMax=1100M
+UMask=0027
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

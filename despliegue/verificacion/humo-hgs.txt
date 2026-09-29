@@ -1,0 +1,21 @@
+Escenario DIA_A_DIA, HGS, salto 30 min, K=7200.0, modo LIBRE, semilla 20260928, 187 pedidos cargados
+Reloj: modo LIBRE RAPIDO, K=7200.0, presupuesto por llamada al planificador 150 ms (SA=30 min, 60 % de SA/K)
+AVISO: el presupuesto por llamada queda fuera del rango de 2000 a 18000 ms del apartado 2.3 del ISA; la calidad medida no es la del planificador en operacion.
+Arranque: desde el plan vigente de la replanificacion anterior (apartados 7.3.5 y 11.4 del ISA)
+Algoritmo: HGS[semilla=20260928 ParametrosHgs[tamanoMinimoPoblacion=25 tamanoGeneracion=40 individuosElite=4 vecinosProximosDiversidad=5 proporcionObjetivoFactibles=0.2 granularidadVecindario=20 pasadasEducacionMaximas=4 frecuenciaMaterializacion=25 probabilidadReparacion=0.5 factorPenalizacionReparacion=10.0 longitudMaximaArco=8 iteracionesLagrangiana=6 candidatosUnidadPorRuta=3 desfaseMaximoDeArco=240 penalizacionDesfaseInicial=20000.0 penalizacionDesfaseMinima=1000.0 penalizacionDesfaseMaxima=200000.0 frecuenciaAjustePenalizacion=10 pesoEstabilidad=25.0 factorAumentoPenalizacion=1.2 factorReduccionPenalizacion=0.85 holguraProporcionFactibles=0.05 esfuerzoElite=0.1 maximoGeneraciones=1000000 maximoGeneracionesSinMejora=0 filtroCotaInferior=false]]
+
+CULMINADA en el minuto 1440 (2026-09-02T00:00), 1.00 dias simulados, 8942 ms reales
+  Horizonte completado en 2d00:00
+  pedidos: registrados=187 entregados=139 pendientes=48 incumplidos=0 (con entrega parcial=0)
+  particion coherente: SI
+  paquetes=699  costo=S/ 15845.00  km=2439 {AUTO=1408, MOTO=496, BICICLETA=535}
+  tiempo medio de entrega por plazo (min): 4h=155.6(n=25) 8h=276.2(n=23) 12h=266.8(n=22) 18h=254.4(n=26) 36h=257.3(n=43)
+  planificador: 88 ejecuciones, 98 ms de media
+  averias por tipo: {1=0, 2=0, 3=0}   activaciones de semaforo: 0
+  colapso=-1 (pedido -1)   primer incumplimiento=-1 (pedido -1)
+  costo recalculado desde los km = S/ 15845.00  coincide
+
+CONCLUSION DEL ESCENARIO
+  Resultado incompleto: quedaron 48 pendientes y 0 incumplidos.
+  Rendimiento: 74.33 % de pedidos entregados, 98 ms promedio por planificacion, 88 replanificaciones y 2439 km recorridos.
+  Lectura: el horizonte configurado se completo.
