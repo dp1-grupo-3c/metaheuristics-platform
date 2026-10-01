@@ -1055,8 +1055,7 @@ public final class MotorSimulacion {
             candado.unlock();
         }
 
-        PresupuestoComputo presupuesto = PresupuestoComputo
-                .deSimulacion(configuracion.saltoMinutos(), configuracion.factorAceleracion())
+        PresupuestoComputo presupuesto = configuracion.presupuestoPlanificacion()
                 .conReserva(PresupuestoComputo.RESERVA_CIERRE_MS)
                 .arrancar();
         presupuestoVigente = presupuesto;

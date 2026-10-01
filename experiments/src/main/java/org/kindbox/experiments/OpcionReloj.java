@@ -109,7 +109,7 @@ record OpcionReloj(int duracionMinutos, ModoReloj modo, boolean rapido) {
 
     /** Presupuesto por llamada al planificador que usara el motor con esta configuracion. */
     static long milisegundosPorLlamada(ConfiguracionEscenario configuracion) {
-        return PresupuestoComputo.deSimulacion(configuracion.saltoMinutos(), configuracion.factorAceleracion())
+        return configuracion.presupuestoPlanificacion()
                 .milisegundosTotales();
     }
 
@@ -124,6 +124,9 @@ record OpcionReloj(int duracionMinutos, ModoReloj modo, boolean rapido) {
                         + " (SA=%d min, %.0f %% de SA/K)",
                 configuracion.modoReloj(), rapido ? " RAPIDO" : "", configuracion.factorAceleracion(),
                 milisegundos, configuracion.saltoMinutos(), 100.0 * PresupuestoComputo.FRACCION_EFECTIVA));
+        if (configuracion.tipo() == org.kindbox.core.simulacion.TipoEscenario.DIA_A_DIA) {
+            texto.append("; dia a dia aplica un tope de 18000 ms a ese presupuesto");
+        }
         if (milisegundos < PRESUPUESTO_MINIMO_MS || milisegundos > PRESUPUESTO_MAXIMO_MS) {
             texto.append(String.format(Locale.ROOT,
                     "%nAVISO: el presupuesto por llamada queda fuera del rango de %d a %d ms del apartado 2.3"

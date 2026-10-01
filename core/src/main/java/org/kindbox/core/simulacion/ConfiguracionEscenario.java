@@ -3,6 +3,7 @@ package org.kindbox.core.simulacion;
 import java.time.LocalDate;
 import java.util.Locale;
 import java.util.Properties;
+import org.kindbox.core.metaheuristica.PresupuestoComputo;
 
 /**
  * Parametros de una corrida de simulacion.
@@ -153,5 +154,19 @@ public record ConfiguracionEscenario(
     /** Milisegundos de reloj de pared que representa un minuto simulado. */
     public double milisegundosPorMinutoSimulado() {
         return 60_000.0 / factorAceleracion;
+    }
+
+    /**
+     * En dia a dia, K=1 no debe convertir una ventana de 30 minutos en 18 minutos
+     * de busqueda bloqueante. Se limita cada llamada a 18 segundos, el extremo
+     * superior del rango operativo documentado. Las simulaciones conservan su
+     * presupuesto experimental derivado de SA/K.
+     */
+    public PresupuestoComputo presupuestoPlanificacion() {
+        PresupuestoComputo presupuesto = PresupuestoComputo.deSimulacion(saltoMinutos, factorAceleracion);
+        if (tipo == TipoEscenario.DIA_A_DIA && presupuesto.milisegundosTotales() > 18_000L) {
+            return PresupuestoComputo.deMilisegundosConPerfil(18_000L);
+        }
+        return presupuesto;
     }
 }
