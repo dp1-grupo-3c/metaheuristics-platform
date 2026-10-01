@@ -361,3 +361,11 @@ se puede consultar desde celular. No hace falta Node.js en la VM.
 El mapa usa Canvas 2D, sin Leaflet. Next.js y TanStack Query permanecen. La instalación
 inicial usa acceso de equipo protegido por Nginx; la guía distingue los componentes
 implementados de los pendientes de la arquitectura final.
+
+## Arquitectura y operación diaria
+
+La revisión de los dos repositorios y el plan para completar el producto están en
+[docs/REVISION_ARQUITECTURA.md](docs/REVISION_ARQUITECTURA.md). La interfaz de producto
+es `web-app`; el empaquetador actual aún entrega `visualizador/`.
+El modo `DIA_A_DIA` avanza a 1× sobre una jornada precargada y limita cada planificación
+a 18 segundos. La operación continua con pedidos dinámicos y recuperación sigue pendiente.
