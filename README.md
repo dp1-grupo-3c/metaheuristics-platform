@@ -369,3 +369,11 @@ La revisión de los dos repositorios y el plan para completar el producto están
 es `web-app`; el empaquetador actual aún entrega `visualizador/`.
 El modo `DIA_A_DIA` avanza a 1× sobre una jornada precargada y limita cada planificación
 a 18 segundos. La operación continua con pedidos dinámicos y recuperación sigue pendiente.
+
+## Experimentación numérica masiva en una computadora local
+
+El ejecutor de las **5.256 corridas de 2026–2027**, los datos publicados y las
+instrucciones para Windows con WSL están en
+[experiments/expnum-2026-2027/README.md](experiments/expnum-2026-2027/README.md).
+Permite ejecutar pares en paralelo, detener y reanudar conservando intentos,
+auditar cada corrida y consolidar mediciones para el análisis posterior.
