@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Campana local 2026–2027: preparar, piloto, ejecutar, estado y verificar."""
 import argparse
+import collections
 import concurrent.futures
 import contextlib
 import csv
 import datetime as dt
 import fcntl
+import functools
 import hashlib
 import io
 import json
@@ -31,6 +33,10 @@ REFERENCIA = '32034e775666e8f8556db42222f9d064a5bc5a27'
 INICIO = dt.date(2026, 1, 1)
 PRESUPUESTO = 2000
 SEMILLA_ORDEN = 27092026
+# Desde 2026-09 cada archivo publicado de ventas trae exactamente 5.000 lineas: el mes
+# termina antes de tiempo, su ultimo dia queda cortado y los siguientes, vacios.
+TOPE_VENTAS = 5000
+DISENO = 'dias-completos-v2'
 STOP = threading.Event()
 PROCESOS = set()
 MUTEX = threading.Lock()
@@ -59,23 +65,66 @@ def write_json(path, value):
     tmp.replace(path)
 
 
+@functools.cache
+def clasificacion():
+    """Pedidos y clase de cada fecha segun los archivos publicados: completo, cortado o vacio."""
+    pedidos = collections.Counter()
+    saturados = set()
+    with zipfile.ZipFile(BASE / 'datos-publicados.zip') as z:
+        for nombre in z.namelist():
+            if not nombre.startswith('ventas.'):
+                continue
+            anio, mes = int(nombre[7:11]), int(nombre[11:13])
+            lineas = [l for l in z.read(nombre).decode('utf-8-sig').splitlines()
+                      if l.strip() and not l.lstrip().startswith('#')]
+            if len(lineas) >= TOPE_VENTAS:
+                saturados.add((anio, mes))
+            for linea in lineas:
+                pedidos[dt.date(anio, mes, int(linea[:2]))] += 1
+    # En un mes saturado no se sabe si el ultimo dia con ventas llego a terminar.
+    cortados = {max(f for f in pedidos if (f.year, f.month) == mes) for mes in saturados}
+    fechas = {}
+    for offset in range(730):
+        fecha = INICIO + dt.timedelta(days=offset)
+        clase = 'vacio' if not pedidos[fecha] else 'cortado' if fecha in cortados else 'completo'
+        fechas[fecha] = (pedidos[fecha], clase)
+    return fechas
+
+
+def fechas_completas():
+    return [f for f, (_, clase) in clasificacion().items() if clase == 'completo']
+
+
+def ventanas_completas():
+    """Ventanas F sin solapamiento: cinco dias consecutivos, todos completos."""
+    completas = set(fechas_completas())
+    ventanas = []
+    fecha = INICIO
+    while fecha + dt.timedelta(days=4) <= max(clasificacion()):
+        if all(fecha + dt.timedelta(days=i) in completas for i in range(5)):
+            ventanas.append(fecha)
+            fecha += dt.timedelta(days=5)
+        else:
+            fecha += dt.timedelta(days=1)
+    return ventanas
+
+
 def matriz(piloto=False):
     pares = []
-    for offset in range(730):
-        fecha = (INICIO + dt.timedelta(days=offset)).isoformat()
+    for fecha in map(dt.date.isoformat, fechas_completas()):
         for semilla in (20260927, 20260928):
             pares.append(dict(bloque='D', fecha=fecha, dias=1, semilla=semilla, incidencias=False))
         pares.append(dict(bloque='P', fecha=fecha, dias=1, semilla=20260927, incidencias=True))
-    for offset in range(0, 730, 5):
+    for fecha in map(dt.date.isoformat, ventanas_completas()):
         for semilla in (20260927, 20260928, 20260929):
-            pares.append(dict(bloque='F', fecha=(INICIO + dt.timedelta(days=offset)).isoformat(),
-                              dias=5, semilla=semilla, incidencias=False))
+            pares.append(dict(bloque='F', fecha=fecha, dias=5, semilla=semilla, incidencias=False))
     if piloto:
-        # Diagnostico separado: ambos anos, horizontes y una fecha con mantenimiento.
-        pares = [dict(bloque=b, fecha=f, dias=d, semilla=20260927, incidencias=b == 'P')
-                 for b, f, d in [('D', '2026-01-01', 1), ('D', '2027-12-31', 1),
-                                 ('F', '2026-01-31', 5), ('F', '2027-01-31', 5),
-                                 ('P', '2026-09-01', 1)]]
+        # Diagnostico separado: ambos anos, horizontes, demanda baja y alta, y mantenimiento.
+        dias, ventanas = fechas_completas(), ventanas_completas()
+        pares = [dict(bloque=b, fecha=f.isoformat(), dias=d, semilla=20260927, incidencias=b == 'P')
+                 for b, f, d in [('D', dias[0], 1), ('D', dias[-1], 1),
+                                 ('F', ventanas[0], 5), ('F', ventanas[-1], 5),
+                                 ('P', dt.date(2026, 9, 1), 1)]]
     rng = random.Random(SEMILLA_ORDEN)
     rng.shuffle(pares)
     for numero, par in enumerate(pares, 1):
@@ -188,20 +237,45 @@ def preparar(out, piloto):
     with (work / 'cobertura.csv').open('w', encoding='utf-8') as cobertura:
         subprocess.run(['java', '-Xmx640m', '-XX:+UseSerialGC', '-cp', str(clases),
                         'org.kindbox.experiments.ValidarDatosCampana', str(datos)], stdout=cobertura, check=True)
+    escribir_clasificacion(work / 'clasificacion-fechas.csv')
+    verificar_cobertura(work / 'cobertura.csv', matriz(piloto))
     write_json(out / 'matriz.json', matriz(piloto))
     write_json(out / 'entorno.json', dict(fechaUtc=utc(), referencia=REFERENCIA,
                commitEjecutor=subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=REPO, text=True).strip(),
                java=version('java'), javac=version('javac'), python=sys.version,
-               tipo='piloto' if piloto else 'campana', fuentesEjecutor=fuentes_experimento(),
+               tipo='piloto' if piloto else 'campana', diseno=DISENO, fuentesEjecutor=fuentes_experimento(),
                fuentes=hashes(fuentes), datos=hashes(datos), clases=hashes(clases),
-               matrizSha256=hash_file(out / 'matriz.json'), coberturaSha256=hash_file(work / 'cobertura.csv')))
+               matrizSha256=hash_file(out / 'matriz.json'), coberturaSha256=hash_file(work / 'cobertura.csv'),
+               clasificacionSha256=hash_file(work / 'clasificacion-fechas.csv')))
     print(f"Preparado: {len(matriz(piloto)) * 2} corridas en {out}", flush=True)
+
+
+def escribir_clasificacion(path):
+    ventanas = set(ventanas_completas())
+    with path.open('w', newline='', encoding='utf-8') as f:
+        w = csv.writer(f)
+        w.writerow(['fecha', 'pedidos', 'clase', 'inicioVentanaF'])
+        for fecha, (pedidos, clase) in clasificacion().items():
+            w.writerow([fecha.isoformat(), pedidos, clase, str(fecha in ventanas).lower()])
+
+
+def verificar_cobertura(path, pares):
+    """Contrasta la clasificacion con el lector Java y exige solo dias completos en la matriz."""
+    java = {r['fecha']: int(r['pedidos']) for r in csv_rows(path) if r['dias'] == '1'}
+    for fecha, (pedidos, _) in clasificacion().items():
+        if java[fecha.isoformat()] != pedidos:
+            raise ValueError(f'Pedidos de {fecha} distintos entre la clasificacion y el lector Java')
+    for par in pares:
+        for i in range(par['dias']):
+            fecha = dt.date.fromisoformat(par['fecha']) + dt.timedelta(days=i)
+            if clasificacion()[fecha][1] != 'completo':
+                raise ValueError(f"La celda {par['bloque']} {par['fecha']} incluye un dia sin datos completos")
 
 
 def validar_preparacion(out, piloto):
     e = read_json(out / 'entorno.json')
-    if e['referencia'] != REFERENCIA or e['tipo'] != ('piloto' if piloto else 'campana'):
-        raise ValueError('Tipo o referencia distintos; usa otra carpeta de salida.')
+    if e['referencia'] != REFERENCIA or e['tipo'] != ('piloto' if piloto else 'campana') or e.get('diseno') != DISENO:
+        raise ValueError('Tipo, referencia o diseno distintos; usa otra carpeta de salida.')
     if e['fuentesEjecutor'] != fuentes_experimento() or e['java'] != version('java'):
         raise ValueError('El ejecutor o Java cambiaron; conserva la version original para reanudar.')
     if hash_file(out / 'matriz.json') != e['matrizSha256'] or read_json(out / 'matriz.json') != matriz(piloto):
@@ -211,6 +285,8 @@ def validar_preparacion(out, piloto):
             raise ValueError(f'Preparacion alterada: {nombre}')
     if hash_file(out / 'preparacion/cobertura.csv') != e['coberturaSha256']:
         raise ValueError('Cobertura alterada')
+    if hash_file(out / 'preparacion/clasificacion-fechas.csv') != e['clasificacionSha256']:
+        raise ValueError('Clasificacion de fechas alterada')
 
 
 def cores_fisicos():
@@ -433,7 +509,7 @@ def consolidar(out, pares, validar=False):
 
 def informe_piloto(out, workers):
     filas = csv_rows(out / 'corridas.csv')
-    cantidades = {'D': 2920, 'F': 876, 'P': 1460}
+    cantidades = collections.Counter(p['bloque'] for p in matriz() for _ in p['algoritmos'])
     medios = {b: statistics.mean(float(r['duracionProcesoSegundos']) for r in filas if r['bloque'] == b)
               for b in cantidades}
     estimado = sum(cantidades[b] * medios[b] for b in cantidades) / 3600 / workers
@@ -510,7 +586,7 @@ def main():
     parser.add_argument('--trabajadores', type=int, help='JVM simultaneas; automatico segun CPU fisica y RAM, maximo 8')
     args = parser.parse_args()
     piloto = args.accion == 'piloto'
-    out = (args.salida or REPO / 'salidas' / ('piloto-expnum-2026-2027' if piloto else 'expnum-2026-2027')).resolve()
+    out = (args.salida or REPO / 'salidas' / ('piloto-expnum-2026-2027-v2' if piloto else 'expnum-2026-2027-v2')).resolve()
     if args.accion in ('estado', 'verificar'):
         if not (out / 'entorno.json').exists():
             raise ValueError('No hay campana preparada en ' + str(out))

@@ -49,20 +49,48 @@ class CampanaTest(unittest.TestCase):
         self.temp.cleanup()
         campana.STOP.clear()
 
-    def test_cobertura_y_repeticiones_del_documento(self):
+    def test_matriz_solo_con_dias_completos(self):
         matriz = campana.matriz()
         self.assertEqual(matriz, campana.matriz())
-        self.assertEqual(len({p['id'] for p in matriz}), 2628)
-        self.assertEqual(collections.Counter(p['bloque'] for p in matriz), {'D': 1460, 'P': 730, 'F': 438})
+        self.assertEqual(len({p['id'] for p in matriz}), 1749)
+        self.assertEqual(collections.Counter(p['bloque'] for p in matriz), {'D': 982, 'P': 491, 'F': 276})
         for bloque, n in [('D', 2), ('P', 1), ('F', 3)]:
             fechas = collections.Counter(p['fecha'] for p in matriz if p['bloque'] == bloque)
             self.assertTrue(all(c == n for c in fechas.values()))
-            self.assertEqual(len(fechas), 146 if bloque == 'F' else 730)
-        ventanas = {p['fecha'] for p in matriz if p['bloque'] == 'F'}
-        cobertura = [dt.date.fromisoformat(f) + dt.timedelta(days=i) for f in ventanas for i in range(5)]
-        self.assertEqual(len(set(cobertura)), 730)
-        self.assertEqual(max(cobertura), dt.date(2027, 12, 31))
+            self.assertEqual(len(fechas), 92 if bloque == 'F' else 491)
+        clases = campana.clasificacion()
+        dias_f = [dt.date.fromisoformat(f) + dt.timedelta(days=i)
+                  for f in {p['fecha'] for p in matriz if p['bloque'] == 'F'} for i in range(5)]
+        self.assertEqual(len(dias_f), len(set(dias_f)))  # ventanas sin solapamiento
+        dias = dias_f + [dt.date.fromisoformat(p['fecha']) for p in matriz if p['bloque'] != 'F']
+        self.assertTrue(all(clases[d][1] == 'completo' for d in dias))
         self.assertTrue(all(set(p['algoritmos']) == {'HGS', 'ALNS'} and p['presupuestoMs'] == 2000 for p in matriz))
+
+    def test_clasificacion_de_fechas_publicadas(self):
+        clases = campana.clasificacion()
+        self.assertEqual(len(clases), 730)
+        self.assertEqual(collections.Counter(c for _, c in clases.values()),
+                         {'completo': 491, 'vacio': 223, 'cortado': 16})
+        self.assertEqual(sum(n for n, _ in clases.values()), 100010)
+        self.assertEqual(clases[dt.date(2026, 8, 31)], (192, 'completo'))  # mes bajo el tope
+        self.assertEqual(clases[dt.date(2026, 10, 27)], (8, 'cortado'))  # termina a las 17:15
+        self.assertEqual(clases[dt.date(2026, 12, 24)], (0, 'vacio'))
+        self.assertEqual(clases[dt.date(2026, 11, 2)][1], 'completo')
+
+    def test_cobertura_rechaza_celdas_incompletas_o_conteos_distintos(self):
+        cobertura = self.out / 'cobertura.csv'
+        filas = [dict(fecha=f.isoformat(), dias=1, pedidos=n, bloqueos=0, mantenimientos=0)
+                 for f, (n, _) in campana.clasificacion().items()]
+        csv_file(cobertura, filas)
+        campana.verificar_cobertura(cobertura, campana.matriz())
+        with self.assertRaises(ValueError):
+            campana.verificar_cobertura(cobertura, [dict(bloque='D', fecha='2026-12-24', dias=1)])
+        with self.assertRaises(ValueError):
+            campana.verificar_cobertura(cobertura, [dict(bloque='F', fecha='2026-10-25', dias=5)])
+        filas[0]['pedidos'] = 0
+        csv_file(cobertura, filas)
+        with self.assertRaises(ValueError):
+            campana.verificar_cobertura(cobertura, [])
 
     def test_originales_y_cobertura_de_datos(self):
         campana.preparar_datos(self.out)
@@ -85,6 +113,9 @@ class CampanaTest(unittest.TestCase):
         self.assertEqual(len(piloto), 5)
         self.assertEqual({p['bloque'] for p in piloto}, {'D', 'F', 'P'})
         self.assertEqual({p['fecha'][:4] for p in piloto}, {'2026', '2027'})
+        clases = campana.clasificacion()
+        self.assertTrue(all(clases[dt.date.fromisoformat(p['fecha']) + dt.timedelta(days=i)][1] == 'completo'
+                            for p in piloto for i in range(p['dias'])))
 
     def test_no_acepta_resumen_incompleto_o_ajeno(self):
         resultado(self.out, self.par, 'HGS')

@@ -1,10 +1,40 @@
 # Experimentacion numerica local: 2026–2027
 
-Ejecutor de las **5.256 corridas** del diseno IEN 2.1: D = 2.920, F = 876,
-P = 1.460. Incluye los 49 archivos publicados necesarios en un ZIP de unos
+Ejecutor de las **3.498 corridas** del diseno de dias completos (v2): D = 1.964,
+F = 552, P = 982. Incluye los 49 archivos publicados necesarios en un ZIP de unos
 1,1 MB, con sus hashes originales. No hace falta copiar nada desde la otra PC.
 Las 100.010 ventas de enero de 2026 a diciembre de 2027 se usan sin escalarlas.
 Los resultados de esta campana permanecen pendientes hasta ejecutar y auditar.
+
+## Cambio de diseno: solo dias con datos completos
+
+El diseno IEN 2.1 original preveia 5.256 corridas sobre las 730 fechas. Los archivos
+publicados de ventas desde 2026-09 tienen **exactamente 5.000 lineas** (145.000
+bytes): cada mes se interrumpe cuando alcanza ese tope, aunque la demanda diaria
+siga creciendo. La descarga original se volvio a comprobar y conserva el tope. En
+consecuencia, el ejecutor clasifica cada fecha antes de construir la matriz:
+
+| Clase | Regla | Fechas |
+|---|---|---|
+| `completo` | tiene pedidos y no es el ultimo dia con ventas de un mes saturado | 491 |
+| `cortado` | ultimo dia con ventas de un mes con 5.000 lineas; puede terminar a mitad del dia (27/10/2026: 8 pedidos hasta las 17:15) | 16 |
+| `vacio` | sin pedidos | 223 |
+
+- D y P usan las 491 fechas completas; F, las **92 ventanas** de cinco dias
+  consecutivos, todos completos, sin solapamiento (recorrido desde 01/01/2026).
+- No se unen intervalos ni se desplazan fechas: cada ventana F son cinco dias
+  reales, alineados con sus bloqueos y mantenimiento. No se generan pedidos.
+- La regla depende solo de los archivos publicados y se fija antes de ver
+  resultados; `preparacion/clasificacion-fechas.csv` la conserva y la preparacion
+  falla si el lector Java cuenta otros pedidos o si una celda incluye un dia que
+  no sea completo.
+- Quedan 340 fechas de 2026 y 151 de 2027; la demanda va de 12 a 645 pedidos por
+  dia. Analizar con los pedidos del dia como covariable o por estratos de demanda,
+  no por ano. Analisis de sensibilidad previsto: el tramo continuo
+  01/01/2026–28/09/2026 (271 fechas, 54 ventanas), ya incluido en esta matriz.
+- La campana v1 de 5.256 corridas queda como evidencia en
+  `salidas/expnum-2026-2027/` y no se mezcla con esta: el ejecutor rechaza una
+  carpeta preparada con otro diseno.
 
 ## Windows: instalacion inicial
 
@@ -58,15 +88,16 @@ tmux new -s expnum
 python3 experiments/expnum-2026-2027/ejecutar.py piloto --trabajadores 4
 ```
 
-El piloto ejecuta diez corridas en `salidas/piloto-expnum-2026-2027/`: ambos
-algoritmos, ambos anos, uno y cinco dias, y una fecha con mantenimiento. Conserva
+El piloto ejecuta diez corridas en `salidas/piloto-expnum-2026-2027-v2/`: ambos
+algoritmos, ambos anos, uno y cinco dias, la primera y la ultima fecha y ventana
+completas (demanda baja y alta) y una fecha con mantenimiento. Conserva
 el presupuesto de 2.000 ms; puede tardar alrededor de una hora, segun CPU.
-**No se agrega a las 5.256 corridas**. Para contrastar ejecucion aislada y
+**No se agrega a las 3.498 corridas**. Para contrastar ejecucion aislada y
 concurrente antes de fijar la concurrencia:
 
 ```bash
-python3 experiments/expnum-2026-2027/ejecutar.py piloto --trabajadores 1 --salida salidas/piloto-aislado
-python3 experiments/expnum-2026-2027/ejecutar.py piloto --trabajadores 4 --salida salidas/piloto-paralelo
+python3 experiments/expnum-2026-2027/ejecutar.py piloto --trabajadores 1 --salida salidas/piloto-aislado-v2
+python3 experiments/expnum-2026-2027/ejecutar.py piloto --trabajadores 4 --salida salidas/piloto-paralelo-v2
 ```
 
 Revisa tiempos en `corridas.csv` y la relacion de `tiempoCpuMs` con
@@ -100,13 +131,16 @@ En otra terminal de Ubuntu, desde el repositorio:
 
 ```bash
 python3 experiments/expnum-2026-2027/ejecutar.py estado
-tail -f salidas/expnum-2026-2027/campana.log
+tail -f salidas/expnum-2026-2027-v2/campana.log
 ```
 
-La estimacion previa de 382 horas secuenciales equivalentes daria unas 96 horas
-ideales con cuatro trabajadores (unos cuatro dias). Es una extrapolacion de la
-campana pequena, **no una medicion de esta PC**: el piloto y el avance real
-permiten corregirla. La RAM por si sola no determina la velocidad.
+Con las duraciones observadas en la campana v1 (unos 145 s por corrida de un dia
+y unos 850 s por corrida de cinco dias) se estiman unas 250 horas secuenciales,
+unas 62 horas ideales con cuatro trabajadores (dos a tres dias). Las fechas
+excluidas eran casi todas corridas vacias de medio segundo, por lo que el ahorro
+de tiempo es menor que la reduccion de corridas. Es una extrapolacion, **no una
+medicion de esta PC**: el piloto y el avance real permiten corregirla. La RAM por
+si sola no determina la velocidad.
 
 ## Interrumpir y reanudar
 
@@ -133,21 +167,21 @@ Tambien puedes verificar manualmente:
 
 ```bash
 python3 experiments/expnum-2026-2027/ejecutar.py verificar
-tar -czf expnum-2026-2027-resultados.tar.gz -C salidas expnum-2026-2027
+tar -czf expnum-2026-2027-v2-resultados.tar.gz -C salidas expnum-2026-2027-v2
 explorer.exe .
 ```
 
-`verificar` devuelve 0 solo si estan completos los 2.628 pares / 5.256 corridas.
-El archivo `expnum-2026-2027-resultados.tar.gz` contiene la evidencia para el
+`verificar` devuelve 0 solo si estan completos los 1.749 pares / 3.498 corridas.
+El archivo `expnum-2026-2027-v2-resultados.tar.gz` contiene la evidencia para el
 analisis posterior. No ejecutes los scripts historicos de 24 corridas sobre
 esta carpeta. El ejecutor consolida mediciones, no publica conclusiones ni
 rellena automaticamente el documento Word.
 
 ## Protocolo que aplica el ejecutor
 
-- D/P: las 730 fechas diarias; D con semillas 20260927/20260928, P con 20260927.
-- F: 146 ventanas contiguas de cinco dias desde 01/01/2026, sin solapamiento;
-  semillas 20260927/20260928/20260929. Ultima ventana: 27–31/12/2027.
+- D/P: las 491 fechas completas; D con semillas 20260927/20260928, P con 20260927.
+- F: 92 ventanas de cinco dias completos consecutivos, sin solapamiento;
+  semillas 20260927/20260928/20260929. Ultima ventana: 01–05/12/2027.
 - HGS y ALNS por par; orden de pares y algoritmos fijado con semilla 27092026.
 - Presupuesto de 2.000 ms, plan vigente habilitado, reloj LIBRE y JVM nueva por
   corrida; calentamiento original de tres llamadas de 200 ms, reserva 50 ms.
@@ -168,8 +202,10 @@ rellena automaticamente el documento Word.
   reales y habilita averias. No se repite mantenimiento en 2027.
 - Los bloqueos se expanden a pasos ortogonales de un kilometro; ventas conservan
   exactamente sus bytes. Flota: 10 autos, 15 motos, 12 bicicletas.
-- Antes de simular, el lector Java valida las 730 fechas, las 146 ventanas,
-  las 100.010 ventas y un rango entre anos; produce `preparacion/cobertura.csv`.
+- Antes de simular, el lector Java valida las 730 fechas, las 146 ventanas
+  originales, las 100.010 ventas y un rango entre anos; produce
+  `preparacion/cobertura.csv`, cuyos pedidos diarios deben coincidir con la
+  clasificacion de fechas.
 - Los resumenes, planes, series y eventos se auditan antes de marcar un par.
   El objetivo H/U/S se verifica como en el arnes original; no representa una
   validacion independiente de cada penalizacion del modelo.
@@ -178,16 +214,17 @@ rellena automaticamente el documento Word.
 
 ## Archivos de salida
 
-Todo queda en `salidas/expnum-2026-2027/`, excluido de Git:
+Todo queda en `salidas/expnum-2026-2027-v2/`, excluido de Git:
 
-- `matriz.json`: 2.628 pares, orden congelado y ambas celdas por par.
+- `matriz.json`: 1.749 pares, orden congelado y ambas celdas por par.
 - `entorno.json`: referencia, versiones, hashes de fuentes, clases y datos.
 - `ejecucion.json`: equipo, CPU, afinidad y concurrencia efectiva.
 - `resultados/<par>/intento-NNN/<algoritmo>/`: resumen, planes, series, eventos,
   entrada, log y metadatos individuales. `completo.json` conserva hashes del par.
 - `progreso.json`, `campana.log` y `corridas.csv`: estado y mediciones consolidadas.
-- `preparacion/`: datos transformados, fuentes de referencia, clases compiladas
-  y cobertura; permite preservar exactamente lo ejecutado.
+- `preparacion/`: datos transformados, fuentes de referencia, clases compiladas,
+  cobertura y `clasificacion-fechas.csv` (fecha, pedidos, clase, inicio de
+  ventana F); permite preservar exactamente lo ejecutado.
 
 Pruebas del ejecutor, sin simulaciones masivas:
 
