@@ -1,6 +1,7 @@
 package org.kindbox.core.simulacion;
 
 import org.kindbox.core.modelo.Ciudad;
+import org.kindbox.core.modelo.ParametrosOperacion;
 import org.kindbox.core.modelo.TipoAveria;
 import org.kindbox.core.modelo.UnidadTransporte;
 import org.kindbox.core.problema.Ruta;
@@ -23,9 +24,9 @@ import org.kindbox.core.problema.Ruta;
  *
  * <p>El itinerario se describe con tres arreglos paralelos: el desplazamiento en el camino
  * de cada parada, su instante de llegada y su instante de salida. La posicion de la unidad
- * dentro de un tramo se interpola de forma lineal en el tiempo entre la salida de la parada
- * anterior y la llegada a la siguiente. Como la velocidad es constante dentro de un tramo,
- * interpolar en tiempo equivale a interpolar en distancia.</p>
+ * dentro de un tramo sigue un calendario discreto por nodo: la llegada comprometida menos
+ * el tiempo de viaje restante, con el mismo redondeo que el decodificador. La ejecucion y
+ * la replanificacion consultan ese mismo calendario y no cuantizan dos veces el tramo.</p>
  *
  * <p>El camino de un itinerario recien comprometido arranca en el nodo <b>fisico</b> de la
  * unidad, que puede no coincidir con el nodo desde el que se planifico: una unidad
@@ -64,6 +65,8 @@ public final class UnidadEnCurso {
     private int indiceParada = SIN_PARADA;
     private boolean sirviendo;
     private long minutoSalidaTramo;
+    /** Velocidad con que se comprometio el itinerario; un cambio se aplica al replanificar. */
+    private ParametrosOperacion.Instantanea parametrosMovimiento = new ParametrosOperacion().instantanea();
     private long minutoFinServicioHeredado = Long.MIN_VALUE;
     private int indiceCobrado;
     private long secuenciaMovimiento = -1L;
@@ -126,6 +129,15 @@ public final class UnidadEnCurso {
         this.sirviendo = false;
         this.minutoFinServicioHeredado = Long.MIN_VALUE;
         this.indiceCobrado = 0;
+    }
+
+    /** Asigna un itinerario capturando los parametros usados para programar sus llegadas. */
+    public void asignarItinerario(Ruta ruta, int[] camino, int[] desplazamientoParada,
+                                  long[] minutoLlegadaParada, long[] minutoSalidaParada,
+                                  long minutoSalidaTramo, ParametrosOperacion.Instantanea parametros) {
+        this.parametrosMovimiento = java.util.Objects.requireNonNull(parametros);
+        asignarItinerario(ruta, camino, desplazamientoParada, minutoLlegadaParada,
+                minutoSalidaParada, minutoSalidaTramo);
     }
 
     /** Deja a la unidad sin itinerario, parada en el nodo indicado. */
@@ -233,10 +245,9 @@ public final class UnidadEnCurso {
     /**
      * Indice en el camino del ultimo nodo por el que la unidad ya paso.
      *
-     * <p>Dentro de un tramo la posicion se interpola de forma lineal en el tiempo entre la
-     * salida de la parada anterior y la llegada a la siguiente, y se trunca al nodo, porque
-     * una unidad a mitad de calle no puede maniobrar y el nodo anterior es el ultimo punto
-     * en que efectivamente estuvo.</p>
+     * <p>Dentro de un tramo se usa un calendario discreto por nodo, derivado desde la
+     * llegada comprometida y los tiempos de viaje restantes. El ultimo nodo alcanzado
+     * y el siguiente comparten exactamente ese calendario con la replanificacion.</p>
      */
     public int indiceNodoActual(long minuto) {
         if (camino.length <= 1) {
@@ -263,14 +274,23 @@ public final class UnidadEnCurso {
         if (minuto <= minutoSalidaTramo || llegada <= minutoSalidaTramo) {
             return inicio;
         }
-        double fraccion = (double) (minuto - minutoSalidaTramo) / (llegada - minutoSalidaTramo);
-        int avance = (int) Math.floor(fraccion * (fin - inicio));
-        return inicio + Math.max(0, Math.min(avance, fin - inicio));
+        // Los tiempos por nodo usan la misma ceil(viaje restante) que el decodificador.
+        // Interpolar linealmente un tramo ya redondeado y volver a redondear su resto
+        // introducia minutos artificiales al replanificar. Buscar el ultimo nodo cuyo
+        // tiempo discreto ya se alcanzo evita esa segunda cuantizacion.
+        int izquierda = inicio;
+        int derecha = fin;
+        while (izquierda < derecha) {
+            int medio = izquierda + (derecha - izquierda + 1) / 2;
+            if (minutoLlegadaANodo(medio) <= minuto) izquierda = medio;
+            else derecha = medio - 1;
+        }
+        return izquierda;
     }
 
     /**
-     * Instante en que la unidad alcanza el nodo del camino indicado, con la misma
-     * interpolacion lineal que usa {@link #indiceNodoActual(long)}.
+     * Instante discreto de paso por un nodo: llegada comprometida menos viaje restante.
+     * No se vuelve a repartir linealmente un tiempo que ya habia sido redondeado.
      */
     public long minutoLlegadaANodo(int indiceEnCamino) {
         if (indiceParada < 0) {
@@ -285,8 +305,9 @@ public final class UnidadEnCurso {
         if (indiceEnCamino >= fin) {
             return llegada;
         }
-        double fraccion = (double) (indiceEnCamino - inicio) / (fin - inicio);
-        return minutoSalidaTramo + (long) Math.ceil(fraccion * (llegada - minutoSalidaTramo));
+        int kmRestantes = fin - indiceEnCamino;
+        return Math.max(minutoSalidaTramo, llegada
+                - parametrosMovimiento.minutosDeViaje(unidad.tipo(), kmRestantes));
     }
 
     /**

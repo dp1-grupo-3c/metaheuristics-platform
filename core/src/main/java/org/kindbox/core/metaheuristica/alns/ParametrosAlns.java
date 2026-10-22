@@ -50,6 +50,20 @@ public final class ParametrosAlns {
     private double pesoAfinidadUnidad = 0.1;
 
     private boolean filtroCotaInferior = true;
+    private int holguraObjetivoMinutos = 30;
+
+    /** Margen deseado para desempates temporales; cero anula la preferencia. */
+    public int holguraObjetivoMinutos() {
+        return holguraObjetivoMinutos;
+    }
+
+    public ParametrosAlns holguraObjetivoMinutos(int valor) {
+        if (valor < 0 || valor > 1440) {
+            throw new IllegalArgumentException("holguraObjetivoMinutos debe estar entre 0 y 1440: " + valor);
+        }
+        this.holguraObjetivoMinutos = valor;
+        return this;
+    }
 
     /** Parametros con los valores iniciales del apartado 7.4 del ISA. */
     public static ParametrosAlns porDefecto() {
@@ -468,6 +482,7 @@ public final class ParametrosAlns {
                 + " factorPenalizacionEstabilidad=" + factorPenalizacionEstabilidad
                 + " maximoIteracionesSinMejora=" + maximoIteracionesSinMejora
                 + " iteracionesParaReinicio=" + iteracionesParaReinicio
+                + " holguraObjetivoMinutos=" + holguraObjetivoMinutos
                 + " filtroCotaInferior=" + filtroCotaInferior + "]";
     }
 }

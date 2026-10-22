@@ -132,6 +132,25 @@ public final class ProgramadorRuta {
         return instancia;
     }
 
+    /**
+     * Copia las llegadas previstas de las entregas de la ultima evaluacion exitosa,
+     * en el orden de la secuencia de entrada e incluyendo el efecto de la pausa.
+     * No materializa rutas ni consume inventario. El destino debe admitir todas las visitas.
+     */
+    public int copiarLlegadasEntregas(long[] destino) {
+        if (destino.length < ultimasEntregas) {
+            throw new IllegalArgumentException("Destino insuficiente para las llegadas");
+        }
+        int n = 0;
+        for (int j = 0; j < cantidadParadas; j++) {
+            if (claseParada[j] == ENTREGA) {
+                long pausa = posicionPausa >= 0 && j >= posicionPausa ? desplazamientoPausa : 0;
+                destino[n++] = llegadaParada[j] + pausa;
+            }
+        }
+        return n;
+    }
+
     // ------------------------------------------------------------ inventarios
 
     /**

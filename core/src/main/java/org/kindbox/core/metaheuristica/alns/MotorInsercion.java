@@ -67,6 +67,10 @@ public final class MotorInsercion {
 
     /** Costo de la ruta resultante de insertar la tarea en la unidad, indexado por par. */
     private final double[] costoNuevo;
+    /** Delta de riesgo global, separado de los soles para no mezclar prioridades. */
+    private final long[] deltaRiesgoNuevo;
+    private final long[] mejorDeltaRiesgo;
+    private final boolean contieneParciales;
     /** Kilometros de esa ruta resultante. */
     private final int[] kilometrosNuevos;
     /** Posicion de insercion que produce ese costo. */
@@ -117,6 +121,11 @@ public final class MotorInsercion {
         this.maximoUnidadesCandidatas = parametros.maximoUnidadesCandidatas();
         int pares = Math.max(1, cantidadTareas) * cantidadUnidades;
         this.costoNuevo = new double[pares];
+        this.deltaRiesgoNuevo = new long[pares];
+        this.mejorDeltaRiesgo = new long[Math.max(1, cantidadTareas)];
+        boolean parciales = false;
+        for (int p = 0; p < cantidadPedidos; p++) parciales |= tareas.tareasDePedido(p) > 1;
+        this.contieneParciales = parciales;
         this.kilometrosNuevos = new int[pares];
         this.posicionNueva = new int[pares];
         this.candidatasDe = new int[pares];
@@ -199,6 +208,12 @@ public final class MotorInsercion {
             // Solo cambio una ruta, de modo que solo esa columna de la cache queda obsoleta.
             for (int j = 0; j < n; j++) {
                 int otro = pendientes[j];
+                // Otra parte del mismo pedido en otra ruta puede cambiar su ultima llegada
+                // o completar su asignacion: los deltas dejan de ser independientes.
+                if (contieneParciales) {
+                    calcularTarea(estado, otro, aleatorio, parpadeo, ordenArrepentimiento);
+                    continue;
+                }
                 if (esCandidata[otro * cantidadUnidades + unidad] != 0) {
                     valorarUnidad(estado, otro, unidad, aleatorio, parpadeo);
                 }
@@ -239,10 +254,13 @@ public final class MotorInsercion {
         int elegido = 0;
         if (ordenArrepentimiento < 2) {
             double mejor = INFINITO;
+            long riesgoMejor = Long.MAX_VALUE;
             for (int i = 0; i < n; i++) {
                 double delta = mejorDelta[pendientes[i]];
-                if (delta < mejor) {
+                long riesgo = mejorDeltaRiesgo[pendientes[i]];
+                if (delta < mejor || (delta == mejor && riesgo < riesgoMejor)) {
                     mejor = delta;
+                    riesgoMejor = riesgo;
                     elegido = i;
                 }
             }
@@ -250,13 +268,16 @@ public final class MotorInsercion {
         }
         double mejorArrepentimiento = Double.NEGATIVE_INFINITY;
         double desempate = INFINITO;
+        long riesgoDesempate = Long.MAX_VALUE;
         for (int i = 0; i < n; i++) {
             int tarea = pendientes[i];
             double valor = arrepentimiento[tarea];
             if (valor > mejorArrepentimiento
-                    || (valor == mejorArrepentimiento && mejorDelta[tarea] < desempate)) {
+                    || (valor == mejorArrepentimiento && (mejorDelta[tarea] < desempate
+                    || (mejorDelta[tarea] == desempate && mejorDeltaRiesgo[tarea] < riesgoDesempate)))) {
                 mejorArrepentimiento = valor;
                 desempate = mejorDelta[tarea];
+                riesgoDesempate = mejorDeltaRiesgo[tarea];
                 elegido = i;
             }
         }
@@ -341,9 +362,13 @@ public final class MotorInsercion {
                                double parpadeo) {
         int par = tarea * cantidadUnidades + unidad;
         costoNuevo[par] = INFINITO;
+        deltaRiesgoNuevo[par] = Long.MAX_VALUE;
         posicionNueva[par] = -1;
         kilometrosNuevos[par] = 0;
 
+        // Preparar ANTES de evaluar candidatas: comparte el decodificador y su ultima
+        // evaluacion debe seguir siendo la de la candidata al calcular su riesgo.
+        estado.riesgoTemporal();
         final ProgramadorRuta programador = estado.programador();
         final int longitud = estado.longitudRuta(unidad);
         asegurarCapacidad(longitud + 1);
@@ -362,6 +387,7 @@ public final class MotorInsercion {
         }
 
         double mejorCosto = INFINITO;
+        long mejorRiesgo = Long.MAX_VALUE;
         int mejorPosicion = -1;
         int mejorKilometros = 0;
         for (int i = longitud; i >= 0; i--) {
@@ -372,7 +398,7 @@ public final class MotorInsercion {
             // ninguna posicion factible no descarta nada, de modo que nunca aumenta la H.
             if (!saltar && mejorPosicion >= 0
                     && costoPorKm * incrementoDirecto(unidad, fila, longitud, i, puntoTarea)
-                        >= mejorCosto - costoActual) {
+                        > mejorCosto - costoActual) {
                 saltar = true;
             }
             // Filtro de cota inferior: con desfase minimo positivo la ruta resultante no puede
@@ -384,11 +410,17 @@ public final class MotorInsercion {
             }
             if (!saltar
                     && programador.evaluar(unidad, secuencia, cantidades, longitud + 1)
-                    && programador.ultimaFactible()
-                    && programador.ultimoCosto() < mejorCosto) {
-                mejorCosto = programador.ultimoCosto();
-                mejorPosicion = i;
-                mejorKilometros = programador.ultimosKilometros();
+                    && programador.ultimaFactible()) {
+                double costo = programador.ultimoCosto();
+                if (costo <= mejorCosto) {
+                    long riesgo = estado.deltaRiesgoInsercionValorada(unidad, secuencia, longitud + 1, tarea);
+                    if (costo < mejorCosto || (costo == mejorCosto && riesgo < mejorRiesgo)) {
+                        mejorCosto = costo;
+                        mejorRiesgo = riesgo;
+                        mejorPosicion = i;
+                        mejorKilometros = programador.ultimosKilometros();
+                    }
+                }
             }
             if (i > 0) {
                 int t = secuencia[i - 1];
@@ -400,6 +432,7 @@ public final class MotorInsercion {
             }
         }
         costoNuevo[par] = mejorCosto;
+        deltaRiesgoNuevo[par] = mejorRiesgo;
         posicionNueva[par] = mejorPosicion;
         kilometrosNuevos[par] = mejorKilometros;
     }
@@ -446,6 +479,8 @@ public final class MotorInsercion {
                 pesoEstabilidad > 0.0 ? estado.unidadVigentePorRecuperar(tarea) : -1;
 
         double mejorVacia = INFINITO;
+        long riesgoVacia = Long.MAX_VALUE;
+        long riesgoPrimera = Long.MAX_VALUE;
         int unidadVacia = -1;
         double primero = INFINITO;
         double segundo = INFINITO;
@@ -463,15 +498,18 @@ public final class MotorInsercion {
             if (unidad == unidadVigente) {
                 delta -= pesoEstabilidad;
             }
+            long riesgo = deltaRiesgoNuevo[base + unidad];
             if (estado.longitudRuta(unidad) == 0) {
-                if (delta < mejorVacia) {
+                if (delta < mejorVacia || (delta == mejorVacia && riesgo < riesgoVacia)) {
                     mejorVacia = delta;
+                    riesgoVacia = riesgo;
                     unidadVacia = unidad;
                 }
                 continue;
             }
             alternativas++;
-            if (delta < primero) {
+            if (delta < primero || (delta == primero && riesgo < riesgoPrimera)) {
+                riesgoPrimera = riesgo;
                 tercero = segundo;
                 segundo = primero;
                 primero = delta;
@@ -485,7 +523,8 @@ public final class MotorInsercion {
         }
         if (unidadVacia >= 0) {
             alternativas++;
-            if (mejorVacia < primero) {
+            if (mejorVacia < primero || (mejorVacia == primero && riesgoVacia < riesgoPrimera)) {
+                riesgoPrimera = riesgoVacia;
                 tercero = segundo;
                 segundo = primero;
                 primero = mejorVacia;
@@ -500,6 +539,7 @@ public final class MotorInsercion {
 
         mejorUnidad[tarea] = unidadPrimera;
         mejorDelta[tarea] = primero;
+        mejorDeltaRiesgo[tarea] = riesgoPrimera;
         if (ordenArrepentimiento < 2) {
             return;
         }

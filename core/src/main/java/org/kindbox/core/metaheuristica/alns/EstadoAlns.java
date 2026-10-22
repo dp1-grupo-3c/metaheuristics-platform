@@ -5,6 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.kindbox.core.evaluacion.Programacion;
+import org.kindbox.core.evaluacion.HolguraTemporal;
 import org.kindbox.core.evaluacion.ProgramadorRuta;
 import org.kindbox.core.problema.InstanciaPlanificacion;
 import org.kindbox.core.problema.Parada;
@@ -123,6 +124,19 @@ public final class EstadoAlns {
     /** Peso del termino blando de estabilidad dentro del escalar interno, en soles por pedido. */
     private double pesoEstabilidad;
 
+    // Cache perezosa: una mutacion invalida solo las llegadas de su ruta. El riesgo
+    // se calcula por pedido y usa la ultima parte, aunque se reparta entre unidades.
+    private final int margenHolgura;
+    private final long[] llegadaTarea;
+    private final boolean[] llegadaSucia;
+    private final long[] riesgoPedido;
+    private final long[] maximoInsercion;
+    private final boolean[] afectadoInsercion;
+    private final int[] afectadosInsercion;
+    private long[] llegadasTrabajo = new long[16];
+    private boolean riesgoValido;
+    private long riesgoTotal;
+
     private double costoTotal;
     private int kilometrosTotales;
 
@@ -146,6 +160,16 @@ public final class EstadoAlns {
      * @param programador decodificador compartido con los operadores del algoritmo
      */
     public EstadoAlns(InstanciaPlanificacion instancia, TareasAlns tareas, ProgramadorRuta programador) {
+        this(instancia, tareas, programador, HolguraTemporal.margenConfigurado());
+    }
+
+    /** Margen capturado de los parametros del algoritmo, sin depender de propiedades globales. */
+    public EstadoAlns(InstanciaPlanificacion instancia, TareasAlns tareas,
+                      ProgramadorRuta programador, int margenHolgura) {
+        if (margenHolgura < 0 || margenHolgura > 1440) {
+            throw new IllegalArgumentException("Margen de holgura fuera de [0,1440]");
+        }
+        this.margenHolgura = margenHolgura;
         this.instancia = instancia;
         this.tareas = tareas;
         this.programador = programador;
@@ -159,6 +183,12 @@ public final class EstadoAlns {
         this.longitud = new int[cantidadUnidades];
         this.kilometrosRuta = new int[cantidadUnidades];
         this.costoRuta = new double[cantidadUnidades];
+        this.llegadaTarea = new long[Math.max(1, cantidadTareas)];
+        this.llegadaSucia = new boolean[cantidadUnidades];
+        this.riesgoPedido = new long[Math.max(1, cantidadPedidos)];
+        this.maximoInsercion = new long[Math.max(1, cantidadPedidos)];
+        this.afectadoInsercion = new boolean[Math.max(1, cantidadPedidos)];
+        this.afectadosInsercion = new int[Math.max(1, cantidadPedidos)];
         this.unidadDe = new int[Math.max(1, cantidadTareas)];
         this.posicionDe = new int[Math.max(1, cantidadTareas)];
         this.banco = new int[Math.max(1, cantidadTareas)];
@@ -483,6 +513,8 @@ public final class EstadoAlns {
 
     /** Devuelve el estado a rutas vacias y banco completo. */
     public void vaciar() {
+        java.util.Arrays.fill(llegadaSucia, true);
+        riesgoValido = false;
         for (int u = 0; u < cantidadUnidades; u++) {
             longitud[u] = 0;
             kilometrosRuta[u] = 0;
@@ -512,6 +544,7 @@ public final class EstadoAlns {
      * caliente: evita reevaluar la ruta que el operador de insercion ya valoro.
      */
     public void insertarValorado(int unidad, int posicion, int tarea, int kilometros, double costo) {
+        invalidarHolgura(unidad);
         asegurarCapacidadRuta(longitud[unidad] + 1);
         int[] fila = rutaTarea[unidad];
         int[] pedidos = rutaPedido[unidad];
@@ -597,6 +630,7 @@ public final class EstadoAlns {
 
     /** Vacia la ruta de una unidad y manda todas sus tareas al banco. */
     public int vaciarRuta(int unidad) {
+        invalidarHolgura(unidad);
         int retirados = longitud[unidad];
         int[] fila = rutaTarea[unidad];
         for (int i = 0; i < retirados; i++) {
@@ -643,6 +677,12 @@ public final class EstadoAlns {
         urgenciaBanco = otro.urgenciaBanco;
         costoTotal = otro.costoTotal;
         kilometrosTotales = otro.kilometrosTotales;
+        if (margenHolgura != otro.margenHolgura) throw new IllegalArgumentException("Margenes distintos");
+        System.arraycopy(otro.llegadaTarea, 0, llegadaTarea, 0, cantidadTareas);
+        System.arraycopy(otro.llegadaSucia, 0, llegadaSucia, 0, cantidadUnidades);
+        System.arraycopy(otro.riesgoPedido, 0, riesgoPedido, 0, cantidadPedidos);
+        riesgoValido = otro.riesgoValido;
+        riesgoTotal = otro.riesgoTotal;
     }
 
     /**
@@ -722,6 +762,8 @@ public final class EstadoAlns {
 
     /** Vuelve a valorar todas las rutas y rehace los agregados de costo y kilometros. */
     public void recalcularTodo() {
+        java.util.Arrays.fill(llegadaSucia, true);
+        riesgoValido = false;
         costoTotal = 0.0;
         kilometrosTotales = 0;
         for (int u = 0; u < cantidadUnidades; u++) {
@@ -755,6 +797,8 @@ public final class EstadoAlns {
      * por debajo del inventario de los intermedios.</p>
      */
     public Solucion materializar() {
+        java.util.Arrays.fill(llegadaSucia, true);
+        riesgoValido = false;
         programador.reiniciarInventarios();
         List<Ruta> rutas = new ArrayList<>(cantidadUnidades);
         costoTotal = 0.0;
@@ -795,9 +839,95 @@ public final class EstadoAlns {
         return new Solucion(rutas, noAtendidos, valor());
     }
 
+    /** Riesgo temporal: solo desempata el objetivo existente, no se suma al costo. */
+    public long riesgoTemporal() {
+        if (riesgoValido) return riesgoTotal;
+        for (int u = 0; u < cantidadUnidades; u++) {
+            if (!llegadaSucia[u]) continue;
+            if (longitud[u] > 0) {
+                if (!programador.evaluar(u, rutaPedido[u], rutaCantidad[u], longitud[u])) {
+                    throw new IllegalStateException("Ruta sin programacion al calcular holgura");
+                }
+                prepararLlegadas(longitud[u]);
+                int n = programador.copiarLlegadasEntregas(llegadasTrabajo);
+                if (n != longitud[u]) throw new IllegalStateException("Llegadas inconsistentes");
+                for (int i = 0; i < n; i++) llegadaTarea[rutaTarea[u][i]] = llegadasTrabajo[i];
+            }
+            llegadaSucia[u] = false;
+        }
+        riesgoTotal = 0;
+        for (int p = 0; p < cantidadPedidos; p++) {
+            long ultima = Long.MIN_VALUE;
+            int fin = tareas.primeraDePedido(p) + tareas.tareasDePedido(p);
+            for (int t = tareas.primeraDePedido(p); t < fin; t++) {
+                if (unidadDe[t] >= 0) ultima = Math.max(ultima, llegadaTarea[t]);
+            }
+            riesgoPedido[p] = tareasEnBancoDe[p] == 0 && ultima != Long.MIN_VALUE
+                    ? HolguraTemporal.penalizacion(instancia.pedidoMinutoLimite(p) - ultima, margenHolgura) : 0;
+            riesgoTotal += riesgoPedido[p];
+        }
+        riesgoValido = true;
+        return riesgoTotal;
+    }
+
+    /** Objetivo original primero, riesgo solo si este empata exactamente. */
+    public int compararConHolgura(EstadoAlns otro) {
+        int principal = valor().compareTo(otro.valor());
+        return principal != 0 ? principal : Long.compare(riesgoTemporal(), otro.riesgoTemporal());
+    }
+
+    /**
+     * Delta exacto de riesgo para la ultima insercion evaluada por el programador.
+     * El llamador debe preparar riesgoTemporal() ANTES de programar la candidata.
+     * Tiene en cuenta tambien las partes del mismo pedido en otras unidades.
+     */
+    long deltaRiesgoInsercionValorada(int unidad, int[] secuencia, int n, int tareaInsertada) {
+        if (!riesgoValido) throw new IllegalStateException("Preparar holguras antes de evaluar insercion");
+        prepararLlegadas(n);
+        if (programador.copiarLlegadasEntregas(llegadasTrabajo) != n) {
+            throw new IllegalStateException("Llegadas de insercion inconsistentes");
+        }
+        int cuantos = 0;
+        for (int i = 0; i < n; i++) {
+            int p = secuencia[i];
+            if (!afectadoInsercion[p]) {
+                afectadoInsercion[p] = true;
+                afectadosInsercion[cuantos++] = p;
+                maximoInsercion[p] = Long.MIN_VALUE;
+            }
+            maximoInsercion[p] = Math.max(maximoInsercion[p], llegadasTrabajo[i]);
+        }
+        long delta = 0;
+        int pedidoInsertado = tareas.pedido(tareaInsertada);
+        for (int i = 0; i < cuantos; i++) {
+            int p = afectadosInsercion[i];
+            long ultima = maximoInsercion[p];
+            int fin = tareas.primeraDePedido(p) + tareas.tareasDePedido(p);
+            for (int t = tareas.primeraDePedido(p); t < fin; t++) {
+                if (unidadDe[t] >= 0 && unidadDe[t] != unidad) ultima = Math.max(ultima, llegadaTarea[t]);
+            }
+            int bancoDespues = tareasEnBancoDe[p] - (p == pedidoInsertado ? 1 : 0);
+            long nuevo = bancoDespues == 0
+                    ? HolguraTemporal.penalizacion(instancia.pedidoMinutoLimite(p) - ultima, margenHolgura) : 0;
+            delta += nuevo - riesgoPedido[p];
+            afectadoInsercion[p] = false;
+        }
+        return delta;
+    }
+
+    private void prepararLlegadas(int n) {
+        if (llegadasTrabajo.length < n) llegadasTrabajo = new long[n];
+    }
+
+    private void invalidarHolgura(int unidad) {
+        llegadaSucia[unidad] = true;
+        riesgoValido = false;
+    }
+
     // ----------------------------------------------------------------- internos
 
     private void reevaluarRuta(int unidad) {
+        invalidarHolgura(unidad);
         costoTotal -= costoRuta[unidad];
         kilometrosTotales -= kilometrosRuta[unidad];
         if (longitud[unidad] == 0) {
