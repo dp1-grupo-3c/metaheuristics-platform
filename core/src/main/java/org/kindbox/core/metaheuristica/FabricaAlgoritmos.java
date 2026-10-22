@@ -209,6 +209,7 @@ public final class FabricaAlgoritmos {
                 .real("factorPenalizacionEstabilidad", ParametrosAlns::factorPenalizacionEstabilidad)
                 .largo("maximoIteracionesSinMejora", ParametrosAlns::maximoIteracionesSinMejora)
                 .largo("iteracionesParaReinicio", ParametrosAlns::iteracionesParaReinicio)
+                .entero("holguraObjetivoMinutos", ParametrosAlns::holguraObjetivoMinutos)
                 .booleano("filtroCotaInferior", ParametrosAlns::filtroCotaInferior);
     }
 

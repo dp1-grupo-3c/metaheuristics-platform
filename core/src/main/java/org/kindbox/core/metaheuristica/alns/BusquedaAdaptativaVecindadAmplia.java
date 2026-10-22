@@ -288,9 +288,10 @@ public final class BusquedaAdaptativaVecindadAmplia implements Algoritmo {
         final CapaAdaptativa capa = new CapaAdaptativa(destruccion.length, reconstruccion.length, parametros);
         final CriterioAceptacion criterio = new CriterioAceptacion(parametros);
 
-        final EstadoAlns vigente = new EstadoAlns(instancia, tareas, programador);
-        final EstadoAlns candidato = new EstadoAlns(instancia, tareas, programador);
-        final EstadoAlns mejor = new EstadoAlns(instancia, tareas, programador);
+        final int margenHolgura = parametros.holguraObjetivoMinutos();
+        final EstadoAlns vigente = new EstadoAlns(instancia, tareas, programador, margenHolgura);
+        final EstadoAlns candidato = new EstadoAlns(instancia, tareas, programador, margenHolgura);
+        final EstadoAlns mejor = new EstadoAlns(instancia, tareas, programador, margenHolgura);
 
         // El plan vigente del apartado 11.4 se traduce a indices locales una sola vez, antes
         // de que la busqueda arranque: dentro del bucle el termino de estabilidad se resuelve
@@ -342,13 +343,27 @@ public final class BusquedaAdaptativaVecindadAmplia implements Algoritmo {
             if (candidato.pierdeCompromisosDe(mejor)) {
                 sinMejora++;
                 resultado = CapaAdaptativa.RECHAZADA;
-            } else if (valorCandidato.mejorQue(mejorValor)) {
+            } else if (valorCandidato.mejorQue(mejorValor)
+                    || (valorCandidato.compareTo(mejorValor) == 0
+                        && candidato.riesgoTemporal() < mejor.riesgoTemporal())) {
                 mejor.copiarDesde(candidato);
                 mejorValor = valorCandidato;
                 vigente.copiarDesde(candidato);
                 escalarVigente = escalarCandidato;
                 sinMejora = 0L;
                 resultado = CapaAdaptativa.NUEVA_MEJOR;
+            } else if (valorCandidato.compareTo(vigente.valor()) == 0) {
+                // El empate de costo no autoriza a perder holgura. El riesgo NO se suma
+                // al escalar: solo desempata el objetivo ya existente H/U/costo+estabilidad.
+                int porHolgura = Long.compare(candidato.riesgoTemporal(), vigente.riesgoTemporal());
+                sinMejora++;
+                if (porHolgura <= 0) {
+                    vigente.copiarDesde(candidato);
+                    escalarVigente = escalarCandidato;
+                    resultado = porHolgura < 0 ? CapaAdaptativa.MEJORA : CapaAdaptativa.ACEPTADA;
+                } else {
+                    resultado = CapaAdaptativa.RECHAZADA;
+                }
             } else if (escalarCandidato < escalarVigente) {
                 vigente.copiarDesde(candidato);
                 escalarVigente = escalarCandidato;

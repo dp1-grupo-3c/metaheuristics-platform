@@ -2,7 +2,6 @@ package org.kindbox.experiments;
 
 import java.nio.file.Path;
 import java.time.LocalDate;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import org.kindbox.core.io.RepositorioDatos;
@@ -12,7 +11,6 @@ import org.kindbox.core.modelo.ParametrosOperacion;
 import org.kindbox.core.simulacion.ConfiguracionEscenario;
 import org.kindbox.core.simulacion.MetricasSimulacion;
 import org.kindbox.core.simulacion.ModoReloj;
-import org.kindbox.core.simulacion.MotorSimulacion;
 import org.kindbox.core.simulacion.ResultadoSimulacion;
 import org.kindbox.core.simulacion.TipoEscenario;
 
@@ -44,7 +42,7 @@ public final class CorrerEscenario {
     }
 
     public static void main(String[] argumentos) throws Exception {
-        Path raiz = Path.of(argumentos.length > 0 ? argumentos[0] : "data");
+        Path raiz = Path.of(argumentos.length > 0 ? argumentos[0] : "data_dp1");
         String escenario = argumentos.length > 1 ? argumentos[1].toUpperCase(Locale.ROOT) : "5D";
         LocalDate primerDia = LocalDate.parse(argumentos.length > 2 ? argumentos[2] : "2026-09-01");
         String nombreAlgoritmo = FabricaAlgoritmos.canonico(argumentos.length > 3 ? argumentos[3] : "ALNS");
@@ -68,6 +66,13 @@ public final class CorrerEscenario {
                 ? primerDia.plusDays(30) : configuracion.ultimoDia();
         var datos = new RepositorioDatos(raiz).cargar(primerDia, ultimoDia);
 
+        if (datos.pedidos().isEmpty()) {
+                throw new IllegalStateException(
+                        "No se cargaron pedidos desde " + raiz.toAbsolutePath().normalize()
+                        + " para el período " + primerDia + " hasta " + ultimoDia
+                );
+        }
+
         System.out.printf(Locale.ROOT,
                 "Escenario %s, %s, salto %d min, K=%.1f, modo %s, semilla %d, %d pedidos cargados%n",
                 configuracion.tipo(), nombreAlgoritmo, salto, configuracion.factorAceleracion(),
@@ -76,8 +81,12 @@ public final class CorrerEscenario {
         System.out.println(OpcionArranque.describir(configuracion, algoritmo));
         System.out.println("Algoritmo: " + algoritmo);
 
-        var motor = new MotorSimulacion(datos, configuracion, new ParametrosOperacion(), algoritmo, List.of());
-        ResultadoSimulacion resultado = motor.ejecutar();
+        System.out.println("Directorio de ejecución: " + Path.of("").toAbsolutePath());
+        System.out.println("Raíz de datos: " + raiz.toAbsolutePath().normalize());
+        System.out.println("Período: " + primerDia + " hasta " + ultimoDia);
+
+        ResultadoSimulacion resultado = ReporteEscenario.ejecutar(
+                datos, configuracion, new ParametrosOperacion(), algoritmo);
         publicar(resultado);
     }
 

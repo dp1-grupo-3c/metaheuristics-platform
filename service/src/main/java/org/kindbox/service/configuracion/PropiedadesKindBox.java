@@ -21,7 +21,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class PropiedadesKindBox {
 
     /** Directorio raiz de los datos del equipo docente. */
-    private String directorioDatos = "data";
+    private String directorioDatos = "data_dp1";
 
     /** Primer dia del escenario cuando la peticion no lo indica. */
     private LocalDate primerDiaPorDefecto = LocalDate.of(2026, 9, 1);

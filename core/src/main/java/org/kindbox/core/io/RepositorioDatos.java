@@ -27,10 +27,11 @@ import org.kindbox.core.modelo.UnidadTransporte;
  * es:</p>
  *
  * <pre>
- * &lt;raiz&gt;/ventas/ventasAAAAMM
- * &lt;raiz&gt;/bloqueos/AAAAMM.bloqueadas
+ * &lt;raiz&gt;/ventas/ventasAAAAMM[.txt] o ventas.AAAAMM.txt
+ * &lt;raiz&gt;/bloqueos/AAAAMM.bloqueadas o bloqueo.AAMM.txt
  * &lt;raiz&gt;/mantenimiento/[aaaa/]mant.preventivo.m1.m2
- * &lt;raiz&gt;/flota.txt
+ * &lt;raiz&gt;/mant.preventivo.m1.m2[.txt] (alternativa DP1)
+ * &lt;raiz&gt;/flota.txt (o flota.csv)
  * </pre>
  *
  * <p>Un escenario puede cubrir meses sin datos publicados, de modo que la falta de un
@@ -157,7 +158,9 @@ public final class RepositorioDatos {
 
         for (YearMonth mes = YearMonth.from(primerDia); !mes.isAfter(YearMonth.from(ultimoDia)); mes = mes.plusMonths(1)) {
             String base = LectorVentas.nombreDeArchivo(mes);
-            Path archivo = localizar(directorio, base);
+            Path archivo = localizarMensual(directorio, List.of(
+                    base, base + ".txt",
+                    "ventas." + String.format("%04d%02d", mes.getYear(), mes.getMonthValue()) + ".txt"));
             if (archivo == null) {
                 avisos.add("No se encontro el archivo de ventas de " + mes + " (" + directorio.resolve(base)
                         + "); el mes se omite");
@@ -196,7 +199,9 @@ public final class RepositorioDatos {
 
         for (YearMonth mes = YearMonth.from(primerDia); !mes.isAfter(YearMonth.from(ultimoDia)); mes = mes.plusMonths(1)) {
             String base = LectorBloqueos.nombreDeArchivo(mes);
-            Path archivo = localizar(directorio, base.substring(0, 6));
+            String periodoDp1 = String.format("%02d%02d", mes.getYear() % 100, mes.getMonthValue());
+            Path archivo = localizarMensual(directorio, List.of(
+                    base, base + ".txt", "bloqueo." + periodoDp1 + ".txt"));
             if (archivo == null) {
                 avisos.add("No se encontro el archivo de bloqueos de " + mes + " (" + directorio.resolve(base)
                         + "); el mes se omite");
@@ -229,10 +234,22 @@ public final class RepositorioDatos {
             throws IOException {
         LectorMantenimiento lector = new LectorMantenimiento();
         Path directorio = raiz.resolve(DIRECTORIO_MANTENIMIENTO);
-        List<Path> archivos = localizarTodos(directorio, LectorMantenimiento.PREFIJO_ARCHIVO);
+        Set<Path> encontrados = new LinkedHashSet<>(
+                localizarTodos(directorio, LectorMantenimiento.PREFIJO_ARCHIVO));
+        // DP1 publica los planes directamente en la raiz junto a flota.txt.
+        if (Files.isDirectory(raiz)) {
+            try (Stream<Path> flujo = Files.list(raiz)) {
+                flujo.filter(Files::isRegularFile)
+                        .filter(p -> p.getFileName().toString().regionMatches(true, 0,
+                                LectorMantenimiento.PREFIJO_ARCHIVO, 0,
+                                LectorMantenimiento.PREFIJO_ARCHIVO.length()))
+                        .forEach(encontrados::add);
+            }
+        }
+        List<Path> archivos = encontrados.stream().sorted(Comparator.comparing(Path::toString)).toList();
         if (archivos.isEmpty()) {
             avisos.add("No se encontro ningun archivo " + LectorMantenimiento.PREFIJO_ARCHIVO + "m1.m2 en "
-                    + directorio + "; el escenario corre sin mantenimiento preventivo");
+                    + directorio + " ni en " + raiz + "; el escenario corre sin mantenimiento preventivo");
             return List.of();
         }
 
@@ -260,14 +277,22 @@ public final class RepositorioDatos {
 
     // ------------------------------------------------------- busqueda de archivos
 
-    /**
-     * Primer archivo del directorio cuyo nombre arranca con el prefijo dado, o
-     * {@code null} si no hay ninguno. El prefijo y no el nombre exacto, porque los archivos
-     * del curso llegan a veces con extension anadida, como {@code ventas202601.txt}.
-     */
-    private static Path localizar(Path directorio, String prefijo) throws IOException {
-        List<Path> encontrados = localizarTodos(directorio, prefijo);
-        return encontrados.isEmpty() ? null : encontrados.get(0);
+    /** Coincidencias exactas, ignorando mayusculas, para un unico mes del escenario. */
+    private static Path localizarMensual(Path directorio, List<String> nombres) throws IOException {
+        if (!Files.isDirectory(directorio)) return null;
+        List<Path> archivos;
+        try (Stream<Path> flujo = Files.walk(directorio)) {
+            archivos = flujo.filter(Files::isRegularFile)
+                    .filter(p -> nombres.stream().anyMatch(n ->
+                            n.equalsIgnoreCase(p.getFileName().toString())))
+                    .sorted(Comparator.comparing(Path::toString))
+                    .toList();
+        }
+        if (archivos.size() > 1) {
+            throw new IOException("Archivos mensuales ambiguos en " + directorio
+                    + ": " + archivos + ". Conserve un solo archivo por mes; no se combinan copias.");
+        }
+        return archivos.isEmpty() ? null : archivos.get(0);
     }
 
     /**

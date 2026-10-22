@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
@@ -151,7 +152,7 @@ public final class MotorSimulacion {
     private long nanoInicio;
     private long minutoPrimerIncumplimiento = -1L;
     private int pedidoDelPrimerIncumplimiento = -1;
-    private long minutoReplanificacionPorBloqueo = Long.MIN_VALUE;
+    private final Map<Long, LinkedHashSet<String>> motivosReplanificacion = new HashMap<>();
     /**
      * Replanificaciones lanzadas en la corrida. Es el numero de orden del que se deriva la
      * semilla de cada iteracion del planificador; solo lo toca el hilo de la simulacion.
@@ -425,6 +426,7 @@ public final class MotorSimulacion {
         }
 
         for (long minuto = 0; minuto < minutoFin; minuto += configuracion.saltoMinutos()) {
+            motivosReplanificacion.computeIfAbsent(minuto, k -> new LinkedHashSet<>()).add("PERIODICA");
             cola.programar(minuto, TipoEvento.REPLANIFICACION);
         }
         for (long minuto = 0; minuto <= minutoFin; minuto += configuracion.minutosEntreFotografias()) {
@@ -553,6 +555,10 @@ public final class MotorSimulacion {
     private String procesar(Evento evento) {
         switch (evento.tipo()) {
             case REPLANIFICACION -> {
+                var motivos = motivosReplanificacion.remove(minutoActual);
+                String detalle = motivos == null ? "SIN_MOTIVO_REGISTRADO" : String.join("|", motivos);
+                long minuto = minutoActual;
+                notificar(o -> o.alIniciarReplanificacion(minuto, detalle));
                 replanificar();
                 return null;
             }
@@ -607,6 +613,11 @@ public final class MotorSimulacion {
         if (vencidos.isEmpty()) {
             return null;
         }
+        for (int indice : vencidos) {
+            Pedido pedido = estado.pedido(indice);
+            int faltante = estado.noEntregadoDe(indice);
+            notificar(o -> o.alIncumplirPedido(minutoActual, pedido.id(), faltante));
+        }
         if (minutoPrimerIncumplimiento < 0) {
             minutoPrimerIncumplimiento = estado.pedido(vencidos.get(0)).minutoLimite();
             pedidoDelPrimerIncumplimiento = estado.pedido(vencidos.get(0)).id();
@@ -643,14 +654,12 @@ public final class MotorSimulacion {
      * de {@link TipoEvento} siga rigiendo: primero termina de actualizarse el entorno.
      */
     private void replanificarPorBloqueo() {
-        // Una poligonal larga produce varios sucesos en el mismo minuto y un bloqueo puede
-        // caer justo en la cadencia periodica: en ambos casos ya hay una replanificacion
-        // encolada para este instante y anadir otra solo gastaria presupuesto.
-        if (minutoActual % configuracion.saltoMinutos() == 0
-                || minutoReplanificacionPorBloqueo == minutoActual) {
-            return;
-        }
-        minutoReplanificacionPorBloqueo = minutoActual;
+        solicitarReplanificacion("BLOQUEO");
+    }
+
+    /** Solicitar en la cola permite procesar primero todos los cambios del entorno. */
+    private void solicitarReplanificacion(String motivo) {
+        motivosReplanificacion.computeIfAbsent(minutoActual, k -> new LinkedHashSet<>()).add(motivo);
         cola.programar(minutoActual, TipoEvento.REPLANIFICACION);
     }
 
@@ -772,6 +781,8 @@ public final class MotorSimulacion {
                 intentarTrasvase(u, tipo);
             }
         }
+        // La mision ya esta reservada y quedara excluida de la fotografia del planificador.
+        solicitarReplanificacion("AVERIA:" + codigo);
     }
 
     /** Indica si la unidad esta trabajando, es decir en ruta o detenida en una parada. */
@@ -850,6 +861,9 @@ public final class MotorSimulacion {
             mejorLlegada = llegada;
         }
         if (elegida == null) {
+            long minuto = minutoActual;
+            notificar(o -> o.alNoAsignarRescate(minuto, averiada.codigo(),
+                    "Sin unidad disponible con capacidad libre y llegada/trasvase antes del traslado"));
             return;
         }
 
@@ -862,13 +876,20 @@ public final class MotorSimulacion {
         elegida.invalidarMovimiento();
         elegida.asignarItinerario(null, ida, new int[] {ida.length - 1},
                 new long[] {mejorLlegada}, new long[] {mejorLlegada + parametrosVigentes.minutosTrasvase()},
-                minutoActual);
+                minutoActual, parametrosVigentes);
         elegida.marcarMisionTrasvase(averiada.indice());
         elegida.unidad().estado(EstadoUnidad.EN_RUTA);
         elegida.unidad().minutoDisponibleDesde(mejorLlegada + parametrosVigentes.minutosTrasvase());
         long secuencia = cola.programar(mejorLlegada, TipoEvento.LLEGADA_A_PARADA,
                 elegida.indice(), PARADA_TRASVASE).secuencia();
         elegida.secuenciaMovimiento(secuencia);
+        long minuto = minutoActual;
+        long llegada = mejorLlegada;
+        long fin = mejorLlegada + parametrosVigentes.minutosTrasvase();
+        String codigoRescate = elegida.codigo();
+        int capacidadLibre = elegida.unidad().capacidadLibre();
+        notificar(o -> o.alDespacharRescate(minuto, averiada.codigo(), codigoRescate,
+                llegada, fin, averiada.unidad().cargaABordo(), capacidadLibre));
     }
 
     /** Cierra el trasvase: la carga que quepa pasa de la unidad averiada a la que la asiste. */
@@ -883,6 +904,11 @@ public final class MotorSimulacion {
         rescate.limpiarItinerario(nodo);
         rescate.unidad().estado(EstadoUnidad.DISPONIBLE);
         rescate.unidad().minutoDisponibleDesde(minutoActual);
+        long minuto = minutoActual;
+        notificar(o -> o.alCompletarTrasvase(minuto, averiada.codigo(), rescate.codigo(),
+                trasvasado, averiada.unidad().cargaABordo(), rescate.unidad().cargaABordo()));
+        // La fotografia debe ver la carga ya transferida y la mision liberada.
+        solicitarReplanificacion("FIN_TRASVASE:" + rescate.codigo());
     }
 
     // ------------------------------------------------------- ejecucion de rutas
@@ -901,6 +927,9 @@ public final class MotorSimulacion {
 
         if (u.misionTrasvase()) {
             u.unidad().estado(EstadoUnidad.ABASTECIENDO);
+            long minuto = minutoActual;
+            notificar(o -> o.alIniciarTrasvase(minuto, estado.unidad(u.unidadAsistida()).codigo(),
+                    u.codigo(), u.minutoSalidaParada(k)));
             programarMovimiento(u, u.minutoSalidaParada(k), TipoEvento.FIN_SERVICIO, k);
             return;
         }
@@ -940,12 +969,15 @@ public final class MotorSimulacion {
             return;
         }
         u.unidad().cargaABordo(u.unidad().cargaABordo() - cantidad);
-        if (!estado.entregar(indicePedido, cantidad, minutoActual)) {
-            return;
-        }
+        boolean completado = estado.entregar(indicePedido, cantidad, minutoActual);
         Pedido pedido = estado.pedido(indicePedido);
         long minuto = minutoActual;
         String codigo = u.unidad().codigo();
+        int pendiente = estado.noEntregadoDe(indicePedido);
+        notificar(o -> o.alDescargarPedido(minuto, pedido.id(), codigo, cantidad, pendiente));
+        if (!completado) {
+            return;
+        }
         long desdeRegistro = minuto - pedido.minutoRegistro();
         notificar(o -> o.alEntregarPedido(minuto, pedido.id(), codigo, pedido.cantidad(),
                 desdeRegistro, pedido.plazoHoras()));
@@ -1084,6 +1116,7 @@ public final class MotorSimulacion {
         long milisegundos = plan.milisegundos();
         String nombre = plan.algoritmo();
         notificar(o -> o.alReplanificar(minuto, nombre, pendientes, noAtendidos, costo, milisegundos));
+        notificar(o -> o.alPublicarPlan(minuto, fotografia.instancia(), plan));
     }
 
     /**
@@ -1138,8 +1171,17 @@ public final class MotorSimulacion {
                 // En marcha: no puede darse la vuelta en mitad de la calle, de modo que se
                 // planifica desde el proximo nodo que alcanzara.
                 int indice = u.indiceRedireccion(minuto);
+                long llegadaNodo = minutoEnRedireccion(u, indice, foto);
+                // El nodo de redireccion no puede pertenecer al pasado del reloj.
+                // Si el redondeo de la parametrizacion del tramo aun lo situase antes,
+                // continuar hasta el siguiente nodo, en vez de retener el nodo anterior
+                // y cobrar de nuevo una fraccion de viaje ya recorrida.
+                int fin = u.desplazamientoParada(u.indiceParada());
+                while (llegadaNodo < minuto && indice < fin) {
+                    llegadaNodo = minutoEnRedireccion(u, ++indice, foto);
+                }
                 nodoRedireccion[i] = u.nodoEn(indice);
-                minutoDisponible[i] = Math.max(minuto, minutoEnRedireccion(u, indice, foto));
+                minutoDisponible[i] = Math.max(minuto, llegadaNodo);
             } else {
                 nodoRedireccion[i] = u.unidad().nodo();
                 minutoDisponible[i] = Math.max(minuto, u.unidad().minutoDisponibleDesde());
@@ -1200,27 +1242,12 @@ public final class MotorSimulacion {
     }
 
     /**
-     * Instante en que la unidad en marcha alcanza el nodo de redireccion, derivado hacia atras
-     * desde la llegada comprometida a su proxima parada: esa llegada menos el viaje por los
-     * kilometros que quedan, con la misma formula con que el planificador los costeara.
-     *
-     * <p>Interpolar el tramo con redondeo hacia arriba y sumarle despues el viaje restante,
-     * tambien redondeado hacia arriba, da en la mitad de los casos un minuto mas que el tramo
-     * entero. Como el motor replanifica cada salto, la llegada prevista a una misma parada
-     * derivaba hacia adelante un minuto por replanificacion y un plan con poca holgura dejaba
-     * de ser factible sin que nada hubiese cambiado. Derivado asi, replanificar la misma ruta
-     * reproduce exactamente la misma llegada. Nunca es anterior al paso fisico por el nodo
-     * menos un minuto, que es el margen del redondeo, ni posterior a la interpolacion.</p>
+     * Usa el mismo calendario discreto de nodos que la ejecucion del movimiento.
+     * La velocidad es la capturada al comprometer el tramo; la fotografia nueva puede
+     * tener otra velocidad y solo debe usarla para programar el recorrido nuevo.
      */
     private static long minutoEnRedireccion(UnidadEnCurso u, int indice, ParametrosOperacion.Instantanea foto) {
-        long interpolado = u.minutoLlegadaANodo(indice);
-        int parada = u.indiceParada();
-        int kmRestantes = u.desplazamientoParada(parada) - indice;
-        if (kmRestantes <= 0) {
-            return interpolado;
-        }
-        long desdeLlegada = u.minutoLlegadaParada(parada) - foto.minutosDeViaje(u.unidad().tipo(), kmRestantes);
-        return Math.min(interpolado, Math.max(interpolado - 1, desdeLlegada));
+        return u.minutoLlegadaANodo(indice);
     }
 
     /**
@@ -1368,7 +1395,7 @@ public final class MotorSimulacion {
 
         long salidaTramo = nodoRedireccion != nodoFisico ? minuto : Math.max(minuto, ruta.minutoInicio());
         u.asignarItinerario(ruta, Arrays.copyOf(caminoTrabajo, longitudTrabajo),
-                desplazamiento, llegadas, salidas, salidaTramo);
+                desplazamiento, llegadas, salidas, salidaTramo, instancia.parametros());
         u.unidad().nodo(nodoFisico);
         if (finServicio > minuto) {
             u.marcarServicioHeredado(finServicio);

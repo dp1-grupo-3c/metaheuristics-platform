@@ -1,6 +1,8 @@
 package org.kindbox.core.simulacion;
 
 import java.util.PriorityQueue;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Cola de prioridad de los sucesos del motor de simulacion.
@@ -30,6 +32,7 @@ public final class ColaEventos {
 
     private final PriorityQueue<Evento> cola = new PriorityQueue<>();
     private long secuencia;
+    private final Map<Long, Evento> replanificacionesPendientes = new HashMap<>();
 
     /**
      * Encola un suceso.
@@ -38,11 +41,17 @@ public final class ColaEventos {
      * @param tipo       naturaleza del suceso
      * @param referencia indice del pedido, de la unidad o del bloqueo implicado, o {@code -1}
      * @param dato       carga util adicional, cuyo significado depende del tipo
-     * @return el evento creado, cuyo numero de secuencia identifica de forma unica esta cita
+     * @return el evento creado (o la replanificacion pendiente reutilizada), cuyo numero de secuencia identifica de forma unica esta cita
      */
     public Evento programar(long minuto, TipoEvento tipo, int referencia, int dato) {
+        // Agrupar solo citas pendientes: un cambio posterior puede requerir otra en el mismo minuto.
+        if (tipo == TipoEvento.REPLANIFICACION) {
+            Evento pendiente = replanificacionesPendientes.get(minuto);
+            if (pendiente != null) return pendiente;
+        }
         Evento evento = new Evento(minuto, tipo, secuencia++, referencia, dato);
         cola.add(evento);
+        if (tipo == TipoEvento.REPLANIFICACION) replanificacionesPendientes.put(minuto, evento);
         return evento;
     }
 
@@ -58,7 +67,11 @@ public final class ColaEventos {
 
     /** Retira y devuelve el proximo suceso, o {@code null} si la cola esta vacia. */
     public Evento siguiente() {
-        return cola.poll();
+        Evento evento = cola.poll();
+        if (evento != null && evento.tipo() == TipoEvento.REPLANIFICACION) {
+            replanificacionesPendientes.remove(evento.minuto(), evento);
+        }
+        return evento;
     }
 
     /** Instante del proximo suceso, o {@link Long#MAX_VALUE} si ya no queda ninguno. */
@@ -85,5 +98,6 @@ public final class ColaEventos {
     /** Vacia la cola. Se usa al abortar una corrida. */
     public void vaciar() {
         cola.clear();
+        replanificacionesPendientes.clear();
     }
 }

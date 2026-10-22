@@ -26,9 +26,9 @@ import org.kindbox.core.modelo.Ciudad;
  * {@code 01d08h00m-01d18h30m:12,20,13,20,13,21}, que corta dos tramos durante diez horas y
  * media del primer dia del mes.</p>
  *
- * <p>Se valida que dos nodos consecutivos de la poligonal sean adyacentes en la reticula,
- * es decir que difieran en 1 Km en exactamente un eje, porque la ciudad no tiene diagonales
- * ni calles de mas de un kilometro entre esquinas. Se valida tambien que la poligonal sea
+ * <p>Los registros pueden enumerar cada esquina o solo los vertices de segmentos largos
+ * horizontales y verticales, como DP1. Estos ultimos se expanden en pasos de 1 Km antes
+ * de construir el bloqueo; los segmentos diagonales se rechazan. Se valida que la poligonal sea
  * abierta, es decir que no repita ningun nodo: el enunciado del curso 1INF54 2026-2 solo
  * usa poligonales abiertas y esa hipotesis es la que garantiza que todo nodo de la ciudad
  * sigue siendo alcanzable.</p>
@@ -124,8 +124,37 @@ public final class LectorBloqueos {
             }
             nodos[i] = Ciudad.nodo(x, y);
         }
-        validarPoligonal(nodos, archivo, numeroLinea, registro);
-        return new Bloqueo(nodos, minutoInicio, minutoFin);
+        int[] expandidos = expandirTramos(nodos, archivo, numeroLinea, registro);
+        validarPoligonal(expandidos, archivo, numeroLinea, registro);
+        return new Bloqueo(expandidos, minutoInicio, minutoFin);
+    }
+
+    /** DP1 enumera vertices; el grafo necesita todas las esquinas del segmento. */
+    private static int[] expandirTramos(int[] vertices, String archivo, int numeroLinea, String registro) {
+        List<Integer> resultado = new ArrayList<>();
+        resultado.add(vertices[0]);
+        for (int i = 1; i < vertices.length; i++) {
+            int x = Ciudad.x(vertices[i - 1]);
+            int y = Ciudad.y(vertices[i - 1]);
+            int destinoX = Ciudad.x(vertices[i]);
+            int destinoY = Ciudad.y(vertices[i]);
+            if (x != destinoX && y != destinoY) {
+                throw error(archivo, numeroLinea, registro, "el tramo entre los vertices "
+                        + i + " y " + (i + 1) + " es diagonal; solo se admiten tramos horizontales o verticales");
+            }
+            if (x == destinoX && y == destinoY) {
+                throw error(archivo, numeroLinea, registro, "la poligonal repite el nodo "
+                        + Ciudad.texto(vertices[i]) + " de forma consecutiva");
+            }
+            int pasoX = Integer.compare(destinoX, x);
+            int pasoY = Integer.compare(destinoY, y);
+            while (x != destinoX || y != destinoY) {
+                x += pasoX;
+                y += pasoY;
+                resultado.add(Ciudad.nodo(x, y));
+            }
+        }
+        return resultado.stream().mapToInt(Integer::intValue).toArray();
     }
 
     /**
