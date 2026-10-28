@@ -1,5 +1,7 @@
 # Arquitectura de KindBox y ruta de implementación
 
+Actualización del 28 de octubre de 2026: la base operativa descrita como pendiente en esta revisión está implementada en `core.operacion` y `service.operacion`. Ver [OPERACIONES_DIARIAS.md](OPERACIONES_DIARIAS.md) para el contrato actual y sus pruebas. Persistencia, recuperación, integración de la pantalla diaria y ejecución simultánea con simulaciones siguen fuera de esta entrega. El texto siguiente conserva el diagnóstico previo.
+
 Revisión del 30 de septiembre de 2026 del documento `24.dis.arquitectura.v02.pdf`,
 la Lista de Exigencias v02 y los repositorios `metaheuristics-platform` y `web-app`.
 La operación diaria en tiempo real es parte del producto, junto con las simulaciones.

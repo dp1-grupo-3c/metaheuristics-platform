@@ -84,6 +84,7 @@ public class ServicioSimulacion {
     /** Cadencia con que se revisan las averias programadas por carga masiva, en milisegundos. */
     private static final long CADENCIA_DESPACHO_AVERIAS_MS = 250L;
 
+    private final org.kindbox.service.operacion.CoordinadorEjecucion coordinador;
     private final RepositorioDatos repositorio;
     private final ParametrosOperacion parametros;
     private final FabricaMotor fabrica;
@@ -111,6 +112,16 @@ public class ServicioSimulacion {
     public ServicioSimulacion(RepositorioDatos repositorio, ParametrosOperacion parametros,
                               FabricaMotor fabrica, RegistroAlgoritmos algoritmos,
                               PublicadorDeEstado publicador, PropiedadesKindBox propiedades) {
+        this(repositorio, parametros, fabrica, algoritmos, publicador, propiedades,
+                new org.kindbox.service.operacion.CoordinadorEjecucion());
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public ServicioSimulacion(RepositorioDatos repositorio, ParametrosOperacion parametros,
+                              FabricaMotor fabrica, RegistroAlgoritmos algoritmos,
+                              PublicadorDeEstado publicador, PropiedadesKindBox propiedades,
+                              org.kindbox.service.operacion.CoordinadorEjecucion coordinador) {
+        this.coordinador = coordinador;
         this.repositorio = repositorio;
         this.parametros = parametros;
         this.fabrica = fabrica;
@@ -127,7 +138,7 @@ public class ServicioSimulacion {
     }
 
     @PreDestroy
-    void cerrar() {
+    public void cerrar() {
         for (Corrida corrida : corridas.values()) {
             if (corrida.enCurso() && corrida.motor() != null) {
                 corrida.motor().cancelar();
@@ -154,6 +165,17 @@ public class ServicioSimulacion {
      * @throws ErrorDeDatos      si el escenario no se pudo leer del directorio de datos
      */
     public synchronized ResumenCorrida arrancar(SolicitudSimulacion solicitud) {
+        var reserva = coordinador.reservar("simulacion");
+        try {
+            return arrancarReservada(solicitud, reserva);
+        } catch (RuntimeException e) {
+            reserva.close();
+            throw e;
+        }
+    }
+
+    private ResumenCorrida arrancarReservada(SolicitudSimulacion solicitud,
+            org.kindbox.service.operacion.CoordinadorEjecucion.Reserva reserva) {
         Corrida activa = corridaActiva();
         if (activa != null) {
             throw new ConflictoDeEstado("Ya hay una simulacion en curso (" + activa.id()
@@ -229,14 +251,15 @@ public class ServicioSimulacion {
 
         LOG.info("Arranca la corrida {}: {} del {} al {}, {} pedidos, algoritmo {}, K={}",
                 id, tipo, primerDia, ultimoDia, datos.pedidos().size(), algoritmo, String.format("%.1f", factor));
-        ejecutor.submit(() -> ejecutarCorrida(corrida));
+        ejecutor.submit(() -> ejecutarCorrida(corrida, reserva));
 
         ResumenCorrida resumen = resumen(corrida);
         publicador.publicar(MensajeVisualizador.TIPO_CORRIDA, id, resumen);
         return resumen;
     }
 
-    private void ejecutarCorrida(Corrida corrida) {
+    private void ejecutarCorrida(Corrida corrida,
+            org.kindbox.service.operacion.CoordinadorEjecucion.Reserva reserva) {
         Thread.currentThread().setName("simulacion-" + corrida.id());
         corrida.estado(EstadoCorrida.EN_CURSO);
         try {
@@ -248,6 +271,8 @@ public class ServicioSimulacion {
             corrida.error("La corrida fallo: " + (e.getMessage() == null ? e.getClass().getSimpleName()
                     : e.getMessage()));
             LOG.error("La corrida {} fallo", corrida.id(), e);
+        } finally {
+            reserva.close();
         }
     }
 

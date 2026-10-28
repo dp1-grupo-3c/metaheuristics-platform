@@ -368,7 +368,9 @@ La revisión de los dos repositorios y el plan para completar el producto están
 [docs/REVISION_ARQUITECTURA.md](docs/REVISION_ARQUITECTURA.md). La interfaz de producto
 es `web-app`; el empaquetador actual aún entrega `visualizador/`.
 El modo `DIA_A_DIA` avanza a 1× sobre una jornada precargada y limita cada planificación
-a 18 segundos. La operación continua con pedidos dinámicos y recuperación sigue pendiente.
+a 18 segundos. La API de operación continua con pedidos dinámicos y su contrato de integración
+están documentados en [docs/OPERACIONES_DIARIAS.md](docs/OPERACIONES_DIARIAS.md).
+La recuperación tras reinicio y la conexión de la pantalla diaria a esta API siguen pendientes.
 
 ## Experimentación numérica masiva en una computadora local
 

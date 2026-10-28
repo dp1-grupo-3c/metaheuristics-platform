@@ -53,14 +53,18 @@ public class ConfiguracionWebSocket implements WebSocketConfigurer {
     public static final String PROPIEDAD_BUFFER_SALIDA = "org.apache.tomcat.websocket.DEFAULT_BUFFER_SIZE";
 
     private final ManejadorWebSocketSimulacion manejador;
+    private final org.kindbox.service.web.ManejadorWebSocketOperacion operaciones;
 
-    public ConfiguracionWebSocket(ManejadorWebSocketSimulacion manejador) {
+    public ConfiguracionWebSocket(ManejadorWebSocketSimulacion manejador,
+            org.kindbox.service.web.ManejadorWebSocketOperacion operaciones) {
         this.manejador = manejador;
+        this.operaciones = operaciones;
     }
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registro) {
         registro.addHandler(manejador, RUTA_SIMULACION).setAllowedOriginPatterns("*");
+        registro.addHandler(operaciones, "/ws/operaciones").setAllowedOriginPatterns("*");
     }
 
     /** Amplia el buffer de texto del contenedor para que cada fotografia viaje entera. */
