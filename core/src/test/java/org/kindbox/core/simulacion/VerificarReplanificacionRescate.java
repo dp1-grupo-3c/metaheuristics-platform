@@ -13,13 +13,13 @@ import org.kindbox.core.simulacion.*;
 public class VerificarReplanificacionRescate {
  static void exigir(boolean c,String m){if(!c)throw new AssertionError(m);}
  static Object campo(Object o,String nombre)throws Exception{
-  Field f=o.getClass().getDeclaredField(nombre);f.setAccessible(true);return f.get(o);
+  Field f=org.kindbox.core.simulacion.MotorEjecucion.class.getDeclaredField(nombre);f.setAccessible(true);return f.get(o);
  }
  static void reloj(MotorSimulacion m,long minuto)throws Exception{
-  Field f=MotorSimulacion.class.getDeclaredField("minutoActual");f.setAccessible(true);f.setLong(m,minuto);
+  Field f=org.kindbox.core.simulacion.MotorEjecucion.class.getDeclaredField("minutoActual");f.setAccessible(true);f.setLong(m,minuto);
  }
  static Object invocar(Object o,String nombre,Class<?>[] tipos,Object...args)throws Exception{
-  Method f=o.getClass().getDeclaredMethod(nombre,tipos);f.setAccessible(true);
+  Method f=org.kindbox.core.simulacion.MotorEjecucion.class.getDeclaredMethod(nombre,tipos);f.setAccessible(true);
   try{return f.invoke(o,args);}catch(InvocationTargetException ex){throw new RuntimeException(ex.getCause());}
  }
  static final class Planificador implements Algoritmo {

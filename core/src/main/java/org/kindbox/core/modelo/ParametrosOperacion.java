@@ -219,7 +219,11 @@ public final class ParametrosOperacion {
             velocidadKmH = velocidadKmH.clone();
         }
 
-        /** Velocidad del tipo en Km/h. */
+        @Override
+        public double[] velocidadKmH() {
+            return velocidadKmH.clone();
+        }
+
         public double velocidad(TipoUnidad tipo) {
             return velocidadKmH[tipo.ordinal()];
         }

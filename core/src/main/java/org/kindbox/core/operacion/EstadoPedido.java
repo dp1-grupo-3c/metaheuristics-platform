@@ -1,0 +1,5 @@
+package org.kindbox.core.operacion;
+
+public enum EstadoPedido {
+    REGISTRADO, PLANIFICADO, EN_TRANSITO, EN_REPLANIFICACION, ENTREGADO_PARCIALMENTE, ENTREGADO, CANCELADO
+}

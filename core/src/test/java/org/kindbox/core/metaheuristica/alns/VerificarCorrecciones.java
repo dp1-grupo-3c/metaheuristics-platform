@@ -29,7 +29,7 @@ public final class VerificarCorrecciones {
 
     private static long redireccion(UnidadEnCurso u, int indice, ParametrosOperacion.Instantanea foto)
             throws Exception {
-        Method m = MotorSimulacion.class.getDeclaredMethod("minutoEnRedireccion",
+        Method m = org.kindbox.core.simulacion.MotorEjecucion.class.getDeclaredMethod("minutoEnRedireccion",
                 UnidadEnCurso.class, int.class, ParametrosOperacion.Instantanea.class);
         m.setAccessible(true);
         return (long) m.invoke(null, u, indice, foto);

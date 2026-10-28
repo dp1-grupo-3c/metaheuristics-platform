@@ -1,6 +1,7 @@
 package org.kindbox.core.simulacion;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -54,7 +55,7 @@ import org.kindbox.core.problema.TipoParada;
 public final class EstadoSimulacion {
 
     private final CalendarioEscenario calendario;
-    private final RegistroBloqueos bloqueos;
+    private RegistroBloqueos bloqueos;
 
     private final List<Almacen> almacenes;
     private final int[] inventario;
@@ -63,11 +64,11 @@ public final class EstadoSimulacion {
 
     private final List<Pedido> pedidos;
     private final Map<Integer, Integer> indicePorIdPedido;
-    private final int[] pendiente;
-    private final boolean[] registrado;
-    private final boolean[] completado;
-    private final boolean[] incumplido;
-    private final boolean[] conEntregaParcial;
+    private int[] pendiente;
+    private boolean[] registrado;
+    private boolean[] completado;
+    private boolean[] incumplido;
+    private boolean[] conEntregaParcial;
     private final PriorityQueue<Integer> vencimientos;
 
     private final UnidadEnCurso[] unidades;
@@ -112,7 +113,7 @@ public final class EstadoSimulacion {
         }
         this.indiceCentral = central;
 
-        this.pedidos = List.copyOf(pedidos);
+        this.pedidos = new ArrayList<>(pedidos);
         int cantidad = this.pedidos.size();
         this.pendiente = new int[cantidad];
         this.registrado = new boolean[cantidad];
@@ -230,7 +231,7 @@ public final class EstadoSimulacion {
 
     /** Pedidos del escenario, ordenados por instante de registro. */
     public List<Pedido> pedidos() {
-        return pedidos;
+        return List.copyOf(pedidos);
     }
 
     /** Pedido en la posicion dada. */
@@ -261,6 +262,29 @@ public final class EstadoSimulacion {
      */
     public int noEntregadoDe(int indice) {
         return registrado[indice] ? pendiente[indice] : pedidos.get(indice).cantidad();
+    }
+
+    public int incorporarPedido(Pedido pedido) {
+        if (indicePorIdPedido.containsKey(pedido.id())) {
+            throw new IllegalArgumentException("El identificador de pedido ya existe");
+        }
+        int indice = pedidos.size();
+        if (indice == pendiente.length) {
+            int capacidad = Math.max(16, indice * 2);
+            pendiente = Arrays.copyOf(pendiente, capacidad);
+            registrado = Arrays.copyOf(registrado, capacidad);
+            completado = Arrays.copyOf(completado, capacidad);
+            incumplido = Arrays.copyOf(incumplido, capacidad);
+            conEntregaParcial = Arrays.copyOf(conEntregaParcial, capacidad);
+        }
+        pedidos.add(pedido);
+        indicePorIdPedido.put(pedido.id(), indice);
+        registrarPedido(indice);
+        return indice;
+    }
+
+    public void actualizarBloqueos(RegistroBloqueos registro) {
+        bloqueos = java.util.Objects.requireNonNull(registro);
     }
 
     /** Registra la llegada de un pedido y lo incorpora al conjunto de pendientes. */

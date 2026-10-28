@@ -102,6 +102,18 @@ public final class RepositorioDatos {
         return new DatosEscenario(calendario, primerDia, ultimoDia, flota, pedidos, bloqueos, mantenimientos, avisos);
     }
 
+    public DatosEscenario cargarEntorno(LocalDate primerDia, LocalDate ultimoDia,
+                                        CalendarioEscenario calendario) throws IOException {
+        if (primerDia == null || ultimoDia == null || calendario == null || ultimoDia.isBefore(primerDia)) {
+            throw new IllegalArgumentException("El rango del entorno es invalido");
+        }
+        List<String> avisos = new ArrayList<>();
+        long fin = calendario.aMinutos(ultimoDia.plusDays(1).atStartOfDay());
+        return new DatosEscenario(calendario, primerDia, ultimoDia, cargarFlota(avisos), List.of(),
+                cargarBloqueos(calendario, primerDia, ultimoDia, fin, avisos),
+                cargarMantenimientos(primerDia, ultimoDia, avisos), avisos);
+    }
+
     // ------------------------------------------------------------------ flota
 
     /** Lee la flota, o usa la del enunciado si el directorio de datos no la trae. */
