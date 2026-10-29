@@ -62,6 +62,12 @@ public class PropiedadesKindBox {
     /** Tamano maximo de pagina admitido en la tabla de pedidos. */
     private int tamanoMaximoPaginaPedidos = 500;
 
+    /**
+     * Archivo JSON del registro de clientes. Debe estar en un directorio escribible y fuera
+     * de la version desplegada, que es de solo lectura.
+     */
+    private String archivoClientes = "clientes/clientes.json";
+
     public String getDirectorioDatos() {
         return directorioDatos;
     }
@@ -172,6 +178,14 @@ public class PropiedadesKindBox {
 
     public void setTamanoMaximoPaginaPedidos(int tamanoMaximoPaginaPedidos) {
         this.tamanoMaximoPaginaPedidos = tamanoMaximoPaginaPedidos;
+    }
+
+    public String getArchivoClientes() {
+        return archivoClientes;
+    }
+
+    public void setArchivoClientes(String archivoClientes) {
+        this.archivoClientes = archivoClientes;
     }
 
     /**
