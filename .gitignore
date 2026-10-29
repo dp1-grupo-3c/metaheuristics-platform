@@ -17,6 +17,8 @@ pom.xml.versionsBackup
 /data/
 /salidas/
 /expnum-2026-2027-resultados.tar.gz
+# Registro de clientes: contiene datos personales.
+/clientes/
 *.bloqueadas
 ventas[0-9][0-9][0-9][0-9][0-9][0-9]
 mant.preventivo.*

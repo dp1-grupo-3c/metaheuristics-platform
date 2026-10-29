@@ -45,6 +45,9 @@ KINDBOX_CORRIDAS_EN_MEMORIA=3
 SERVER_TOMCAT_THREADS_MAX=24
 CONFIGURACION
 fi
+# Tambien en instalaciones previas, cuyo entorno no se reescribe.
+grep -q '^KINDBOX_ARCHIVO_CLIENTES=' /etc/kindbox/entorno \
+    || echo 'KINDBOX_ARCHIVO_CLIENTES=/var/lib/kindbox/clientes.json' >> /etc/kindbox/entorno
 anterior=$(readlink /opt/kindbox/actual || true)
 respaldo=$(mktemp -d)
 for archivo in /etc/nginx/sites-enabled/kindbox /etc/systemd/system/kindbox.service; do

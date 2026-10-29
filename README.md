@@ -288,6 +288,15 @@ metodo no mapeado en esa ruta, 409 para una operacion que choca con el estado (a
 corrida ya en curso, o averiar una unidad ya averiada o en mantenimiento), 413 para un archivo
 de averias por encima del limite y 415 para un tipo de contenido que el extremo no sabe leer.
 
+El registro de clientes se publica en `/api/clientes`: `POST` registra, `GET` lista (admite
+`busqueda` por documento o nombre), `GET /{documento}` busca y `PUT /{documento}` edita. Una
+persona natural se identifica con DNI de 8 digitos y una empresa con RUC de 11 que empieza con
+10 o 20 y cumple el digito verificador. El documento es el `codigoCliente` de sus pedidos y,
+junto con el tipo, no se puede cambiar. A diferencia de la operacion diaria, los clientes se
+guardan en el archivo JSON de `kindbox.archivo-clientes` (por defecto `clientes/clientes.json`;
+en el servidor `/var/lib/kindbox/clientes.json`) y sobreviven al reinicio. Un documento repetido
+devuelve 409.
+
 Al conectarse al canal, un cliente recibe de inmediato la cabecera `corrida` y la ultima
 `instantanea` (o el `resultado` final) de la corrida activa o, si no hay ninguna activa, de la
 ultima que se ejecuto. Al arrancar una corrida nueva se descarta lo que quedaba de la anterior,
