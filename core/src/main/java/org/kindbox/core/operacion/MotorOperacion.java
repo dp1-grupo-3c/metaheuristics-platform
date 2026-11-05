@@ -23,6 +23,7 @@ import org.kindbox.core.modelo.EstadoUnidad;
 import org.kindbox.core.modelo.TipoAveria;
 import org.kindbox.core.problema.InstanciaPlanificacion;
 import org.kindbox.core.simulacion.ConfiguracionEscenario;
+import org.kindbox.core.simulacion.EntregaRegistrada;
 import org.kindbox.core.simulacion.EnvioPedido;
 import org.kindbox.core.simulacion.ModoReloj;
 import org.kindbox.core.simulacion.MotorEjecucion;
@@ -117,6 +118,10 @@ public final class MotorOperacion implements AutoCloseable, ObservadorSimulacion
     }
 
     public VistaOperacion vista() { return vista; }
+
+    public List<EntregaRegistrada> entregasRecientes() {
+        return ejecucion.entregasRecientes();
+    }
 
     public synchronized void actualizar() {
         if (contexto.estado() != VistaOperacion.Estado.EN_CURSO) return;

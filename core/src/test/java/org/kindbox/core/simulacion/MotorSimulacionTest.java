@@ -406,6 +406,11 @@ class MotorSimulacionTest {
 
         assertEquals(EstadoCorrida.CULMINADA, resultado.estado(), resultado.mensaje());
         assertTrue(conEnvios[0] > 0, "ninguna fotografia tuvo envios");
+        // La corrida dura un dia, asi que el registro conserva todas sus entregas.
+        List<EntregaRegistrada> entregas = motor.entregasRecientes();
+        assertEquals(resultado.metricas().unidadesEntregadas(), entregas.stream().mapToInt(EntregaRegistrada::cantidad).sum(),
+                "el registro cuadra con los paquetes entregados");
+        assertTrue(entregas.stream().allMatch(e -> e.idAlmacenCarga() >= 0), "cada entrega sabe de que almacen salio");
         assertTrue(errores.isEmpty(), errores.size() + " incoherencias: " + errores.subList(0, Math.min(3, errores.size())));
     }
 

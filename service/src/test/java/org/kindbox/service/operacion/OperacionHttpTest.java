@@ -119,6 +119,21 @@ class OperacionHttpTest {
                 .andExpect(status().isNotFound());
     }
 
+    @Test void losEnviosDeUnAlmacenSeConsultanPorHttp() throws Exception {
+        String id = iniciar();
+        mvc.perform(get("/api/operaciones/{id}/almacenes/{almacen}/envios", id, 0))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.almacen.id").value(0))
+                .andExpect(jsonPath("$.horas").value(4)).andExpect(jsonPath("$.enTransito").isArray())
+                .andExpect(jsonPath("$.porSalir").isArray()).andExpect(jsonPath("$.entregados").isArray());
+        mvc.perform(get("/api/operaciones/{id}/almacenes/{almacen}/envios", id, 1).param("horas", "24"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.horas").value(24));
+        mvc.perform(get("/api/operaciones/{id}/almacenes/{almacen}/envios", id, 9)).andExpect(status().isNotFound());
+        mvc.perform(get("/api/operaciones/{id}/almacenes/{almacen}/envios", id, 0).param("horas", "0"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/operaciones/{id}/almacenes/{almacen}/envios", id, 0).param("horas", "25"))
+                .andExpect(status().isBadRequest());
+    }
+
     @Test void validacionYConflictosTienenRespuestaEstable() throws Exception {
         String id = iniciar();
         mvc.perform(post("/api/operaciones")).andExpect(status().isConflict());

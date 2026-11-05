@@ -5,6 +5,7 @@ import org.kindbox.core.operacion.SolicitudAveriaOperacion;
 import org.kindbox.core.operacion.SolicitudParametrosOperacion;
 import org.kindbox.core.operacion.SolicitudPedidoOperacion;
 import org.kindbox.core.operacion.VistaOperacion;
+import org.kindbox.core.simulacion.EnviosAlmacen;
 import org.kindbox.core.simulacion.MetricasSimulacion;
 import org.kindbox.service.dto.PaginaPedidosOperacion;
 import org.kindbox.service.dto.RutasPedido;
@@ -70,6 +71,13 @@ public class ControladorOperacion {
             @RequestParam(name = "busqueda", required = false) String busqueda,
             @RequestParam(name = "soloActivos", defaultValue = "false") boolean soloActivos) {
         return servicio.pedidos(id, pagina, tamano, busqueda, soloActivos);
+    }
+
+    // En transito, salidas de las proximas horas y entregas de las ultimas horas de un almacen.
+    @GetMapping("/{id}/almacenes/{almacen}/envios")
+    public EnviosAlmacen enviosAlmacen(@PathVariable("id") String id, @PathVariable("almacen") int almacen,
+            @RequestParam(name = "horas", required = false) Integer horas) {
+        return servicio.enviosAlmacen(id, almacen, horas);
     }
 
     // Camino de cada unidad que lleva el pedido hasta su entrega; con paquete, solo la que lo lleva.

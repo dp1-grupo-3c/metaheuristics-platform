@@ -396,6 +396,16 @@ public class MotorEjecucion {
      * Pedidos conocidos, hayan llegado o no. Se copian bajo el candado porque el escenario
      * abierto amplia la lista mientras corre.
      */
+    // Entregas de las ultimas 24 horas simuladas, leidas bajo el candado del motor.
+    public List<EntregaRegistrada> entregasRecientes() {
+        candado.lock();
+        try {
+            return estado.entregasRecientes();
+        } finally {
+            candado.unlock();
+        }
+    }
+
     public List<Pedido> pedidosConocidos() {
         candado.lock();
         try {
@@ -1104,6 +1114,7 @@ public class MotorEjecucion {
         u.unidad().cargaABordo(u.unidad().cargaABordo() - cantidad);
         boolean completado = estado.entregar(indicePedido, cantidad, minutoActual);
         Pedido pedido = estado.pedido(indicePedido);
+        estado.anotarEntrega(minutoActual, pedido.id(), u.codigo(), u.idAlmacenOrigen(), cantidad);
         long minuto = minutoActual;
         String codigo = u.unidad().codigo();
         int pendiente = estado.noEntregadoDe(indicePedido);

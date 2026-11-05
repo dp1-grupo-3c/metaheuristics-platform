@@ -21,6 +21,8 @@ import org.kindbox.core.operacion.SolicitudPedidoOperacion;
 import org.kindbox.core.operacion.VistaOperacion;
 import org.kindbox.core.operacion.VistaPedidoOperacion;
 import org.kindbox.core.simulacion.EnvioPedido;
+import org.kindbox.core.simulacion.EnviosAlmacen;
+import org.kindbox.core.simulacion.VistaAlmacen;
 import org.kindbox.service.dto.PaginaPedidosOperacion;
 import org.kindbox.service.dto.RutasPedido;
 import org.kindbox.service.dto.SolicitudOperacion;
@@ -29,6 +31,7 @@ import org.kindbox.service.error.ErrorDeDatos;
 import org.kindbox.service.error.RecursoNoEncontrado;
 import org.kindbox.service.error.SolicitudInvalida;
 import org.kindbox.service.simulacion.RegistroAlgoritmos;
+import org.kindbox.service.simulacion.ServicioSimulacion;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -160,6 +163,15 @@ public class ServicioOperacion implements AutoCloseable {
         int hasta = Math.min(desde + tamano, filas.size());
         return new PaginaPedidosOperacion(id, vista.revision(), filas.subList(desde, hasta), pagina, tamano,
                 filas.size(), (filas.size() + tamano - 1) / tamano);
+    }
+
+    public synchronized EnviosAlmacen enviosAlmacen(String id, int idAlmacen, Integer horas) {
+        int ventana = ServicioSimulacion.horasDeVentana(horas);
+        MotorOperacion motor = requerir(id);
+        VistaOperacion vista = motor.vista();
+        VistaAlmacen almacen = vista.instantanea().almacenes().stream().filter(a -> a.id() == idAlmacen)
+                .findFirst().orElseThrow(() -> new RecursoNoEncontrado("No existe el almacen " + idAlmacen));
+        return EnviosAlmacen.de(vista.instantanea(), motor.entregasRecientes(), almacen, ventana);
     }
 
     public synchronized RutasPedido rutasPedido(String id, int idPedido, Integer paquete) {

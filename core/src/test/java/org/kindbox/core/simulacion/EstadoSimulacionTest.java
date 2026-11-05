@@ -217,4 +217,18 @@ class EstadoSimulacionTest {
         assertEquals(List.of(120L, 130L), List.of(esperando.minutoSalidaTramo(), esperando.minutoLlegadaTramo()));
         assertEquals(VistaUnidad.Fase.LLEGANDO, estado.vistaDe(bici, 125L, p).fase());
     }
+
+    @Test
+    @DisplayName("El registro de entregas guarda solo las ultimas 24 horas")
+    void elRegistroDeEntregasSeRecorta() {
+        EstadoSimulacion estado = estadoCon(List.of());
+        estado.anotarEntrega(0L, 1, "TA01", 0, 3);
+        estado.anotarEntrega(1000L, 2, "TM01", 1, 2);
+        estado.anotarEntrega(1440L, 3, "TB01", 2, 1);
+        assertEquals(List.of(1, 2, 3), estado.entregasRecientes().stream().map(EntregaRegistrada::idPedido).toList(),
+                "a los 1440 la del minuto cero aun cae en la ventana");
+        estado.anotarEntrega(2000L, 4, "TA01", 0, 4);
+        assertEquals(List.of(2, 3, 4), estado.entregasRecientes().stream().map(EntregaRegistrada::idPedido).toList());
+        assertEquals(LocalDate.of(2026, 9, 2).atTime(9, 20), estado.entregasRecientes().get(2).fechaHora());
+    }
 }

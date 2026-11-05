@@ -349,6 +349,16 @@ Un pedido que no existe, o que aun no se registra, responde 404; un paquete fuer
 y un pedido sin unidad asignada trae `rutas` vacio. Cada pedido de `pedidosABordo` trae ademas
 `nodosHastaEntrega`, para cortar el mismo tramo desde `caminoPendiente`.
 
+Para el panel de almacenes, `GET /api/simulaciones/{id}/almacenes/{almacen}/envios?horas=4` (o
+`/api/operaciones/{id}/...`) devuelve el `almacen` y tres listas:
+- `enTransito`: envios cargados en ese almacen que ya salieron y van a bordo.
+- `porSalir`: envios que salen de el en las proximas `horas`, incluidos los que se estan cargando.
+- `entregados`: descargas de las ultimas `horas` cuya carga salio de ese almacen.
+
+Cada lista trae su total de paquetes. `horas` va de 1 a 24, porque el motor guarda las entregas del
+ultimo dia simulado; por defecto es 4. Un almacen que no existe responde 404 y una ventana fuera de
+rango, 400.
+
 La flota se edita con `PUT /api/parametros/flota`, con cuerpo
 `{"unidades":{"AUTO":{"cantidad":10,"kmPorHora":40},...}}`; en cada tipo la cantidad (0 a 99) y
 la velocidad son opcionales. Se valida todo antes de aplicar: la velocidad cambia en caliente y

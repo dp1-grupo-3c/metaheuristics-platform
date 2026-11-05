@@ -1,5 +1,6 @@
 package org.kindbox.core.simulacion;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -86,6 +87,9 @@ public final class EstadoSimulacion {
     private final List<MetricasSimulacion.ActivacionSemaforo> activaciones = new ArrayList<>();
     private final int[] averiasPorTipo = new int[TipoAveria.values().length];
     private long ejecucionesPlanificador;
+    // Entregas de las ultimas horas, para los paneles de almacen; las mas antiguas se descartan.
+    public static final long MINUTOS_REGISTRO_ENTREGAS = CalendarioEscenario.MINUTOS_POR_DIA;
+    private final ArrayDeque<EntregaRegistrada> entregasRecientes = new ArrayDeque<>();
     private long milisegundosPlanificador;
 
     /**
@@ -219,6 +223,19 @@ public final class EstadoSimulacion {
     /** Color vigente del semaforo del almacen. */
     public ColorSemaforo colorAlmacen(int indiceAlmacen) {
         return colorAlmacen[indiceAlmacen];
+    }
+
+    public void anotarEntrega(long minuto, int idPedido, String codigoUnidad, int idAlmacenCarga, int cantidad) {
+        entregasRecientes.addLast(new EntregaRegistrada(minuto, calendario.aFecha(minuto), idPedido, codigoUnidad,
+                idAlmacenCarga, cantidad));
+        while (!entregasRecientes.isEmpty()
+                && entregasRecientes.peekFirst().minuto() < minuto - MINUTOS_REGISTRO_ENTREGAS) {
+            entregasRecientes.pollFirst();
+        }
+    }
+
+    public List<EntregaRegistrada> entregasRecientes() {
+        return List.copyOf(entregasRecientes);
     }
 
     /** Anota una activacion del semaforo en el registro cronologico de las metricas. */

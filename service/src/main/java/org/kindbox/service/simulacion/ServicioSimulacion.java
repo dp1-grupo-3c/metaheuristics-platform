@@ -34,7 +34,9 @@ import org.kindbox.core.modelo.TipoUnidad;
 import org.kindbox.core.modelo.UnidadTransporte;
 import org.kindbox.core.simulacion.ColorSemaforo;
 import org.kindbox.core.simulacion.ConfiguracionEscenario;
+import org.kindbox.core.simulacion.EntregaRegistrada;
 import org.kindbox.core.simulacion.EnvioPedido;
+import org.kindbox.core.simulacion.EnviosAlmacen;
 import org.kindbox.core.simulacion.EstadoCorrida;
 import org.kindbox.core.simulacion.EstadoSimulacion;
 import org.kindbox.core.simulacion.InstantaneaSimulacion;
@@ -455,6 +457,29 @@ public class ServicioSimulacion {
         int hasta = Math.min(desde + filasPorPagina, total);
         return new PaginaPedidos(filtradas.subList(desde, hasta), numeroPagina, filasPorPagina,
                 total, totalPaginas, filtro, soloActivos);
+    }
+
+    // Envios del almacen segun la ultima fotografia y entregas de las ultimas horas.
+    public EnviosAlmacen enviosAlmacen(String id, int idAlmacen, Integer horas) {
+        Corrida corrida = requerir(id);
+        int ventana = horasDeVentana(horas);
+        InstantaneaSimulacion foto = corrida.instantanea();
+        if (foto == null) {
+            throw new ConflictoDeEstado("La corrida " + id + " todavia no tiene fotografia");
+        }
+        VistaAlmacen almacen = foto.almacenes().stream().filter(a -> a.id() == idAlmacen).findFirst()
+                .orElseThrow(() -> new RecursoNoEncontrado("No existe el almacen " + idAlmacen));
+        List<EntregaRegistrada> entregas = corrida.motor() == null ? List.of() : corrida.motor().entregasRecientes();
+        return EnviosAlmacen.de(foto, entregas, almacen, ventana);
+    }
+
+    // La ventana va de 1 a 24 horas, que es lo que guarda el registro de entregas.
+    public static int horasDeVentana(Integer horas) {
+        int valor = horas == null ? 4 : horas;
+        if (valor < 1 || valor * 60L > EstadoSimulacion.MINUTOS_REGISTRO_ENTREGAS) {
+            throw new SolicitudInvalida("Las horas de la ventana deben estar entre 1 y 24: " + valor);
+        }
+        return valor;
     }
 
     // Solo cuentan los pedidos ya registrados en el minuto simulado, como en el listado.
