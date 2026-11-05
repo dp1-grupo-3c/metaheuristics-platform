@@ -79,6 +79,20 @@ public final class ParametrosOperacion {
         }
     }
 
+    // Los atributos viven en el tipo de averia; aqui solo se registra el cambio en la version.
+    public void atributosAveria(TipoAveria tipo, AtributosAveria atributos) {
+        if (tipo == null) {
+            throw new IllegalArgumentException("El tipo de averia es obligatorio");
+        }
+        candado.lock();
+        try {
+            tipo.atributos(atributos);
+            version++;
+        } finally {
+            candado.unlock();
+        }
+    }
+
     public int minutosAcondicionamiento() {
         return minutosAcondicionamiento;
     }

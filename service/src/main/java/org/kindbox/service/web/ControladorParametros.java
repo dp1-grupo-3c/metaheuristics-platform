@@ -5,8 +5,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import org.kindbox.core.modelo.Almacen;
+import org.kindbox.core.modelo.AtributosAveria;
 import org.kindbox.core.modelo.ParametrosOperacion;
+import org.kindbox.core.modelo.TipoAveria;
 import org.kindbox.core.modelo.TipoUnidad;
+import org.kindbox.service.dto.SolicitudAtributosAveria;
 import org.kindbox.service.dto.SolicitudSemaforo;
 import org.kindbox.service.dto.SolicitudVelocidad;
 import org.kindbox.service.dto.VistaParametros;
@@ -94,6 +97,57 @@ public class ControladorParametros {
         return vista();
     }
 
+    // Cambio parcial: los atributos que no llegan conservan su valor vigente.
+    @PutMapping("/averias")
+    public VistaParametros averias(@RequestBody SolicitudAtributosAveria solicitud) {
+        if (solicitud == null || solicitud.tipo() == null) {
+            throw new SolicitudInvalida("Falta el tipo de averia. Los admitidos son 1, 2 y 3");
+        }
+        if (solicitud.minutosEnElLugar() == null && solicitud.turnosHastaReincorporacion() == null
+                && solicitud.diasMantenimiento() == null) {
+            throw new SolicitudInvalida("Falta al menos uno de minutosEnElLugar, turnosHastaReincorporacion"
+                    + " o diasMantenimiento");
+        }
+        TipoAveria tipo;
+        AtributosAveria nuevos;
+        try {
+            tipo = TipoAveria.porCodigo(solicitud.tipo());
+            synchronized (this) {
+                AtributosAveria actuales = tipo.atributos();
+                nuevos = new AtributosAveria(
+                        valorO(solicitud.minutosEnElLugar(), actuales.minutosEnElLugar()),
+                        valorO(solicitud.turnosHastaReincorporacion(), actuales.turnosHastaReincorporacion()),
+                        valorO(solicitud.diasMantenimiento(), actuales.diasMantenimiento()));
+                parametros.atributosAveria(tipo, nuevos);
+            }
+        } catch (IllegalArgumentException e) {
+            throw new SolicitudInvalida(e.getMessage(), e);
+        }
+        LOG.info("Atributos de la averia de tipo {} cambiados a {}; rigen para las averias siguientes",
+                tipo.codigo(), nuevos);
+        return vista();
+    }
+
+    private static int valorO(Integer valor, int vigente) {
+        return valor == null ? vigente : valor;
+    }
+
+    // Regla de reincorporacion con los atributos vigentes, para mostrarla tal cual.
+    static String regla(TipoAveria tipo) {
+        AtributosAveria a = tipo.atributos();
+        return switch (tipo) {
+            case TIPO_1 -> "Queda " + a.minutosEnElLugar() + " minutos inmovilizada en el lugar y se"
+                    + " reincorpora ahi mismo";
+            case TIPO_2 -> "Queda " + a.minutosEnElLugar() + " minutos en el lugar, pasa al almacen central"
+                    + " y vuelve al cierre del " + (a.turnosHastaReincorporacion() == 1
+                    ? "turno siguiente al del incidente"
+                    : "turno del incidente mas " + a.turnosHastaReincorporacion() + " turnos");
+            case TIPO_3 -> "Queda " + a.minutosEnElLugar() + " minutos en el lugar, pasa al almacen central"
+                    + " y, tras " + a.diasMantenimiento() + (a.diasMantenimiento() == 1 ? " dia" : " dias")
+                    + " de mantenimiento, reingresa al inicio del turno de 15:00";
+        };
+    }
+
     private static TipoUnidad resolverTipo(String texto) {
         String clave = texto.trim().toUpperCase(Locale.ROOT);
         for (TipoUnidad tipo : TipoUnidad.values()) {
@@ -114,9 +168,14 @@ public class ControladorParametros {
             tipos.add(new VistaParametros.FichaTipoUnidad(tipo.name(), tipo.prefijo(), tipo.etiqueta(),
                     tipo.capacidad(), vigentes.velocidad(tipo), tipo.velocidadPorDefecto(), tipo.costoPorKm()));
         }
+        List<VistaParametros.FichaAveria> averias = new java.util.ArrayList<>();
+        for (TipoAveria tipo : TipoAveria.values()) {
+            averias.add(new VistaParametros.FichaAveria(tipo.codigo(), tipo.atributos(),
+                    tipo.trasladaAlmacenCentral(), regla(tipo)));
+        }
         return new VistaParametros(velocidades, tipos, vigentes.umbralSemaforoAmbar(),
                 vigentes.umbralSemaforoVerde(), 0, Almacen.CAPACIDAD_INTERMEDIO,
                 vigentes.minutosAcondicionamiento(), vigentes.minutosAlimentacion(),
-                vigentes.minutosSeparacionCambioTurno(), vigentes.minutosTrasvase(), vigentes.version());
+                vigentes.minutosSeparacionCambioTurno(), vigentes.minutosTrasvase(), averias, vigentes.version());
     }
 }

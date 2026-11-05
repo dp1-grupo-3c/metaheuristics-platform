@@ -904,7 +904,9 @@ public class MotorEjecucion {
         UnidadTransporte unidad = u.unidad();
         unidad.nodo(nodo);
         unidad.estado(EstadoUnidad.AVERIADA);
-        unidad.minutoDisponibleDesde(tipo.minutoReincorporacion(minutoActual));
+        // Se calcula una sola vez porque los atributos de la averia cambian en caliente.
+        long reincorporacion = tipo.minutoReincorporacion(minutoActual);
+        unidad.minutoDisponibleDesde(reincorporacion);
 
         estado.anotarAveria(tipo);
         long minuto = minutoActual;
@@ -913,7 +915,7 @@ public class MotorEjecucion {
         int y = Ciudad.y(nodo);
         notificar(o -> o.alAveriarse(minuto, codigo, tipo.codigo(), x, y, cargaABordo));
 
-        cola.programar(tipo.minutoReincorporacion(minutoActual), TipoEvento.FIN_AVERIA, indiceUnidad, tipo.codigo());
+        cola.programar(reincorporacion, TipoEvento.FIN_AVERIA, indiceUnidad, tipo.codigo());
         if (tipo.trasladaAlmacenCentral()) {
             cola.programar(minutoActual + tipo.minutosEnElLugar(), TipoEvento.TRASLADO_A_CENTRAL, indiceUnidad, 0);
             if (cargaABordo > 0) {

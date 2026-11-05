@@ -288,6 +288,13 @@ metodo no mapeado en esa ruta, 409 para una operacion que choca con el estado (a
 corrida ya en curso, o averiar una unidad ya averiada o en mantenimiento), 413 para un archivo
 de averias por encima del limite y 415 para un tipo de contenido que el extremo no sabe leer.
 
+Los atributos de las averias se cambian con `PUT /api/parametros/averias`, por ejemplo
+`{"tipo":2,"turnosHastaReincorporacion":3}`: `minutosEnElLugar` (1 a 1440; hasta 480 en los
+tipos 2 y 3), `turnosHastaReincorporacion` (1 a 9, lo usa el tipo 2) y `diasMantenimiento` (1 a
+14, lo usa el tipo 3). Los campos omitidos conservan su valor, el cambio rige para las averias
+siguientes y `GET /api/parametros` devuelve en `averias` los valores vigentes con la regla en
+texto. Un valor fuera de rango responde 400.
+
 El registro de clientes se publica en `/api/clientes`: `POST` registra, `GET` lista (admite
 `busqueda` por documento o nombre), `GET /{documento}` busca y `PUT /{documento}` edita. Una
 persona natural se identifica con DNI de 8 digitos y una empresa con RUC de 11 que empieza con

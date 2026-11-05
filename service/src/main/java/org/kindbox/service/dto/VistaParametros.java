@@ -4,6 +4,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.kindbox.core.modelo.AtributosAveria;
 
 /**
  * Respuesta de {@code GET /api/parametros}: los parametros de operacion vigentes.
@@ -36,6 +37,7 @@ public record VistaParametros(
         int minutosAlimentacion,
         int minutosSeparacionCambioTurno,
         int minutosTrasvase,
+        List<FichaAveria> averias,
         long version) {
 
     /**
@@ -59,6 +61,14 @@ public record VistaParametros(
             double costoPorKm) {
     }
 
+    // Atributos vigentes de un tipo de averia y su regla de reincorporacion en texto.
+    public record FichaAveria(
+            int tipo,
+            AtributosAveria atributos,
+            boolean trasladaAlmacenCentral,
+            String regla) {
+    }
+
     /**
      * Copia defensiva que conserva el orden del mapa recibido, que es el del enumerado de
      * tipos, en lugar del orden que {@code Map.copyOf} sortea en cada arranque de la maquina
@@ -68,5 +78,6 @@ public record VistaParametros(
     public VistaParametros {
         velocidades = Collections.unmodifiableMap(new LinkedHashMap<>(velocidades));
         tipos = List.copyOf(tipos);
+        averias = List.copyOf(averias);
     }
 }
