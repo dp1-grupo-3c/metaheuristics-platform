@@ -14,7 +14,10 @@ import org.kindbox.core.modelo.Almacen;
 import org.kindbox.core.modelo.Ciudad;
 import org.kindbox.core.modelo.Pedido;
 import org.kindbox.core.modelo.TipoUnidad;
+import org.kindbox.core.modelo.ParametrosOperacion;
 import org.kindbox.core.modelo.UnidadTransporte;
+import org.kindbox.core.problema.Parada;
+import org.kindbox.core.problema.Ruta;
 
 /**
  * Contabilidad de pedidos y de kilometros del estado del mundo simulado.
@@ -97,5 +100,54 @@ class EstadoSimulacionTest {
         assertEquals(12, metricas.kilometrosPorTipo().get("MOTO"), "kilometros de la moto");
         assertEquals(0, metricas.kilometrosPorTipo().get("BICICLETA"), "la bicicleta no salio");
         assertEquals(42, metricas.kilometrosTotales(), "kilometros totales de la flota");
+    }
+
+    /**
+     * Itinerario de un auto con dos recargas intercaladas y una pausa de alimentacion:
+     * entrega 1, abastecimiento, entrega 2, alimentacion, entrega 3, abastecimiento, entrega 4.
+     */
+    private static UnidadEnCurso autoConRecargas(EstadoSimulacion estado) {
+        int[] camino = new int[7];
+        for (int k = 0; k < camino.length; k++) {
+            camino[k] = Ciudad.nodo(10 + k, 10);
+        }
+        List<Parada> paradas = List.of(
+                Parada.entrega(camino[0], 1, 5, 0, 60, 0),
+                Parada.abastecimiento(camino[1], 2, 20, 61, 61, 1),
+                Parada.entrega(camino[2], 2, 9, 62, 122, 1),
+                Parada.alimentacion(camino[3], 123, 183),
+                Parada.entrega(camino[4], 3, 7, 184, 244, 1),
+                Parada.abastecimiento(camino[5], 2, 10, 245, 245, 1),
+                Parada.entrega(camino[6], 4, 8, 246, 306, 1));
+        long[] llegadas = paradas.stream().mapToLong(Parada::minutoLlegada).toArray();
+        long[] salidas = paradas.stream().mapToLong(Parada::minutoSalida).toArray();
+        UnidadEnCurso u = estado.unidad(estado.indiceDeUnidad("TA01"));
+        u.unidad().nodo(camino[0]);
+        u.asignarItinerario(new Ruta("TA01", TipoUnidad.AUTO, camino[0], 0L, paradas), camino,
+                new int[] {0, 1, 2, 3, 4, 5, 6}, llegadas, salidas, 0L, new ParametrosOperacion().instantanea());
+        return u;
+    }
+
+    @Test
+    @DisplayName("Los pedidos a bordo distinguen la carga actual de los viajes tras cada recarga")
+    void losPedidosABordoSeparanLosViajes() {
+        EstadoSimulacion estado = estadoCon(List.of(pedido(1, 5, 0L, 36), pedido(2, 9, 0L, 36),
+                pedido(3, 7, 0L, 36), pedido(4, 8, 0L, 36)));
+        UnidadEnCurso u = autoConRecargas(estado);
+
+        List<VistaUnidad.PedidoABordo> enRuta = estado.vistaDe(u, 0L).pedidosABordo();
+        assertEquals(List.of(1, 2, 3, 4), enRuta.stream().map(VistaUnidad.PedidoABordo::idPedido).toList(),
+                "la lista conserva todas las entregas pendientes, en orden");
+        assertEquals(List.of(0, 1, 1, 2), enRuta.stream().map(VistaUnidad.PedidoABordo::viaje).toList(),
+                "cada abastecimiento abre un viaje; la alimentacion no");
+        assertTrue(enRuta.get(0).cargado() && !enRuta.get(1).cargado(), "solo el viaje cero va a bordo");
+
+        // Sirviendo la primera recarga, lo cargado ya incluye esos paquetes.
+        u.llegarA(1);
+        List<VistaUnidad.PedidoABordo> recargando = estado.vistaDe(u, 61L).pedidosABordo();
+        assertEquals(List.of(2, 3, 4), recargando.stream().map(VistaUnidad.PedidoABordo::idPedido).toList(),
+                "la entrega ya hecha sale de la lista");
+        assertEquals(List.of(0, 0, 1), recargando.stream().map(VistaUnidad.PedidoABordo::viaje).toList(),
+                "la recarga en curso ya no separa viajes");
     }
 }

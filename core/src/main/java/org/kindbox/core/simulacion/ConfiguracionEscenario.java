@@ -54,6 +54,14 @@ public record ConfiguracionEscenario(
     public static final int HORIZONTE_5D_MINUTOS = 5 * 24 * 60;
 
     /**
+     * K del escenario de colapso. Con el reloj libre el factor no acompasa nada y solo fija
+     * el presupuesto de cada ejecucion del planificador, de modo que no puede derivarse del
+     * rango de fechas ni de la duracion pedida: un rango mas largo daria menos computo por
+     * busqueda y adelantaria el colapso. Se toma el K de la simulacion 5D en 30 minutos.
+     */
+    public static final double FACTOR_COLAPSO = (double) HORIZONTE_5D_MINUTOS / 30;
+
+    /**
      * Propiedad de sistema con que los ejecutables y el servicio activan el arranque desde el
      * plan vigente, sin recompilar y sin tocar la configuracion del escenario.
      */
@@ -105,8 +113,22 @@ public record ConfiguracionEscenario(
     /** Configuracion del escenario de colapso, que corre sin horizonte y sin acompasar. */
     public static ConfiguracionEscenario colapso(LocalDate primerDia, int saltoMinutos,
                                                  String algoritmo, long semilla) {
+        return colapso(primerDia, saltoMinutos, algoritmo, semilla, 15, true, 0.02, false);
+    }
+
+    /**
+     * Configuracion del escenario de colapso con los parametros que el servicio deja elegir.
+     * Es el unico constructor del colapso, tanto para el servicio como para los experimentos,
+     * de modo que el K, el modo de reloj y el horizonte son siempre los mismos y las
+     * corridas de ambos caminos son comparables.
+     */
+    public static ConfiguracionEscenario colapso(LocalDate primerDia, int saltoMinutos, String algoritmo,
+                                                 long semilla, int minutosEntreFotografias,
+                                                 boolean generarAverias, double averiasPorUnidadPorTurno,
+                                                 boolean arranqueDesdePlanVigente) {
         return new ConfiguracionEscenario(TipoEscenario.COLAPSO, primerDia, primerDia.plusYears(1),
-                saltoMinutos, 240.0, ModoReloj.LIBRE, algoritmo, semilla, 15, true, 0.02, false);
+                saltoMinutos, FACTOR_COLAPSO, ModoReloj.LIBRE, algoritmo, semilla, minutosEntreFotografias,
+                generarAverias, averiasPorUnidadPorTurno, arranqueDesdePlanVigente);
     }
 
     /** Configuracion de la operacion dia a dia, en la que el reloj simulado es el real. */

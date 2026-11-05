@@ -4,6 +4,7 @@ import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.Locale;
 import java.util.Map;
+import org.kindbox.core.io.FuenteTramos;
 import org.kindbox.core.io.RepositorioDatos;
 import org.kindbox.core.metaheuristica.Algoritmo;
 import org.kindbox.core.metaheuristica.FabricaAlgoritmos;
@@ -62,19 +63,32 @@ public final class CorrerEscenario {
         ConfiguracionEscenario configuracion = OpcionArranque.aplicar(reloj.aplicar(base));
         Algoritmo algoritmo = FabricaAlgoritmos.crear(nombreAlgoritmo, semilla);
 
-        LocalDate ultimoDia = configuracion.tipo() == TipoEscenario.COLAPSO
-                ? primerDia.plusDays(30) : configuracion.ultimoDia();
-        var datos = new RepositorioDatos(raiz).cargar(primerDia, ultimoDia);
+        // El colapso carga mes a mes, igual que el servicio: arranca con el primer mes y el
+        // motor pide los siguientes hasta colapsar o quedarse sin datos.
+        boolean abierto = configuracion.tipo() == TipoEscenario.COLAPSO;
+        RepositorioDatos repositorio = new RepositorioDatos(raiz);
+        RepositorioDatos.DatosEscenario datos;
+        FuenteTramos siguientes = null;
+        if (abierto) {
+            RepositorioDatos.CargaAbierta carga = repositorio.abrir(primerDia);
+            datos = carga.inicio();
+            siguientes = carga.siguientes();
+        } else {
+            datos = repositorio.cargar(primerDia, configuracion.ultimoDia());
+        }
+        String periodo = abierto
+                ? "desde " + primerDia + ", mes a mes hasta el colapso o el fin de los datos"
+                : primerDia + " hasta " + configuracion.ultimoDia();
 
         if (datos.pedidos().isEmpty()) {
                 throw new IllegalStateException(
                         "No se cargaron pedidos desde " + raiz.toAbsolutePath().normalize()
-                        + " para el período " + primerDia + " hasta " + ultimoDia
+                        + " para el período " + periodo
                 );
         }
 
         System.out.printf(Locale.ROOT,
-                "Escenario %s, %s, salto %d min, K=%.1f, modo %s, semilla %d, %d pedidos cargados%n",
+                "Escenario %s, %s, salto %d min, K=%.1f, modo %s, semilla %d, %d pedidos cargados al arrancar%n",
                 configuracion.tipo(), nombreAlgoritmo, salto, configuracion.factorAceleracion(),
                 configuracion.modoReloj(), semilla, datos.pedidos().size());
         System.out.println(reloj.describir(configuracion));
@@ -83,10 +97,10 @@ public final class CorrerEscenario {
 
         System.out.println("Directorio de ejecución: " + Path.of("").toAbsolutePath());
         System.out.println("Raíz de datos: " + raiz.toAbsolutePath().normalize());
-        System.out.println("Período: " + primerDia + " hasta " + ultimoDia);
+        System.out.println("Período: " + periodo);
 
         ResultadoSimulacion resultado = ReporteEscenario.ejecutar(
-                datos, configuracion, new ParametrosOperacion(), algoritmo);
+                datos, configuracion, new ParametrosOperacion(), algoritmo, siguientes);
         publicar(resultado);
     }
 
@@ -139,8 +153,11 @@ public final class CorrerEscenario {
                         + "%d replanificaciones y %d km recorridos.%n",
                 porcentajeEntregado, m.milisegundosPorEjecucion(),
                 m.ejecucionesPlanificador(), m.kilometrosTotales());
-        System.out.println("  Lectura: " + (r.estado() == org.kindbox.core.simulacion.EstadoCorrida.CULMINADA
-                ? "el horizonte configurado se completo." : "la corrida termino antes del horizonte configurado."));
+        System.out.println("  Lectura: " + switch (r.estado()) {
+            case CULMINADA -> "el horizonte configurado se completo.";
+            case DATOS_AGOTADOS -> "no hubo colapso: los datos de ventas se acabaron antes.";
+            default -> "la corrida termino antes del horizonte configurado.";
+        });
     }
 
     private static String formatear(MetricasSimulacion m) {

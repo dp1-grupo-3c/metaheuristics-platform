@@ -1,5 +1,8 @@
 package org.kindbox.core.simulacion;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -21,6 +24,7 @@ import org.kindbox.core.grafo.MatrizDistanciasReticula;
 import org.kindbox.core.grafo.OraculoDistancias;
 import org.kindbox.core.grafo.RegistroBloqueos;
 import org.kindbox.core.io.CalendarioEscenario;
+import org.kindbox.core.io.FuenteTramos;
 import org.kindbox.core.io.RepositorioDatos;
 import org.kindbox.core.metaheuristica.Algoritmo;
 import org.kindbox.core.metaheuristica.PresupuestoComputo;
@@ -68,6 +72,15 @@ public class MotorEjecucion {
     private final int[] predecesoresAuxiliares = new int[Ciudad.TOTAL_NODOS];
     private final long minutoFin;
     private final boolean operacion;
+    /** Fuente de los meses siguientes en el escenario abierto; nula en los de horizonte fijo. */
+    private final FuenteTramos fuenteTramos;
+    /** Ultimo mes cargado del escenario abierto. */
+    private YearMonth mesCargado;
+    /** Bloqueos cargados que aun no terminaron, de los que se rehace el registro de cada tramo. */
+    private final List<Bloqueo> bloqueosCargados = new ArrayList<>();
+    private final List<String> avisosDeCarga = new CopyOnWriteArrayList<>();
+    private volatile long horizonteCargado;
+    private volatile boolean datosAgotados;
     private List<Mantenimiento> mantenimientos;
     private ExecutorService buscador;
     private Future<ResultadoPlanificacion> busqueda;
@@ -111,7 +124,29 @@ public class MotorEjecucion {
     public MotorEjecucion(RepositorioDatos.DatosEscenario datos, ConfiguracionEscenario configuracion,
                           ParametrosOperacion parametros, Algoritmo algoritmo,
                           List<ObservadorSimulacion> observadores, boolean operacion) {
+        this(datos, configuracion, parametros, algoritmo, observadores, operacion, null);
+    }
+
+    /**
+     * Motor de un escenario abierto, sin fecha de fin. Arranca con el mes que traen los datos
+     * y pide cada mes siguiente a la fuente al empezar el anterior, de modo que siempre tiene
+     * un mes cargado por delante del reloj y nunca lee meses que la corrida no alcanza.
+     *
+     * @param datos  primer mes del escenario, con la flota y todo el mantenimiento preventivo
+     * @param fuente meses posteriores al primero, que comparten calendario y numeracion
+     */
+    public MotorEjecucion(RepositorioDatos.DatosEscenario datos, ConfiguracionEscenario configuracion,
+                          ParametrosOperacion parametros, Algoritmo algoritmo,
+                          List<ObservadorSimulacion> observadores, FuenteTramos fuente) {
+        this(datos, configuracion, parametros, algoritmo, observadores, false,
+                java.util.Objects.requireNonNull(fuente, "El escenario abierto necesita una fuente de meses"));
+    }
+
+    private MotorEjecucion(RepositorioDatos.DatosEscenario datos, ConfiguracionEscenario configuracion,
+                           ParametrosOperacion parametros, Algoritmo algoritmo,
+                           List<ObservadorSimulacion> observadores, boolean operacion, FuenteTramos fuente) {
         this.operacion = operacion;
+        this.fuenteTramos = fuente;
         if (datos == null || configuracion == null || parametros == null || algoritmo == null) {
             throw new IllegalArgumentException("El motor necesita datos, configuracion, parametros y algoritmo");
         }
@@ -128,13 +163,21 @@ public class MotorEjecucion {
         RegistroBloqueos bloqueos = new RegistroBloqueos(datos.bloqueos());
         this.estado = new EstadoSimulacion(calendario, bloqueos, Almacen.todos(), datos.pedidos(), datos.unidades());
 
-        long cierreConfigurado = calendario.aMinutos(configuracion.ultimoDia().plusDays(1).atStartOfDay());
-        this.minutoFin = operacion ? Long.MAX_VALUE : Math.min(cierreConfigurado, datos.minutoFin());
-        if (minutoFin <= 0) {
-            throw new IllegalArgumentException("El horizonte del escenario es vacio: el ultimo dia configurado ("
-                    + configuracion.ultimoDia() + ") no alcanza el primer dia de los datos (" + datos.primerDia() + ")");
+        if (operacion || fuente != null) {
+            this.minutoFin = Long.MAX_VALUE;
+        } else {
+            long cierreConfigurado = calendario.aMinutos(configuracion.ultimoDia().plusDays(1).atStartOfDay());
+            this.minutoFin = Math.min(cierreConfigurado, datos.minutoFin());
+            if (minutoFin <= 0) {
+                throw new IllegalArgumentException("El horizonte del escenario es vacio: el ultimo dia configurado ("
+                        + configuracion.ultimoDia() + ") no alcanza el primer dia de los datos (" + datos.primerDia() + ")");
+            }
         }
-        if (!operacion) sembrar();
+        if (fuente != null) {
+            sembrarAbierto();
+        } else if (!operacion) {
+            sembrar();
+        }
     }
 
     public void iniciarOperacion(long minuto, ExecutorService ejecutor, long presupuestoMs) {
@@ -320,6 +363,42 @@ public class MotorEjecucion {
         return minutoFin;
     }
 
+    /** Si el escenario es abierto: sin fecha de fin y cargado mes a mes. */
+    public boolean abierto() {
+        return fuenteTramos != null;
+    }
+
+    /**
+     * Instante hasta el que hay datos sembrados: el cierre en un horizonte fijo y el final del
+     * ultimo mes cargado en el escenario abierto.
+     */
+    public long horizonteCargado() {
+        return fuenteTramos == null ? minutoFin : horizonteCargado;
+    }
+
+    /** Si el escenario abierto ya pidio un mes sin archivo de ventas. */
+    public boolean datosAgotados() {
+        return datosAgotados;
+    }
+
+    /** Avisos de los meses que el escenario abierto cargo despues de arrancar. */
+    public List<String> avisosDeCarga() {
+        return List.copyOf(avisosDeCarga);
+    }
+
+    /**
+     * Pedidos conocidos, hayan llegado o no. Se copian bajo el candado porque el escenario
+     * abierto amplia la lista mientras corre.
+     */
+    public List<Pedido> pedidosConocidos() {
+        candado.lock();
+        try {
+            return estado.pedidos();
+        } finally {
+            candado.unlock();
+        }
+    }
+
     public ResultadoSimulacion resultado() {
         return resultado;
     }
@@ -422,22 +501,83 @@ public class MotorEjecucion {
         return estado;
     }
 
+    /** Siembra el horizonte fijo entero, cerrado en {@code minutoFin}, y su cierre. */
     private void sembrar() {
-        List<Pedido> pedidos = estado.pedidos();
-        for (int i = 0; i < pedidos.size(); i++) {
-            long registro = pedidos.get(i).minutoRegistro();
-            if (registro >= 0 && registro <= minutoFin) {
+        // Los minutos son enteros: "hasta minutoFin incluido" es lo mismo que "antes de minutoFin + 1".
+        sembrarVentana(0L, minutoFin + 1, minutoFin, 0, estado.cantidadPedidos(), datos.bloqueos());
+        cola.programar(minutoFin, TipoEvento.FIN_ESCENARIO);
+    }
+
+    /**
+     * Siembra el primer mes del escenario abierto y programa en el minuto cero la carga del
+     * segundo, de modo que el motor arranca con un mes cargado por delante.
+     */
+    private void sembrarAbierto() {
+        mesCargado = YearMonth.from(datos.ultimoDia());
+        horizonteCargado = datos.minutoFin();
+        bloqueosCargados.addAll(datos.bloqueos());
+        sembrarVentana(0L, horizonteCargado, horizonteCargado, 0, estado.cantidadPedidos(), datos.bloqueos());
+        cola.programar(0L, TipoEvento.CARGA_TRAMO);
+    }
+
+    /**
+     * Carga el mes siguiente al ultimo cargado y lo siembra. Al empezar ese mes se cargara el
+     * siguiente, de modo que el reloj nunca alcanza el final de lo cargado. Un mes sin archivo
+     * de ventas marca el final de los datos: no se cargan mas meses y la corrida termina
+     * cuando los pedidos que quedan se entregan o vencen.
+     */
+    private void cargarTramoSiguiente() {
+        YearMonth mes = mesCargado.plusMonths(1);
+        RepositorioDatos.TramoMensual tramo;
+        try {
+            tramo = fuenteTramos.cargar(mes);
+        } catch (IOException e) {
+            throw new UncheckedIOException("No se pudieron leer los datos de " + mes + ": " + e.getMessage(), e);
+        }
+        avisosDeCarga.addAll(tramo.avisos());
+        if (!tramo.conVentas()) {
+            datosAgotados = true;
+            return;
+        }
+        long desde = calendario.aMinutos(mes.atDay(1));
+        long hasta = calendario.aMinutos(mes.plusMonths(1).atDay(1));
+
+        bloqueosCargados.removeIf(b -> b.minutoFin() <= minutoActual);
+        bloqueosCargados.addAll(tramo.bloqueos());
+        estado.actualizarBloqueos(new RegistroBloqueos(bloqueosCargados));
+
+        int primerPedido = estado.cantidadPedidos();
+        for (Pedido pedido : tramo.pedidos()) {
+            estado.anexarPedido(pedido);
+        }
+        sembrarVentana(desde, hasta, hasta, primerPedido, estado.cantidadPedidos(), tramo.bloqueos());
+        mesCargado = mes;
+        horizonteCargado = hasta;
+        cola.programar(desde, TipoEvento.CARGA_TRAMO);
+    }
+
+    /**
+     * Programa los eventos de la ventana {@code [desde, hasta)}: llegadas de los pedidos
+     * {@code [primerPedido, finPedidos)}, los bloqueos dados, el mantenimiento, las recargas,
+     * los cambios de turno, las fotografias y las replanificaciones periodicas, estas ultimas
+     * solo antes de {@code finReplanificacion}. Los fines de bloqueo y de mantenimiento se
+     * programan aunque caigan despues de la ventana, siempre que no pasen de {@code minutoFin}.
+     */
+    private void sembrarVentana(long desde, long hasta, long finReplanificacion,
+                                int primerPedido, int finPedidos, List<Bloqueo> bloqueos) {
+        for (int i = primerPedido; i < finPedidos; i++) {
+            long registro = estado.pedido(i).minutoRegistro();
+            if (registro >= desde && registro < hasta) {
                 cola.programar(registro, TipoEvento.LLEGADA_PEDIDO, i, 0);
             }
         }
 
-        List<Bloqueo> bloqueos = datos.bloqueos();
         for (int i = 0; i < bloqueos.size(); i++) {
             Bloqueo b = bloqueos.get(i);
-            if (b.minutoInicio() >= 0 && b.minutoInicio() <= minutoFin) {
+            if (b.minutoInicio() >= minutoActual && b.minutoInicio() <= minutoFin) {
                 cola.programar(b.minutoInicio(), TipoEvento.ACTIVACION_BLOQUEO, i, 0);
             }
-            if (b.minutoFin() >= 0 && b.minutoFin() <= minutoFin) {
+            if (b.minutoFin() >= minutoActual && b.minutoFin() <= minutoFin) {
                 cola.programar(b.minutoFin(), TipoEvento.DESACTIVACION_BLOQUEO, i, 0);
             }
         }
@@ -448,7 +588,8 @@ public class MotorEjecucion {
                 continue;
             }
             long inicio = calendario.aMinutos(m.fecha());
-            if (inicio > minutoFin) {
+            // La primera ventana tambien recoge el dia en curso si empezo antes del minuto cero.
+            if (inicio >= hasta || (desde > 0 && inicio < desde)) {
                 continue;
             }
             cola.programar(Math.max(0L, inicio), TipoEvento.INICIO_MANTENIMIENTO, unidad, 0);
@@ -456,27 +597,33 @@ public class MotorEjecucion {
                     TipoEvento.FIN_MANTENIMIENTO, unidad, 0);
         }
 
-        for (long dia = 0; dia * CalendarioEscenario.MINUTOS_POR_DIA <= minutoFin; dia++) {
-            long base = dia * CalendarioEscenario.MINUTOS_POR_DIA;
+        long primeraBase = desde - desde % CalendarioEscenario.MINUTOS_POR_DIA;
+        for (long base = primeraBase; base < hasta; base += CalendarioEscenario.MINUTOS_POR_DIA) {
             long recarga = base + Almacen.MINUTO_RECARGA_DIARIA;
-            if (recarga <= minutoFin) {
+            if (recarga >= desde && recarga < hasta) {
                 cola.programar(recarga, TipoEvento.RECARGA_ALMACENES);
             }
             for (int cambio : Turno.CAMBIOS_DE_TURNO) {
-                if (base + cambio <= minutoFin) {
+                if (base + cambio >= desde && base + cambio < hasta) {
                     cola.programar(base + cambio, TipoEvento.CAMBIO_TURNO);
                 }
             }
         }
 
-        for (long minuto = 0; minuto < minutoFin; minuto += configuracion.saltoMinutos()) {
+        for (long minuto = primerMultiplo(desde, configuracion.saltoMinutos()); minuto < finReplanificacion;
+                minuto += configuracion.saltoMinutos()) {
             motivosReplanificacion.computeIfAbsent(minuto, k -> new LinkedHashSet<>()).add("PERIODICA");
             cola.programar(minuto, TipoEvento.REPLANIFICACION);
         }
-        for (long minuto = 0; minuto <= minutoFin; minuto += configuracion.minutosEntreFotografias()) {
+        for (long minuto = primerMultiplo(desde, configuracion.minutosEntreFotografias()); minuto < hasta;
+                minuto += configuracion.minutosEntreFotografias()) {
             cola.programar(minuto, TipoEvento.FOTOGRAFIA);
         }
-        cola.programar(minutoFin, TipoEvento.FIN_ESCENARIO);
+    }
+
+    /** Primer multiplo de {@code paso} que no es menor que {@code desde}. */
+    private static long primerMultiplo(long desde, long paso) {
+        return (desde + paso - 1) / paso * paso;
     }
 
     private String bucle() {
@@ -490,6 +637,11 @@ public class MotorEjecucion {
             long minutoVencimiento = vencimientoPendiente();
             Evento proximo = cola.asomar();
             if (proximo == null && minutoVencimiento == Long.MAX_VALUE) {
+                if (datosAgotados) {
+                    estadoCorrida = EstadoCorrida.DATOS_AGOTADOS;
+                    return "Sin colapso hasta " + calendario.textoCorto(minutoActual)
+                            + ": no hay datos de ventas desde " + mesCargado.plusMonths(1);
+                }
                 estadoCorrida = EstadoCorrida.CULMINADA;
                 return "Escenario agotado en " + calendario.textoCorto(minutoActual);
             }
@@ -606,6 +758,7 @@ public class MotorEjecucion {
                 case CAMBIO_TURNO -> sortearAveriasDelTurno();
                 case INICIO_MANTENIMIENTO -> iniciarMantenimiento(evento.referencia());
                 case FIN_MANTENIMIENTO -> terminarMantenimiento(evento.referencia());
+                case CARGA_TRAMO -> cargarTramoSiguiente();
                 case LLEGADA_PEDIDO -> estado.registrarPedido(evento.referencia());
                 case AVERIA -> averiar(evento.referencia(), evento.dato());
                 case TRASLADO_A_CENTRAL -> trasladarAlCentral(evento.referencia());
