@@ -74,6 +74,9 @@ public final class UnidadEnCurso {
     private boolean misionTrasvase;
     private int unidadAsistida = -1;
     private TipoAveria averia;
+    private long minutoInicioAveria = -1L;
+    private long minutoFinAveriaEnElLugar = -1L;
+    private long minutoReincorporacion = -1L;
 
     /**
      * @param indice posicion de la unidad en la flota, que es la referencia que viaja en los
@@ -416,6 +419,31 @@ public final class UnidadEnCurso {
 
     public void averia(TipoAveria averia) {
         this.averia = averia;
+        if (averia == null) {
+            minutoInicioAveria = -1L;
+            minutoFinAveriaEnElLugar = -1L;
+            minutoReincorporacion = -1L;
+        }
+    }
+
+    // Se fijan al averiarse porque los atributos de la averia cambian en caliente.
+    public void tiemposAveria(long inicio, long finEnElLugar, long reincorporacion) {
+        this.minutoInicioAveria = inicio;
+        this.minutoFinAveriaEnElLugar = finEnElLugar;
+        this.minutoReincorporacion = reincorporacion;
+    }
+
+    public long minutoInicioAveria() {
+        return minutoInicioAveria;
+    }
+
+    // Hasta este minuto la averia sigue en el lugar; en los tipos 2 y 3 luego va al central.
+    public long minutoFinAveriaEnElLugar() {
+        return minutoFinAveriaEnElLugar;
+    }
+
+    public long minutoReincorporacion() {
+        return minutoReincorporacion;
     }
 
     // ------------------------------------------------------------- presentacion

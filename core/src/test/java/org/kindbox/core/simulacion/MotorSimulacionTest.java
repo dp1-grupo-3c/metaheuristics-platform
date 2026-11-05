@@ -217,6 +217,11 @@ class MotorSimulacionTest {
                     codigo + " deja de estar averiada antes de tiempo");
             assertEquals(reincorporacion, registro.primerMinutoDisponible(codigo),
                     codigo + " no se reincorpora en el minuto que dicta " + tipo);
+            long finEnElLugar = tipo.trasladaAlmacenCentral() ? tipo.minutosEnElLugar() : reincorporacion;
+            assertEquals(List.of(0L, finEnElLugar, reincorporacion), registro.tiemposVistos(codigo),
+                    codigo + " no muestra en la fotografia los minutos de su averia");
+            assertEquals(List.of(-1L, -1L, -1L), registro.tiemposAlReincorporarse(codigo),
+                    codigo + " conserva los minutos de la averia ya resuelta");
         });
         Map<Integer, Integer> porTipo = resultado.metricas().averiasPorTipo();
         for (TipoAveria tipo : TipoAveria.values()) {
@@ -377,6 +382,8 @@ class MotorSimulacionTest {
         private final Map<String, Long> ultimoAveriada = new HashMap<>();
         private final Map<String, Long> primeroDisponible = new HashMap<>();
         private final Map<String, Integer> tipos = new HashMap<>();
+        private final Map<String, List<Long>> tiempos = new HashMap<>();
+        private final Map<String, List<Long>> tiemposAlReincorporarse = new HashMap<>();
 
         RegistroDeAverias(Set<String> vigiladas) {
             this.vigiladas = Set.copyOf(vigiladas);
@@ -388,11 +395,15 @@ class MotorSimulacionTest {
                 if (!vigiladas.contains(vista.codigo())) {
                     continue;
                 }
+                List<Long> marcas = List.of(vista.minutoInicioAveria(), vista.minutoFinAveriaEnElLugar(),
+                        vista.minutoReincorporacion());
                 if (vista.averiada()) {
                     tipos.put(vista.codigo(), vista.tipoAveria());
                     ultimoAveriada.put(vista.codigo(), instantanea.minutoSimulado());
+                    tiempos.putIfAbsent(vista.codigo(), marcas);
                 } else if (ultimoAveriada.containsKey(vista.codigo())) {
                     primeroDisponible.putIfAbsent(vista.codigo(), instantanea.minutoSimulado());
+                    tiemposAlReincorporarse.putIfAbsent(vista.codigo(), marcas);
                 }
             }
         }
@@ -407,6 +418,14 @@ class MotorSimulacionTest {
 
         long primerMinutoDisponible(String codigo) {
             return primeroDisponible.getOrDefault(codigo, -1L);
+        }
+
+        List<Long> tiemposVistos(String codigo) {
+            return tiempos.getOrDefault(codigo, List.of());
+        }
+
+        List<Long> tiemposAlReincorporarse(String codigo) {
+            return tiemposAlReincorporarse.getOrDefault(codigo, List.of());
         }
     }
 

@@ -576,6 +576,7 @@ public final class EstadoSimulacion {
                 ColorSemaforo.deOcupacion(unidad.cargaABordo(), unidad.capacidad(), parametros),
                 u.caminoRecorrido(minuto), u.caminoPendiente(minuto),
                 destinoX, destinoY, minutosHastaDestino, aBordo,
-                u.averia() == null ? 0 : u.averia().codigo());
+                u.averia() == null ? 0 : u.averia().codigo(),
+                u.minutoInicioAveria(), u.minutoFinAveriaEnElLugar(), u.minutoReincorporacion());
     }
 }

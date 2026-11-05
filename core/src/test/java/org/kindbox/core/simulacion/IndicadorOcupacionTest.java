@@ -16,7 +16,7 @@ class IndicadorOcupacionTest {
     private static VistaUnidad unidad(TipoUnidad tipo, int carga) {
         return new VistaUnidad("T" + carga, tipo, EstadoUnidad.EN_RUTA, 0, 0, carga, tipo.capacidad(),
                 ColorSemaforo.deOcupacion(carga, tipo.capacidad(), POR_DEFECTO), new int[0], new int[0],
-                -1, -1, 0L, List.of(), 0);
+                -1, -1, 0L, List.of(), 0, -1L, -1L, -1L);
     }
 
     private static VistaAlmacen intermedio(int id, int disponible) {

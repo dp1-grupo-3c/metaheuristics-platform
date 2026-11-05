@@ -209,12 +209,19 @@ class MotorOperacionTest {
             motor.aceptar(new SolicitudAveriaOperacion("averia1", "TA01", 1));
             motor.actualizar();
             assertEquals(EstadoUnidad.AVERIADA, motor.vista().instantanea().unidades().getFirst().estado());
+            var vista = motor.vista().instantanea().unidades().getFirst();
+            var incidente = motor.vista().incidentes().getFirst();
+            assertEquals(120, vista.minutoReincorporacion() - vista.minutoInicioAveria(), "el tipo 1 dura 120 minutos");
+            assertEquals(vista.minutoReincorporacion(), vista.minutoFinAveriaEnElLugar(), "el tipo 1 no se traslada");
+            assertEquals(120, java.time.Duration.between(incidente.inicio(), incidente.reincorporacion()).toMinutes(),
+                    "el incidente usa los mismos minutos que la unidad");
             motor.aceptar(new SolicitudAveriaOperacion("averia2", "TA01", 1));
             motor.actualizar();
             assertEquals(ComandoOperacion.Estado.RECHAZADO, motor.comando("averia2").estado());
             reloj.avanzar(120);
             motor.actualizar();
             assertEquals(EstadoUnidad.DISPONIBLE, motor.vista().instantanea().unidades().getFirst().estado());
+            assertEquals(-1L, motor.vista().instantanea().unidades().getFirst().minutoReincorporacion());
             assertTrue(motor.vista().incidentes().getFirst().resuelto());
             assertEquals(1, motor.vista().instantanea().metricas().averiasPorTipo().get(1));
         }

@@ -161,10 +161,11 @@ public final class MotorOperacion implements AutoCloseable, ObservadorSimulacion
                 pedidoId = pedido.pedido().id();
             } else if (contenido instanceof SolicitudAveriaOperacion solicitud) {
                 ejecucion.aplicarAveria(solicitud.placa(), TipoAveria.porCodigo(solicitud.tipo()));
-                long inicio = ejecucion.minutoActual();
+                // El incidente usa los mismos minutos que la unidad muestra en el mapa.
+                var averiada = ejecucion.estado().unidad(ejecucion.estado().indiceDeUnidad(solicitud.placa()));
                 incidentes.add(new VistaOperacion.Incidente(comando.id(), solicitud.placa(), solicitud.tipo(),
-                        reloj.calendario().aFecha(inicio),
-                        reloj.calendario().aFecha(TipoAveria.porCodigo(solicitud.tipo()).minutoReincorporacion(inicio)), false));
+                        reloj.calendario().aFecha(averiada.minutoInicioAveria()),
+                        reloj.calendario().aFecha(averiada.minutoReincorporacion()), false));
             } else if (contenido instanceof SolicitudParametrosOperacion solicitud) {
                 for (var entrada : solicitud.velocidades().entrySet()) {
                     contexto.parametros().velocidad(entrada.getKey(), entrada.getValue());

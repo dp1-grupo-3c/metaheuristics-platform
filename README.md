@@ -308,6 +308,11 @@ tipos 2 y 3), `turnosHastaReincorporacion` (1 a 9, lo usa el tipo 2) y `diasMant
 siguientes y `GET /api/parametros` devuelve en `averias` los valores vigentes con la regla en
 texto. Un valor fuera de rango responde 400.
 
+En la fotografia, cada unidad averiada trae `minutoInicioAveria`, `minutoFinAveriaEnElLugar` y
+`minutoReincorporacion`, en minutos del escenario, o -1 si esta operativa. El tipo 1 sigue en el
+lugar hasta reincorporarse; los tipos 2 y 3 pasan al almacen central al cumplir `minutosEnElLugar`.
+Los tres minutos se fijan al averiarse, asi que cambiar los atributos no altera una averia en curso.
+
 La flota se edita con `PUT /api/parametros/flota`, con cuerpo
 `{"unidades":{"AUTO":{"cantidad":10,"kmPorHora":40},...}}`; en cada tipo la cantidad (0 a 99) y
 la velocidad son opcionales. Se valida todo antes de aplicar: la velocidad cambia en caliente y

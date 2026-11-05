@@ -44,7 +44,11 @@ public record VistaUnidad(
         int destinoY,
         long minutosHastaDestino,
         List<PedidoABordo> pedidosABordo,
-        int tipoAveria) {
+        int tipoAveria,
+        // Minutos de la averia vigente, o -1 si la unidad esta operativa.
+        long minutoInicioAveria,
+        long minutoFinAveriaEnElLugar,
+        long minutoReincorporacion) {
 
     /**
      * Renglon de la tarjeta emergente de una unidad.

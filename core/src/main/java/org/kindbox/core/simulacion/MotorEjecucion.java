@@ -906,6 +906,8 @@ public class MotorEjecucion {
         unidad.estado(EstadoUnidad.AVERIADA);
         // Se calcula una sola vez porque los atributos de la averia cambian en caliente.
         long reincorporacion = tipo.minutoReincorporacion(minutoActual);
+        long finEnElLugar = tipo.trasladaAlmacenCentral() ? minutoActual + tipo.minutosEnElLugar() : reincorporacion;
+        u.tiemposAveria(minutoActual, finEnElLugar, reincorporacion);
         unidad.minutoDisponibleDesde(reincorporacion);
 
         estado.anotarAveria(tipo);
@@ -917,9 +919,9 @@ public class MotorEjecucion {
 
         cola.programar(reincorporacion, TipoEvento.FIN_AVERIA, indiceUnidad, tipo.codigo());
         if (tipo.trasladaAlmacenCentral()) {
-            cola.programar(minutoActual + tipo.minutosEnElLugar(), TipoEvento.TRASLADO_A_CENTRAL, indiceUnidad, 0);
+            cola.programar(finEnElLugar, TipoEvento.TRASLADO_A_CENTRAL, indiceUnidad, 0);
             if (cargaABordo > 0) {
-                intentarTrasvase(u, tipo);
+                intentarTrasvase(u);
             }
         }
 
@@ -953,11 +955,11 @@ public class MotorEjecucion {
         u.limpiarItinerario(u.unidad().nodo());
     }
 
-    private void intentarTrasvase(UnidadEnCurso averiada, TipoAveria tipo) {
+    private void intentarTrasvase(UnidadEnCurso averiada) {
         int nodoAveria = averiada.unidad().nodo();
         oraculo.distanciasDesde(nodoAveria, estado.bloqueos().mascaraBloqueada(minutoActual),
                 distanciasAuxiliares, predecesoresAuxiliares);
-        long limite = minutoActual + tipo.minutosEnElLugar();
+        long limite = averiada.minutoFinAveriaEnElLugar();
 
         UnidadEnCurso elegida = null;
         int mejorKilometros = Integer.MAX_VALUE;
