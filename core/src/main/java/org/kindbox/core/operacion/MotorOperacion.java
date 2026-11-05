@@ -2,7 +2,10 @@ package org.kindbox.core.operacion;
 
 import java.io.IOException;
 import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -30,6 +33,8 @@ public final class MotorOperacion implements AutoCloseable, ObservadorSimulacion
     private final ConfiguracionOperacion configuracion;
     private final ContextoOperacion contexto;
     private final RelojOperacion reloj;
+    private final Instant inicio;
+    private final LocalDateTime fechaHoraInicio;
     private final FuenteEntornoOperacion fuente;
     private final MotorEjecucion ejecucion;
     private final ExecutorService buscador;
@@ -49,6 +54,8 @@ public final class MotorOperacion implements AutoCloseable, ObservadorSimulacion
         this.configuracion = java.util.Objects.requireNonNull(configuracion);
         contexto = new ContextoOperacion(id);
         this.reloj = new RelojOperacion(reloj, configuracion.zonaHoraria());
+        this.inicio = this.reloj.instante();
+        this.fechaHoraInicio = LocalDateTime.ofInstant(inicio, configuracion.zonaHoraria());
         this.fuente = java.util.Objects.requireNonNull(fuente);
         LocalDate hoy = this.reloj.fechaHora().toLocalDate();
         RepositorioDatos.DatosEscenario datos = fuente.cargar(hoy.minusDays(1), hoy.plusDays(3), this.reloj.calendario());
@@ -205,8 +212,10 @@ public final class MotorOperacion implements AutoCloseable, ObservadorSimulacion
                 new VistaOperacion.Incidente(incidente.comandoId(), incidente.placa(), incidente.tipo(),
                         incidente.inicio(), incidente.reincorporacion(),
                         !instantanea.fechaHoraSimulada().isBefore(incidente.reincorporacion()))).toList();
+        Instant ahora = reloj.instante();
         vista = new VistaOperacion(contexto.id(), contexto.siguienteRevision(), contexto.estado(),
-                configuracion.zonaHoraria().getId(), reloj.instante(), instantanea.fechaHoraSimulada(),
+                configuracion.zonaHoraria().getId(), ahora, instantanea.fechaHoraSimulada(),
+                inicio, fechaHoraInicio, Duration.between(inicio, ahora).toMinutes(),
                 configuracion, instantanea, contexto.parametros().instantanea(), contexto.pedidos().vistas(),
                 historial, List.copyOf(avisos), ejecucion.calculando(), ejecucion.planesDescartados(), error);
     }

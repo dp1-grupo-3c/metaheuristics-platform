@@ -6,6 +6,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -290,6 +291,25 @@ class MotorOperacionTest {
         assertThrows(IllegalArgumentException.class,
                 () -> new SolicitudParametrosOperacion("b", Map.of(), null, null, 70, 60));
         assertEquals(40, new SolicitudParametrosOperacion("c", Map.of(), null, null, 40, 90).ocupacionAmbar());
+    }
+
+    @Test void laVistaTraeElArranqueYElTiempoTranscurrido() throws Exception {
+        var reloj = new Reloj("2026-10-28T17:00:00Z");
+        var motor = crear(reloj, new Constructivo());
+        assertEquals(Instant.parse("2026-10-28T17:00:00Z"), motor.vista().inicio());
+        assertEquals(LocalDateTime.of(2026, 10, 28, 12, 0), motor.vista().fechaHoraInicio(), "hora de Lima");
+        assertEquals(0, motor.vista().minutosTranscurridos());
+
+        reloj.avanzar(95);
+        motor.actualizar();
+        assertEquals(95, motor.vista().minutosTranscurridos());
+        assertEquals(LocalDateTime.of(2026, 10, 28, 13, 35), motor.vista().fechaHoraOperativa());
+        assertEquals(LocalDateTime.of(2026, 10, 28, 12, 0), motor.vista().fechaHoraInicio(), "el arranque no se mueve");
+
+        motor.close();
+        reloj.avanzar(30);
+        motor.actualizar();
+        assertEquals(95, motor.vista().minutosTranscurridos(), "detenida, el tiempo queda en el del cierre");
     }
 
     @Test void detenerRechazaComandosPendientesYConservaLaConsulta() throws Exception {

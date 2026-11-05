@@ -87,7 +87,7 @@ curl -X PUT "http://localhost:8080/api/operaciones/${OPERACION_ID}/parametros" \
 
 Los tipos de averia admitidos son 1, 2 y 3. La unidad debe pertenecer a la flota y no estar ya deshabilitada al aplicar el comando. El rechazo queda consultable si el conflicto aparece despues de la aceptacion. Las averias operativas se registran explicitamente; no se generan al azar.
 
-Las velocidades deben ser positivas y finitas, con claves `AUTO`, `MOTO` o `BICICLETA`. Los umbrales se envian juntos y cumplen `0 <= ambar < verde`. Cada operacion posee parametros independientes de los parametros globales de simulacion. El siguiente calculo captura una instantanea inmutable.
+Las velocidades deben ser positivas y finitas, con claves `AUTO`, `MOTO` o `BICICLETA`. Los umbrales se envian juntos y cumplen `0 <= ambar < verde`. Los de ocupacion de las unidades, `ocupacionAmbar` y `ocupacionRojo`, tambien van juntos y cumplen `1 <= ocupacionAmbar < ocupacionRojo <= 100`. Cada operacion posee parametros independientes de los parametros globales de simulacion. El siguiente calculo captura una instantanea inmutable.
 
 ## Pedidos, calculo y consistencia
 
@@ -105,7 +105,9 @@ El presupuesto limita la busqueda del algoritmo, no garantiza el tiempo total de
 
 Conectar a `/ws/operaciones?contextoId=OPERACION_ID`. La suscripcion exige un contexto existente y no cambia automaticamente cuando se crea otra operacion. Al conectar o reconectar se obtiene una instantanea completa de ese contexto.
 
-Cada mensaje es un `VistaOperacion` con `contextoId`, `revision`, `estado`, `zonaHoraria`, `horaServidor`, `fechaHoraOperativa`, `configuracion`, `instantanea`, `parametros`, `pedidos`, `incidentes`, `avisos`, `calculando`, `planesDescartados` y `error`.
+Cada mensaje es un `VistaOperacion` con `contextoId`, `revision`, `estado`, `zonaHoraria`, `horaServidor`, `fechaHoraOperativa`, `inicio`, `fechaHoraInicio`, `minutosTranscurridos`, `configuracion`, `instantanea`, `parametros`, `pedidos`, `incidentes`, `avisos`, `calculando`, `planesDescartados` y `error`.
+
+`inicio` y `fechaHoraInicio` son el arranque de la operacion, en reloj real y en su zona horaria. `minutosTranscurridos` cuenta los minutos de reloj desde ese arranque hasta `horaServidor` y queda fijo al detener la operacion.
 
 El frontend debe conservar su contexto y descartar revisiones anteriores a la ultima aplicada. Puede resincronizar por `GET /api/operaciones/{id}`. El canal publica aproximadamente cada segundo real, independientemente de los minutos del dominio. Se admiten 32 sesiones y se desconectan sesiones con envios detenidos; los envios ocurren fuera del ciclo operativo.
 

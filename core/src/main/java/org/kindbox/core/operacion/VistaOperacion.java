@@ -7,7 +7,10 @@ import org.kindbox.core.modelo.ParametrosOperacion;
 import org.kindbox.core.simulacion.InstantaneaSimulacion;
 
 public record VistaOperacion(String contextoId, long revision, Estado estado, String zonaHoraria,
-        Instant horaServidor, LocalDateTime fechaHoraOperativa, ConfiguracionOperacion configuracion,
+        Instant horaServidor, LocalDateTime fechaHoraOperativa,
+        // Arranque de la operacion y minutos de reloj transcurridos desde entonces.
+        Instant inicio, LocalDateTime fechaHoraInicio, long minutosTranscurridos,
+        ConfiguracionOperacion configuracion,
         InstantaneaSimulacion instantanea, ParametrosOperacion.Instantanea parametros,
         List<VistaPedidoOperacion> pedidos, List<Incidente> incidentes, List<String> avisos,
         boolean calculando, long planesDescartados, String error) {
