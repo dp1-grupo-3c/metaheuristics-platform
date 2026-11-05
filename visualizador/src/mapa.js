@@ -199,7 +199,7 @@ export class MapaCiudad {
             boton.style.setProperty('--colorMarcador', `var(--${elemento.color})`);
             boton.setAttribute('aria-label', elemento.etiqueta);
             boton.title = elemento.etiqueta;
-            const contenido = `${icono(elemento.simbolo)}<span class="rotulo">${escapar(elemento.texto)}</span>${elemento.tipoAveria ? '<b class="insignia">!</b>' : ''}${elemento.clase === 'almacen' && !elemento.central ? `<small class="nivel">${{VERDE:'▰▰▰',AMBAR:'▰▰',ROJO:'!'}[elemento.dato.color]}</small>` : ''}`;
+            const contenido = `${icono(elemento.simbolo)}<span class="rotulo">${escapar(elemento.texto)}</span>${elemento.tipoAveria ? '<b class="insignia">!</b>' : ''}${elemento.clase === 'almacen' && !elemento.central ? `<small class="nivel">${{VERDE:'▰▰▰',AMBAR:'▰▰',ROJO:'!',VACIO:'○'}[elemento.dato.color]}</small>` : ''}`;
             if (registro.contenido !== contenido) { boton.innerHTML = contenido; registro.contenido = contenido; }
         }
         for (const [clave, registro] of this.marcadores) if (!presentes.has(clave)) { registro.boton.remove(); this.marcadores.delete(clave); }

@@ -1,6 +1,6 @@
 import { test as prueba } from 'node:test';
 import { strict as verificar } from 'node:assert';
-import { duracion, fecha, sumarDias, presupuestoSegundos, escapar } from '../src/formato.js';
+import { duracion, fecha, sumarDias, presupuestoSegundos, escapar, etiquetaSemaforo } from '../src/formato.js';
 import { solicitar, tituloError } from '../src/api.js';
 
 prueba('Las duraciones conservan días y las fechas simuladas no cambian de zona', () => {
@@ -8,6 +8,11 @@ prueba('Las duraciones conservan días y las fechas simuladas no cambian de zona
     verificar.equal(fecha('2026-09-01T14:35:00'), '01/09/2026 14:35');
     verificar.equal(sumarDias('2026-12-30', 4), '2027-01-03');
     verificar.equal(presupuestoSegundos(30, 240), 4.5);
+});
+prueba('El semáforo nombra los cuatro colores del servidor, incluido el vacío', () => {
+    verificar.equal(etiquetaSemaforo('VACIO'), '○ Vacío');
+    verificar.equal(etiquetaSemaforo('ROJO'), '! Crítico');
+    verificar.equal(etiquetaSemaforo(undefined), 'Sin datos');
 });
 prueba('El contenido del servidor se escapa antes de insertarse en HTML', () => {
     verificar.equal(escapar('<img onerror="x">'), '&lt;img onerror=&quot;x&quot;&gt;');

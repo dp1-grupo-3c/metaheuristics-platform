@@ -37,5 +37,5 @@ export function presupuestoSegundos(saltoMinutos, factorAceleracion) {
     return Math.max(50, Math.round(0.6 * saltoMinutos * 60000 / factorAceleracion)) / 1000;
 }
 export function etiquetaSemaforo(color) {
-    return { VERDE: '✓ Saludable', AMBAR: '△ Alerta', ROJO: '! Crítico' }[color] || 'Sin datos';
+    return { VERDE: '✓ Saludable', AMBAR: '△ Alerta', ROJO: '! Crítico', VACIO: '○ Vacío' }[color] || 'Sin datos';
 }
