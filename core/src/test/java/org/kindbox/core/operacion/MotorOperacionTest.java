@@ -33,6 +33,7 @@ import org.kindbox.core.modelo.EstadoUnidad;
 import org.kindbox.core.modelo.Mantenimiento;
 import org.kindbox.core.modelo.TipoUnidad;
 import org.kindbox.core.modelo.UnidadTransporte;
+import org.kindbox.core.simulacion.EnvioPedido;
 import org.kindbox.core.problema.InstanciaPlanificacion;
 import org.kindbox.core.problema.Solucion;
 import org.kindbox.core.util.Aleatorio;
@@ -169,6 +170,26 @@ class MotorOperacionTest {
             assertNotEquals(EstadoUnidad.ENTREGANDO, motor.vista().instantanea().unidades().getFirst().estado());
             assertEquals(2, motor.vista().instantanea().metricas().unidadesEntregadas());
             assertTrue(motor.vista().instantanea().metricas().particionCoherente());
+        }
+    }
+
+    @Test void cadaPedidoPlanificadoTraeSusEnvios() throws Exception {
+        var reloj = new Reloj("2026-10-28T17:00:00Z");
+        var algoritmo = new Constructivo();
+        try (var motor = crear(reloj, algoritmo)) {
+            motor.aceptar(pedido("envio", 3, 28, 14));
+            esperarPlan(motor, algoritmo);
+            var vista = motor.vista();
+            var pedido = vista.pedidos().getFirst();
+            var envios = pedido.envios();
+            assertFalse(envios.isEmpty(), "el pedido planificado debe ir en alguna unidad");
+            assertEquals(3, envios.stream().mapToInt(EnvioPedido::cantidad).sum());
+            assertEquals(1, envios.getFirst().primerPaquete());
+            assertEquals(3, envios.getLast().ultimoPaquete());
+            assertNotNull(envios.getFirst().fechaHoraLlegada());
+            var unidad = vista.instantanea().unidades().stream()
+                    .filter(u -> u.codigo().equals(envios.getFirst().codigoUnidad())).findFirst().orElseThrow();
+            assertTrue(unidad.pedidosABordo().stream().anyMatch(p -> p.idPedido() == pedido.id()));
         }
     }
 

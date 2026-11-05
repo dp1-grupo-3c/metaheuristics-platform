@@ -1,7 +1,9 @@
 package org.kindbox.service.dto;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import org.kindbox.core.simulacion.ColorSemaforo;
+import org.kindbox.core.simulacion.EnvioPedido;
 
 /**
  * Renglon de la tabla de pedidos del panel lateral del prototipo, que muestra identificador,
@@ -36,7 +38,13 @@ public record FilaPedido(
         LocalDateTime limite,
         long holguraMinutos,
         boolean entregado,
-        ColorSemaforo semaforo) {
+        ColorSemaforo semaforo,
+        // Unidades que llevan el pedido, con sus horarios, segun la ultima fotografia.
+        List<EnvioPedido> envios) {
+
+    public FilaPedido {
+        envios = envios == null ? List.of() : List.copyOf(envios);
+    }
 
     /** Direccion tal como la pinta el prototipo, en coordenadas de la reticula. */
     public String direccion() {

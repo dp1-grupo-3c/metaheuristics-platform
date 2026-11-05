@@ -94,7 +94,8 @@ class OperacionHttpTest {
         mvc.perform(get("/api/operaciones/{id}/pedidos", id).param("tamano", "1"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.totalPedidos").value(1))
                 .andExpect(jsonPath("$.pedidos[0].nombreCliente").value("Nombre"))
-                .andExpect(jsonPath("$.pedidos[0].direccion").value("Calle Uno"));
+                .andExpect(jsonPath("$.pedidos[0].direccion").value("Calle Uno"))
+                .andExpect(jsonPath("$.pedidos[0].envios").isArray());
         mvc.perform(get("/api/operaciones/{id}/pedidos", id).param("pagina", "1").param("tamano", "1"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.pedidos").isEmpty());
         mvc.perform(get("/api/operaciones/{id}/metricas", id)).andExpect(status().isOk())

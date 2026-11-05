@@ -68,6 +68,6 @@ public final class PedidoOperativo {
         return new VistaPedidoOperacion(pedido.id(), solicitud.codigoCliente(), solicitud.nombreCliente(),
                 solicitud.telefonoCliente(), solicitud.direccion(), pedido.x(), pedido.y(), pedido.cantidad(),
                 pendiente, solicitud.prioridad(), estado, incumplido, calendario.aFecha(pedido.minutoRegistro()),
-                calendario.aFecha(pedido.minutoLimite()), transiciones);
+                calendario.aFecha(pedido.minutoLimite()), transiciones, List.of());
     }
 }

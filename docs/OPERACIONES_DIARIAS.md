@@ -91,7 +91,7 @@ Las velocidades deben ser positivas y finitas, con claves `AUTO`, `MOTO` o `BICI
 
 ## Pedidos, calculo y consistencia
 
-Cada pedido expone datos del cliente, destino, cantidad, pendiente, prioridad, registro, limite, estado, indicador de incumplimiento y transiciones con fecha. Los estados son `REGISTRADO`, `PLANIFICADO`, `EN_TRANSITO`, `EN_REPLANIFICACION`, `ENTREGADO_PARCIALMENTE`, `ENTREGADO` y `CANCELADO`. El alcance actual implementa el alta y la ejecucion; los endpoints de modificacion y cancelacion individual quedan para una ampliacion.
+Cada pedido expone datos del cliente, destino, cantidad, pendiente, prioridad, registro, limite, estado, indicador de incumplimiento, transiciones con fecha y `envios`, con la unidad, cantidad, almacen de carga, salida, llegada y paquetes de cada parte planificada. Los estados son `REGISTRADO`, `PLANIFICADO`, `EN_TRANSITO`, `EN_REPLANIFICACION`, `ENTREGADO_PARCIALMENTE`, `ENTREGADO` y `CANCELADO`. El alcance actual implementa el alta y la ejecucion; los endpoints de modificacion y cancelacion individual quedan para una ampliacion.
 
 El incumplimiento es un indicador separado para conservar el remanente y la trazabilidad, siguiendo las ventanas duras del nucleo existente. La identidad de metricas es registrados igual a entregados mas pendientes mas incumplidos. Las entregas parciales son un subconjunto, no otra categoria que deba sumarse.
 

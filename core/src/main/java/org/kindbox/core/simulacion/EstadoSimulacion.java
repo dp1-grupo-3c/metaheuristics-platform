@@ -557,10 +557,15 @@ public final class EstadoSimulacion {
             int desde = u.indiceParada() < 0 ? 0 : (u.sirviendo() ? u.indiceParada() + 1 : u.indiceParada());
             List<Parada> paradas = ruta.paradas();
             int viaje = 0;
+            // El viaje cero sale del ultimo almacen donde cargo; cada recarga abre otro.
+            int almacenViaje = u.idAlmacenOrigen();
+            long salidaViaje = u.minutoSalidaAlmacen();
             for (int k = desde; k < paradas.size(); k++) {
                 Parada p = paradas.get(k);
                 if (p.tipo() == TipoParada.ABASTECIMIENTO) {
                     viaje++;
+                    almacenViaje = p.idAlmacen();
+                    salidaViaje = u.minutoSalidaParada(k);
                     continue;
                 }
                 if (p.tipo() != TipoParada.ENTREGA) {
@@ -568,7 +573,9 @@ public final class EstadoSimulacion {
                 }
                 int indicePedido = indiceDePedido(p.idPedido());
                 int total = indicePedido < 0 ? p.cantidad() : pedidos.get(indicePedido).cantidad();
-                aBordo.add(new VistaUnidad.PedidoABordo(p.idPedido(), p.cantidad(), total, viaje));
+                int pendienteDelPedido = indicePedido < 0 ? p.cantidad() : noEntregadoDe(indicePedido);
+                aBordo.add(new VistaUnidad.PedidoABordo(p.idPedido(), p.cantidad(), total, viaje,
+                        pendienteDelPedido, almacenViaje, salidaViaje, u.minutoLlegadaParada(k)));
             }
         }
         VistaUnidad.Fase fase = VistaUnidad.Fase.SIN_RUTA;

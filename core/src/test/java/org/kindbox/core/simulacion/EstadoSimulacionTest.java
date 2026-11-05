@@ -141,6 +141,13 @@ class EstadoSimulacionTest {
         assertEquals(List.of(0, 1, 1, 2), enRuta.stream().map(VistaUnidad.PedidoABordo::viaje).toList(),
                 "cada abastecimiento abre un viaje; la alimentacion no");
         assertTrue(enRuta.get(0).cargado() && !enRuta.get(1).cargado(), "solo el viaje cero va a bordo");
+        assertEquals(List.of(0L, 62L, 184L, 246L), enRuta.stream().map(VistaUnidad.PedidoABordo::minutoLlegada).toList(),
+                "cada entrega trae su llegada comprometida");
+        assertEquals(List.of(-1, 2, 2, 2), enRuta.stream().map(VistaUnidad.PedidoABordo::idAlmacenCarga).toList(),
+                "el viaje cero no tiene almacen conocido; los demas salen de su recarga");
+        assertEquals(List.of(-1L, 61L, 61L, 245L), enRuta.stream().map(VistaUnidad.PedidoABordo::minutoSalida).toList());
+        assertEquals(List.of(5, 9, 7, 8), enRuta.stream().map(VistaUnidad.PedidoABordo::pendienteDelPedido).toList(),
+                "sin registrar falta el pedido entero");
 
         // Sirviendo la primera recarga, lo cargado ya incluye esos paquetes.
         u.llegarA(1);

@@ -23,6 +23,7 @@ import org.kindbox.core.modelo.EstadoUnidad;
 import org.kindbox.core.modelo.TipoAveria;
 import org.kindbox.core.problema.InstanciaPlanificacion;
 import org.kindbox.core.simulacion.ConfiguracionEscenario;
+import org.kindbox.core.simulacion.EnvioPedido;
 import org.kindbox.core.simulacion.ModoReloj;
 import org.kindbox.core.simulacion.MotorEjecucion;
 import org.kindbox.core.simulacion.ObservadorSimulacion;
@@ -213,10 +214,13 @@ public final class MotorOperacion implements AutoCloseable, ObservadorSimulacion
                         incidente.inicio(), incidente.reincorporacion(),
                         !instantanea.fechaHoraSimulada().isBefore(incidente.reincorporacion()))).toList();
         Instant ahora = reloj.instante();
+        Map<Integer, List<EnvioPedido>> envios = EnvioPedido.porPedido(instantanea);
+        List<VistaPedidoOperacion> pedidos = contexto.pedidos().vistas().stream()
+                .map(p -> p.conEnvios(envios.getOrDefault(p.id(), List.of()))).toList();
         vista = new VistaOperacion(contexto.id(), contexto.siguienteRevision(), contexto.estado(),
                 configuracion.zonaHoraria().getId(), ahora, instantanea.fechaHoraSimulada(),
                 inicio, fechaHoraInicio, Duration.between(inicio, ahora).toMinutes(),
-                configuracion, instantanea, contexto.parametros().instantanea(), contexto.pedidos().vistas(),
+                configuracion, instantanea, contexto.parametros().instantanea(), pedidos,
                 historial, List.copyOf(avisos), ejecucion.calculando(), ejecucion.planesDescartados(), error);
     }
 

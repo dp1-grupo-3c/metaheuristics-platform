@@ -33,6 +33,7 @@ import org.kindbox.core.modelo.TipoUnidad;
 import org.kindbox.core.modelo.UnidadTransporte;
 import org.kindbox.core.simulacion.ColorSemaforo;
 import org.kindbox.core.simulacion.ConfiguracionEscenario;
+import org.kindbox.core.simulacion.EnvioPedido;
 import org.kindbox.core.simulacion.EstadoCorrida;
 import org.kindbox.core.simulacion.EstadoSimulacion;
 import org.kindbox.core.simulacion.InstantaneaSimulacion;
@@ -403,6 +404,8 @@ public class ServicioSimulacion {
         Set<Integer> entregados = corrida.entregados();
         EstadoSimulacion mundo = corrida.motor() == null ? null : corrida.motor().estado();
 
+        InstantaneaSimulacion foto = corrida.instantanea();
+        Map<Integer, List<EnvioPedido>> envios = foto == null ? Map.of() : EnvioPedido.porPedido(foto);
         List<FilaPedido> filtradas = new ArrayList<>();
         List<Pedido> conocidos = corrida.motor() == null ? corrida.datos().pedidos()
                 : corrida.motor().pedidosConocidos();
@@ -424,7 +427,8 @@ public class ServicioSimulacion {
                     corrida.datos().calendario().aFecha(pedido.minutoLimite()),
                     holgura, entregado,
                     entregado ? ColorSemaforo.VERDE
-                            : ColorSemaforo.deHolgura(holgura, pedido.plazoHoras() * 60L, vigentes)));
+                            : ColorSemaforo.deHolgura(holgura, pedido.plazoHoras() * 60L, vigentes),
+                    envios.getOrDefault(pedido.id(), List.of())));
         }
         filtradas.sort(Comparator.comparingLong(FilaPedido::holguraMinutos).thenComparingInt(FilaPedido::id));
 

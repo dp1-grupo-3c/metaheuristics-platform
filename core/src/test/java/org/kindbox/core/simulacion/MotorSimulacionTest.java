@@ -351,6 +351,49 @@ class MotorSimulacionTest {
         assertTrue(errores.isEmpty(), errores.size() + " incoherencias: " + errores.subList(0, Math.min(5, errores.size())));
     }
 
+    @Test
+    @DisplayName("Los envios de cada pedido cuadran con sus paquetes pendientes en toda la corrida")
+    void losEnviosDeCadaPedidoSonCoherentes(@TempDir Path raiz) throws IOException {
+        ConfiguracionEscenario configuracion = new ConfiguracionEscenario(TipoEscenario.DIA_A_DIA, PRIMER_DIA,
+                PRIMER_DIA, 30, FACTOR_LIBRE, ModoReloj.LIBRE, BusquedaAdaptativaVecindadAmplia.NOMBRE, SEMILLA,
+                1, false, 0.0, false);
+        MotorSimulacion motor = new MotorSimulacion(escenario(raiz, PRIMER_DIA, 40.0),
+                configuracion, new ParametrosOperacion(), new PlanificadorConstructivo(), List.of());
+        List<String> errores = new ArrayList<>();
+        int[] conEnvios = new int[1];
+        motor.agregarObservador(new ObservadorSimulacion() {
+            @Override
+            public void alTomarFotografia(InstantaneaSimulacion foto) {
+                long ahora = foto.minutoSimulado();
+                for (Map.Entry<Integer, List<EnvioPedido>> entrada : EnvioPedido.porPedido(foto).entrySet()) {
+                    conEnvios[0]++;
+                    List<EnvioPedido> envios = entrada.getValue();
+                    int siguiente = envios.get(0).primerPaquete();
+                    for (EnvioPedido e : envios) {
+                        boolean bien = e.primerPaquete() == siguiente && e.cantidad() > 0
+                                && e.ultimoPaquete() == e.primerPaquete() + e.cantidad() - 1
+                                && e.minutoLlegada() >= ahora
+                                && (e.minutoSalida() < 0 || e.minutoSalida() <= e.minutoLlegada())
+                                && (!e.cargado() || e.idAlmacenCarga() >= 0);
+                        if (!bien) {
+                            errores.add("pedido " + entrada.getKey() + " " + e + " en " + ahora);
+                        }
+                        siguiente = e.ultimoPaquete() + 1;
+                    }
+                    if (envios.get(0).primerPaquete() < 1) {
+                        errores.add("pedido " + entrada.getKey() + " numera desde " + envios.get(0).primerPaquete());
+                    }
+                }
+            }
+        });
+
+        ResultadoSimulacion resultado = motor.ejecutar();
+
+        assertEquals(EstadoCorrida.CULMINADA, resultado.estado(), resultado.mensaje());
+        assertTrue(conEnvios[0] > 0, "ninguna fotografia tuvo envios");
+        assertTrue(errores.isEmpty(), errores.size() + " incoherencias: " + errores.subList(0, Math.min(3, errores.size())));
+    }
+
     // -------------------------------------------------------------- escenario
 
     /**

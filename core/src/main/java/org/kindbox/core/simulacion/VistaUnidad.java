@@ -71,7 +71,9 @@ public record VistaUnidad(
      *                        abastecimiento; {@code 1} tras la primera recarga, y asi
      *                        sucesivamente. Solo el viaje {@code 0} esta a bordo de verdad
      */
-    public record PedidoABordo(int idPedido, int enLaUnidad, int totalDelPedido, int viaje) {
+    public record PedidoABordo(int idPedido, int enLaUnidad, int totalDelPedido, int viaje,
+                               // Paquetes del pedido aun sin entregar, almacen y salida del viaje, y llegada.
+                               int pendienteDelPedido, int idAlmacenCarga, long minutoSalida, long minutoLlegada) {
 
         /** Indica si los paquetes ya van en la unidad, y no esperan una recarga posterior. */
         public boolean cargado() {

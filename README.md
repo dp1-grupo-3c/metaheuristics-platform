@@ -322,6 +322,16 @@ llegada, la de la parada siguiente. `SIN_RUTA` no tiene itinerario y lleva -1 en
 salio de el (-1 si aun no cargo). Los minutos hasta el destino o desde el origen se obtienen
 restandolos de `minutoSimulado`.
 
+Cada pedido de `GET /api/simulaciones/{id}/pedidos`, y de la operacion diaria (su listado y el
+canal WebSocket), trae `envios`: una entrada por unidad y parada que lo entrega, ordenadas por
+llegada. Cada una trae `codigoUnidad`, `tipoUnidad`, `cantidad`, `viaje` (0 si ya va a bordo, 1 tras
+la primera recarga) y `cargado`. Trae tambien `idAlmacenCarga`, `minutoSalida` y `fechaHoraSalida`
+del almacen donde carga ese viaje; `minutoLlegada` y `fechaHoraLlegada` a la entrega; y
+`primerPaquete` y `ultimoPaquete`. Los datos no traen codigo por paquete, asi que se numeran de 1 a
+la cantidad del pedido: primero los entregados y luego los pendientes por orden de llegada. Una
+replanificacion que reparta el pedido de otra forma puede cambiar esa numeracion. Todo se calcula
+sobre la ultima fotografia, cuyas unidades traen en `pedidosABordo` los mismos datos.
+
 La flota se edita con `PUT /api/parametros/flota`, con cuerpo
 `{"unidades":{"AUTO":{"cantidad":10,"kmPorHora":40},...}}`; en cada tipo la cantidad (0 a 99) y
 la velocidad son opcionales. Se valida todo antes de aplicar: la velocidad cambia en caliente y
