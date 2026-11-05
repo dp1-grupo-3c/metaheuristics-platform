@@ -247,6 +247,42 @@ class MotorSimulacionTest {
         }
     }
 
+    @Test
+    @DisplayName("Cada fotografia trae los indicadores globales y el color de cada unidad")
+    void laFotografiaTraeLosIndicadoresGlobales(@TempDir Path raiz) throws IOException {
+        ParametrosOperacion parametros = new ParametrosOperacion();
+        MotorSimulacion motor = new MotorSimulacion(escenario(raiz, PRIMER_DIA),
+                configuracionSinAverias(PRIMER_DIA), parametros, new PlanificadorConstructivo(), List.of());
+        ParametrosOperacion.Instantanea vigentes = parametros.instantanea();
+        List<String> errores = new ArrayList<>();
+        int[] fotos = new int[2];
+        motor.agregarObservador(new ObservadorSimulacion() {
+            @Override
+            public void alTomarFotografia(InstantaneaSimulacion foto) {
+                fotos[0]++;
+                if (!foto.ocupacionFlota().equals(IndicadorOcupacion.deFlota(foto.unidades(), vigentes))
+                        || !foto.ocupacionAlmacenes().equals(IndicadorOcupacion.deAlmacenes(foto.almacenes(), vigentes))) {
+                    errores.add("indicadores del minuto " + foto.minutoSimulado());
+                }
+                for (VistaUnidad u : foto.unidades()) {
+                    if (u.color() != ColorSemaforo.deOcupacion(u.cargaABordo(), u.capacidad(), vigentes)) {
+                        errores.add(u.codigo() + " en el minuto " + foto.minutoSimulado());
+                    }
+                }
+                if (foto.ocupacionFlota().ocupado() > 0) {
+                    fotos[1]++;
+                }
+            }
+        });
+
+        ResultadoSimulacion resultado = motor.ejecutar();
+
+        assertEquals(EstadoCorrida.CULMINADA, resultado.estado(), resultado.mensaje());
+        assertTrue(fotos[0] > 0, "la corrida no tomo fotografias");
+        assertTrue(fotos[1] > 0, "alguna fotografia debe tener carga a bordo");
+        assertTrue(errores.isEmpty(), "fotografias incoherentes: " + errores.subList(0, Math.min(5, errores.size())));
+    }
+
     // -------------------------------------------------------------- escenario
 
     /**

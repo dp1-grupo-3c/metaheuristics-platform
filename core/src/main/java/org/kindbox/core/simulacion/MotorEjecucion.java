@@ -1531,9 +1531,12 @@ public class MotorEjecucion {
         for (UnidadEnCurso u : unidades) {
             vistas.add(estado.vistaDe(u, minuto, parametrosVigentes));
         }
+        List<VistaAlmacen> almacenes = estado.vistasDeAlmacenes();
         return new InstantaneaSimulacion(minuto, calendario.aFecha(minuto), estadoCorrida,
-                milisegundosReales(), vistas, estado.vistasDeAlmacenes(), estado.vistasDeBloqueos(minuto),
-                estado.pedidosPendientes(), estado.metricas());
+                milisegundosReales(), vistas, almacenes, estado.vistasDeBloqueos(minuto),
+                estado.pedidosPendientes(), estado.metricas(),
+                IndicadorOcupacion.deFlota(vistas, parametrosVigentes),
+                IndicadorOcupacion.deAlmacenes(almacenes, parametrosVigentes));
     }
 
     private void notificar(Consumer<ObservadorSimulacion> aviso) {

@@ -9,6 +9,7 @@ import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.kindbox.core.modelo.EstadoUnidad;
+import org.kindbox.core.modelo.ParametrosOperacion;
 import org.kindbox.core.modelo.TipoUnidad;
 
 /**
@@ -30,8 +31,10 @@ class InstantaneaSimulacionTest {
     private static InstantaneaSimulacion con(List<VistaUnidad> unidades) {
         MetricasSimulacion metricas = new MetricasSimulacion(0, 0, 0, 0, 0, 0, 0.0,
                 Map.of(), Map.of(), Map.of(), List.of(), Map.of(), 0L, 0L);
+        ParametrosOperacion.Instantanea parametros = new ParametrosOperacion().instantanea();
         return new InstantaneaSimulacion(0L, LocalDateTime.of(2026, 9, 1, 0, 0), EstadoCorrida.EN_CURSO,
-                0L, unidades, List.of(), List.of(), 0, metricas);
+                0L, unidades, List.of(), List.of(), 0, metricas,
+                IndicadorOcupacion.deFlota(unidades, parametros), IndicadorOcupacion.deAlmacenes(List.of(), parametros));
     }
 
     @Test

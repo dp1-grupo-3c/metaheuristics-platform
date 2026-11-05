@@ -296,6 +296,11 @@ antes de aplicar. Los colores son `VERDE`, `AMBAR`, `ROJO` y `VACIO`: un almacen
 unidad sin carga salen en `VACIO`, y cada unidad de la fotografia trae su `color`. En la operacion
 diaria los mismos campos van en `PUT /api/operaciones/{id}/parametros`.
 
+Cada fotografia trae ademas `ocupacionFlota` y `ocupacionAlmacenes`, con `ocupado`, `capacidad`,
+`porcentaje` (con un decimal) y `color`. La flota suma la carga a bordo de todas sus unidades y usa
+los umbrales de ocupacion; los almacenes suman el stock de los intermedios, sin el central, que es
+ilimitado, y usan los umbrales de inventario multiplicados por el numero de intermedios.
+
 Los atributos de las averias se cambian con `PUT /api/parametros/averias`, por ejemplo
 `{"tipo":2,"turnosHastaReincorporacion":3}`: `minutosEnElLugar` (1 a 1440; hasta 480 en los
 tipos 2 y 3), `turnosHastaReincorporacion` (1 a 9, lo usa el tipo 2) y `diasMantenimiento` (1 a

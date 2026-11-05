@@ -33,7 +33,10 @@ public record InstantaneaSimulacion(
         List<VistaAlmacen> almacenes,
         List<VistaBloqueo> bloqueosVigentes,
         int pedidosPendientes,
-        MetricasSimulacion metricas) {
+        MetricasSimulacion metricas,
+        // Indicadores globales de ocupacion de la flota y de los almacenes intermedios.
+        IndicadorOcupacion ocupacionFlota,
+        IndicadorOcupacion ocupacionAlmacenes) {
 
     public InstantaneaSimulacion {
         unidades = List.copyOf(unidades);

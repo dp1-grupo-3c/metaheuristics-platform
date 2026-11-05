@@ -64,6 +64,18 @@ public enum ColorSemaforo {
         return fraccion >= corteAmbar ? AMBAR : ROJO;
     }
 
+    // Stock sumado de varios almacenes, contra los umbrales de uno multiplicados por su numero.
+    public static ColorSemaforo deInventarioConjunto(int disponible, int almacenes,
+                                                     ParametrosOperacion.Instantanea parametros) {
+        if (disponible <= 0 || almacenes <= 0) {
+            return VACIO;
+        }
+        if (disponible >= (long) parametros.umbralSemaforoVerde() * almacenes) {
+            return VERDE;
+        }
+        return disponible >= (long) parametros.umbralSemaforoAmbar() * almacenes ? AMBAR : ROJO;
+    }
+
     // Ocupacion de una unidad: mas carga es menos espacio libre, de verde a rojo.
     public static ColorSemaforo deOcupacion(int carga, int capacidad, ParametrosOperacion.Instantanea parametros) {
         if (carga <= 0) {
