@@ -293,7 +293,8 @@ public class ControladorParametros {
         }
         return new VistaParametros(velocidades, tipos, cantidades(), vigentes.umbralSemaforoAmbar(),
                 vigentes.umbralSemaforoVerde(), vigentes.umbralOcupacionAmbar(), vigentes.umbralOcupacionRojo(),
-                0, Almacen.CAPACIDAD_INTERMEDIO,
+                0, Almacen.todos().stream().filter(a -> !a.central()).mapToInt(Almacen::capacidad).max()
+                        .orElse(Almacen.CAPACIDAD_INTERMEDIO),
                 vigentes.minutosAcondicionamiento(), vigentes.minutosAlimentacion(),
                 vigentes.minutosSeparacionCambioTurno(), vigentes.minutosTrasvase(), averias, vigentes.version());
     }

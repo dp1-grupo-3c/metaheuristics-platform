@@ -59,9 +59,9 @@ public final class RegistroBloqueos {
     /** Numero de direcciones que salen de un nodo de la reticula. */
     public static final int DIRECCIONES = 4;
     /** Dimension de la mascara de aristas: cuatro aristas por nodo, existan o no. */
-    public static final int TOTAL_ARISTAS = Ciudad.TOTAL_NODOS * DIRECCIONES;
-
-    private static final RegistroBloqueos VACIO = new RegistroBloqueos(List.of());
+    public static int totalAristas() {
+        return Ciudad.TOTAL_NODOS * DIRECCIONES;
+    }
 
     private final Bloqueo[] bloqueos;
     private final long[] minutoInicio;
@@ -154,19 +154,19 @@ public final class RegistroBloqueos {
         }
 
         this.instantesCambio = instantesDeCambio(minutoInicio, minutoFin);
-        this.mascara = new boolean[TOTAL_ARISTAS];
+        this.mascara = new boolean[totalAristas()];
         // Ademas de la poligonal se marcan las calles laterales de cada nodo bloqueado.
-        this.aristasMarcadas = new int[TOTAL_ARISTAS];
+        this.aristasMarcadas = new int[totalAristas()];
         this.nodosVigentes = new int[nodos.length];
         this.accesoVigente = new int[nodos.length];
     }
 
     /**
      * Registro sin ningun bloqueo, para los escenarios que no cargan el archivo mensual.
-     * Se comparte una sola instancia porque su mascara nunca llega a escribirse.
+     * No se comparte una instancia porque su mascara depende del tamano vigente de la ciudad.
      */
     public static RegistroBloqueos vacio() {
-        return VACIO;
+        return new RegistroBloqueos(List.of());
     }
 
     // ------------------------------------------------- codificacion de aristas
@@ -243,7 +243,7 @@ public final class RegistroBloqueos {
 
     /**
      * Mascara de las aristas bloqueadas vigentes en el instante dado, de dimension
-     * {@link #TOTAL_ARISTAS}. La consume la construccion de la matriz de distancias en
+     * {@link #totalAristas()}. La consume la construccion de la matriz de distancias en
      * cada iteracion de planificacion. Incluye las aristas de las poligonales y, de cada
      * nodo bloqueado, todas sus calles salvo la de acceso (ver la documentacion de la clase).
      *

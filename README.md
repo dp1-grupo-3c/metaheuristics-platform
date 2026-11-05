@@ -391,8 +391,23 @@ nada y lo guardan con un temporal y un movimiento atomico. Responden la `ruta` g
 (`AAAAMM.bloqueadas` o `bloqueo.AAMM.txt`). Reemplaza el archivo que ya tenga ese mes donde este o
 crea `bloqueos/AAAAMM.bloqueadas`. Si el mes tiene mas de un archivo responde 409.
 
+`POST /api/datos/bloqueos/manual` agrega un bloqueo sin subir un archivo, con cuerpo
+`{"nodos":[{"x":12,"y":20},{"x":13,"y":20}],"inicio":"2026-09-02T10:30","fin":"2026-09-02T18:00"}`.
+El registro se suma al archivo del mes y se valida con el mismo lector. Si cruza de mes se parte en
+un registro por mes, y ese ultimo minuto del mes queda libre porque el formato no puede expresarlo.
+Rige desde la siguiente carga: una corrida en curso no lo ve.
+
 `POST /api/datos/mantenimiento` exige el nombre `mant.preventivo.m1.m2` y guarda el plan en
 `mantenimiento/<ano de su primera fecha>/`, reemplazando el del mismo nombre.
+
+El tamano del mapa y los almacenes se editan con `/api/parametros/mundo`. `GET` devuelve el `mapa`,
+los `almacenes`, la `version` y en `ejecucionActiva` lo que impide editar. `PUT` recibe
+`{"mapa":{"largoKm":90,"anchoKm":60},"almacenes":[{"id":0,"x":27,"y":14},{"id":1,"x":12,"y":38,"capacidad":800},...]}`
+con todos los almacenes existentes: no se agregan ni se quitan. Se guarda en
+`kindbox.archivo-parametros-mundo`, rige desde la siguiente corrida y responde 409 con una
+simulacion u operacion en curso. Las demas secciones de ese archivo se guardan, pero el motor
+todavia no las lee. Si el mapa se achica, un pedido o bloqueo que quede fuera hace que el inicio de
+la corrida responda 400.
 
 El registro de clientes se publica en `/api/clientes`: `POST` registra, `GET` lista (admite
 `busqueda` por documento o nombre), `GET /{documento}` busca y `PUT /{documento}` edita. Una

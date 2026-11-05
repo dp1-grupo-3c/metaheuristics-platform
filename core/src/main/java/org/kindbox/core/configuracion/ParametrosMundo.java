@@ -29,7 +29,9 @@ import org.kindbox.core.simulacion.GeneradorAverias;
  * sentido junto con los demas (un almacen esta dentro o fuera segun el tamano del mapa).</p>
  *
  * <p>Durante la migracion, {@link #delEnunciado()} se construye a partir de las constantes
- * que hoy usa el nucleo, de modo que ambos caminos coinciden mientras convivan.</p>
+ * que hoy usa el nucleo, de modo que ambos caminos coinciden mientras convivan. Por ahora el
+ * nucleo solo lee de aqui el mapa y los almacenes, con {@link #aplicarAlNucleo()}; las demas
+ * secciones se guardan, pero el motor sigue usando sus propios valores.</p>
  *
  * @param mapa      dimensiones de la ciudad
  * @param almacenes almacen central e intermedios
@@ -181,13 +183,31 @@ public record ParametrosMundo(
 
     // ---- Valores del enunciado -----------------------------------------------------
 
-    /** Parametros del enunciado, tomados de las constantes que hoy usa el nucleo. */
-    public static ParametrosMundo delEnunciado() {
-        List<AlmacenParam> almacenes = new ArrayList<>();
-        for (Almacen a : Almacen.todos()) {
-            almacenes.add(new AlmacenParam(a.id(), a.nombre(), Ciudad.x(a.nodo()), Ciudad.y(a.nodo()),
-                    a.central(), a.central() ? null : a.capacidad()));
+    /**
+     * Hace regir el mapa y los almacenes en el nucleo. Solo debe llamarse sin ejecuciones en
+     * curso: las siguientes corridas arrancan con estos valores.
+     */
+    public void aplicarAlNucleo() {
+        Ciudad.configurar(mapa.largoKm(), mapa.anchoKm());
+        List<Almacen> red = new ArrayList<>();
+        for (AlmacenParam a : almacenes) {
+            red.add(new Almacen(a.id(), a.nombre(), Ciudad.nodo(a.x(), a.y()), a.central(),
+                    a.central() ? Integer.MAX_VALUE : a.capacidad()));
         }
+        Almacen.configurar(red);
+    }
+
+    /** Copia con otro mapa y otros almacenes, que se validan junto con el resto. */
+    public ParametrosMundo conMapaYAlmacenes(Mapa nuevoMapa, List<AlmacenParam> nuevosAlmacenes) {
+        return new ParametrosMundo(nuevoMapa, nuevosAlmacenes, flota, averias, semaforo, turnos, plazos, tiempos);
+    }
+
+    /** Parametros del enunciado; no dependen de lo que este configurado en el nucleo. */
+    public static ParametrosMundo delEnunciado() {
+        List<AlmacenParam> almacenes = List.of(
+                new AlmacenParam(0, "Almacen Central", 27, 14, true, null),
+                new AlmacenParam(1, "Almacen Intermedio Nor-Oeste", 12, 38, false, Almacen.CAPACIDAD_INTERMEDIO),
+                new AlmacenParam(2, "Almacen Intermedio Este", 57, 27, false, Almacen.CAPACIDAD_INTERMEDIO));
         int[] cantidades = {10, 15, 12};
         List<TipoUnidadParam> flota = new ArrayList<>();
         for (TipoUnidad t : TipoUnidad.values()) {
@@ -210,7 +230,7 @@ public record ParametrosMundo(
             priorizados.add(h);
         }
         return new ParametrosMundo(
-                new Mapa(Ciudad.LARGO_KM, Ciudad.ANCHO_KM),
+                new Mapa(Ciudad.LARGO_KM_ENUNCIADO, Ciudad.ANCHO_KM_ENUNCIADO),
                 almacenes,
                 flota,
                 averias,

@@ -7,8 +7,10 @@ import java.nio.file.Path;
 import java.time.YearMonth;
 import java.time.format.DateTimeParseException;
 import java.util.Comparator;
+import java.util.List;
 import java.util.stream.Stream;
 import org.kindbox.core.io.RepositorioDatos;
+import org.kindbox.service.dto.SolicitudBloqueo;
 import org.kindbox.service.error.ConflictoDeEstado;
 import org.kindbox.service.error.ErrorDeDatos;
 import org.kindbox.service.error.SolicitudInvalida;
@@ -17,6 +19,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -61,6 +64,42 @@ public class ControladorDatos {
                                                      @RequestParam(name = "mes", required = false) String mes) {
         YearMonth periodo = mes == null || mes.isBlank() ? null : mes(mes);
         return guardar(archivo, "bloqueos.txt", origen -> repositorio.guardarBloqueos(periodo, origen));
+    }
+
+    // Se agrega al archivo del mes: rige desde la siguiente carga, no en una corrida en curso.
+    @PostMapping("/bloqueos/manual")
+    public List<RepositorioDatos.ArchivoGuardado> bloqueoManual(@RequestBody SolicitudBloqueo solicitud) {
+        if (solicitud == null || solicitud.nodos() == null || solicitud.nodos().size() < 2) {
+            throw new SolicitudInvalida("Un bloqueo necesita al menos dos nodos");
+        }
+        if (solicitud.inicio() == null || solicitud.fin() == null) {
+            throw new SolicitudInvalida("Faltan el inicio y el fin del bloqueo");
+        }
+        if (solicitud.inicio().getSecond() != 0 || solicitud.inicio().getNano() != 0
+                || solicitud.fin().getSecond() != 0 || solicitud.fin().getNano() != 0) {
+            throw new SolicitudInvalida("El inicio y el fin se indican hasta el minuto, sin segundos");
+        }
+        int[] coordenadas = new int[solicitud.nodos().size() * 2];
+        for (int i = 0; i < solicitud.nodos().size(); i++) {
+            SolicitudBloqueo.Nodo nodo = solicitud.nodos().get(i);
+            if (nodo == null || nodo.x() == null || nodo.y() == null) {
+                throw new SolicitudInvalida("Al nodo " + (i + 1) + " le falta una coordenada");
+            }
+            coordenadas[2 * i] = nodo.x();
+            coordenadas[2 * i + 1] = nodo.y();
+        }
+        try {
+            List<RepositorioDatos.ArchivoGuardado> guardados =
+                    repositorio.agregarBloqueo(coordenadas, solicitud.inicio(), solicitud.fin());
+            LOG.info("Bloqueo manual de {} a {} agregado a {}", solicitud.inicio(), solicitud.fin(), guardados);
+            return guardados;
+        } catch (IllegalArgumentException e) {
+            throw new SolicitudInvalida(e.getMessage(), e);
+        } catch (IllegalStateException e) {
+            throw new ConflictoDeEstado(e.getMessage());
+        } catch (IOException e) {
+            throw new ErrorDeDatos("No se pudo guardar el bloqueo en el directorio de datos " + repositorio.raiz(), e);
+        }
     }
 
     @PostMapping("/mantenimiento")
