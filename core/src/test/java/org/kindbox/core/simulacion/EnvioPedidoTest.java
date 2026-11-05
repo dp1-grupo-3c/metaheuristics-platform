@@ -1,5 +1,6 @@
 package org.kindbox.core.simulacion;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -19,9 +20,13 @@ class EnvioPedidoTest {
     private static final LocalDateTime FECHA = LocalDateTime.of(2026, 9, 1, 1, 0);
 
     private static VistaUnidad unidad(String codigo, List<VistaUnidad.PedidoABordo> aBordo) {
+        return unidad(codigo, new int[0], aBordo);
+    }
+
+    private static VistaUnidad unidad(String codigo, int[] pendiente, List<VistaUnidad.PedidoABordo> aBordo) {
         TipoUnidad tipo = TipoUnidad.porCodigo(codigo);
         return new VistaUnidad(codigo, tipo, EstadoUnidad.EN_RUTA, 0, 0, 0, tipo.capacidad(), ColorSemaforo.VACIO,
-                new int[0], new int[0], -1, -1, 0L, aBordo, 0, -1L, -1L, -1L,
+                new int[0], pendiente, -1, -1, 0L, aBordo, 0, -1L, -1L, -1L,
                 VistaUnidad.Fase.LLEGANDO, 30L, 90L, 1, 30L);
     }
 
@@ -39,9 +44,9 @@ class EnvioPedidoTest {
     void agrupaOrdenaYNumera() {
         // Pedido 7: 10 paquetes, 2 ya entregados; el auto lleva 5 y la moto 3 tras recargar.
         InstantaneaSimulacion foto = foto(List.of(
-                unidad("TA01", List.of(new VistaUnidad.PedidoABordo(7, 5, 10, 0, 8, 1, 30L, 120L),
-                        new VistaUnidad.PedidoABordo(9, 2, 2, 0, 2, 1, 30L, 150L))),
-                unidad("TM01", List.of(new VistaUnidad.PedidoABordo(7, 3, 10, 1, 8, 2, 80L, 90L)))));
+                unidad("TA01", List.of(new VistaUnidad.PedidoABordo(7, 5, 10, 0, 8, 1, 30L, 120L, 1),
+                        new VistaUnidad.PedidoABordo(9, 2, 2, 0, 2, 1, 30L, 150L, 1))),
+                unidad("TM01", List.of(new VistaUnidad.PedidoABordo(7, 3, 10, 1, 8, 2, 80L, 90L, 1)))));
 
         Map<Integer, List<EnvioPedido>> envios = EnvioPedido.porPedido(foto);
         assertEquals(List.of(7, 9), List.copyOf(envios.keySet()));
@@ -67,12 +72,33 @@ class EnvioPedidoTest {
     @DisplayName("Una salida desconocida no tiene fecha y una fotografia sin rutas no tiene envios")
     void casosBorde() {
         InstantaneaSimulacion foto = foto(List.of(
-                unidad("TB01", List.of(new VistaUnidad.PedidoABordo(4, 1, 1, 0, 1, -1, -1L, 75L)))));
+                unidad("TB01", List.of(new VistaUnidad.PedidoABordo(4, 1, 1, 0, 1, -1, -1L, 75L, 1)))));
         EnvioPedido envio = EnvioPedido.porPedido(foto).get(4).get(0);
         assertNull(envio.fechaHoraSalida());
         assertEquals(-1, envio.idAlmacenCarga());
         assertEquals(LocalDateTime.of(2026, 9, 1, 1, 15), envio.fechaHoraLlegada());
 
         assertTrue(EnvioPedido.porPedido(foto(List.of(unidad("TA01", List.of())))).isEmpty());
+    }
+
+    @Test
+    @DisplayName("La ruta de cada envio corta el camino pendiente de su unidad en la entrega")
+    void laRutaTerminaEnLaEntrega() {
+        // El auto pasa por (1,1), (2,1) y (3,1), donde entrega, y sigue a (4,1); la moto entrega en (3,1) al llegar.
+        InstantaneaSimulacion foto = foto(List.of(
+                unidad("TA01", new int[] {1, 1, 2, 1, 3, 1, 4, 1},
+                        List.of(new VistaUnidad.PedidoABordo(7, 4, 6, 0, 6, 1, 30L, 100L, 3))),
+                unidad("TM01", new int[] {3, 2, 3, 1},
+                        List.of(new VistaUnidad.PedidoABordo(7, 2, 6, 0, 6, 1, 30L, 80L, 2)))));
+
+        List<RutaEnvio> rutas = EnvioPedido.rutas(foto, 7);
+        assertEquals(List.of("TM01", "TA01"), rutas.stream().map(r -> r.envio().codigoUnidad()).toList());
+        assertArrayEquals(new int[] {3, 2, 3, 1}, rutas.get(0).camino());
+        assertArrayEquals(new int[] {1, 1, 2, 1, 3, 1}, rutas.get(1).camino(), "no incluye lo que sigue tras entregar");
+        assertEquals(EnvioPedido.porPedido(foto).get(7), rutas.stream().map(RutaEnvio::envio).toList(),
+                "la numeracion es la misma que la del listado");
+        assertTrue(rutas.get(0).envio().lleva(1) && rutas.get(0).envio().lleva(2) && !rutas.get(0).envio().lleva(3));
+        assertTrue(rutas.get(1).envio().lleva(6));
+        assertTrue(EnvioPedido.rutas(foto, 99).isEmpty(), "un pedido sin envios no tiene rutas");
     }
 }

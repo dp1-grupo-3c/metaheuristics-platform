@@ -35,6 +35,7 @@ import org.kindbox.core.metaheuristica.PresupuestoComputo;
 import org.kindbox.core.metaheuristica.ResultadoPlanificacion;
 import org.kindbox.core.metaheuristica.alns.BusquedaAdaptativaVecindadAmplia;
 import org.kindbox.core.modelo.ParametrosOperacion;
+import org.kindbox.core.modelo.Pedido;
 import org.kindbox.core.modelo.TipoAveria;
 import org.kindbox.core.modelo.TipoUnidad;
 import org.kindbox.core.problema.InstanciaPlanificacion;
@@ -357,7 +358,10 @@ class MotorSimulacionTest {
         ConfiguracionEscenario configuracion = new ConfiguracionEscenario(TipoEscenario.DIA_A_DIA, PRIMER_DIA,
                 PRIMER_DIA, 30, FACTOR_LIBRE, ModoReloj.LIBRE, BusquedaAdaptativaVecindadAmplia.NOMBRE, SEMILLA,
                 1, false, 0.0, false);
-        MotorSimulacion motor = new MotorSimulacion(escenario(raiz, PRIMER_DIA, 40.0),
+        RepositorioDatos.DatosEscenario datos = escenario(raiz, PRIMER_DIA, 40.0);
+        Map<Integer, Pedido> pedidos = new HashMap<>();
+        datos.pedidos().forEach(p -> pedidos.put(p.id(), p));
+        MotorSimulacion motor = new MotorSimulacion(datos,
                 configuracion, new ParametrosOperacion(), new PlanificadorConstructivo(), List.of());
         List<String> errores = new ArrayList<>();
         int[] conEnvios = new int[1];
@@ -382,6 +386,14 @@ class MotorSimulacionTest {
                     }
                     if (envios.get(0).primerPaquete() < 1) {
                         errores.add("pedido " + entrada.getKey() + " numera desde " + envios.get(0).primerPaquete());
+                    }
+                    // Cada ruta acaba en el destino del pedido.
+                    Pedido pedido = pedidos.get(entrada.getKey());
+                    for (RutaEnvio ruta : EnvioPedido.rutas(foto, entrada.getKey())) {
+                        int[] c = ruta.camino();
+                        if (c.length < 2 || c[c.length - 2] != pedido.x() || c[c.length - 1] != pedido.y()) {
+                            errores.add("ruta del pedido " + entrada.getKey() + " no acaba en su destino en " + ahora);
+                        }
                     }
                 }
             }

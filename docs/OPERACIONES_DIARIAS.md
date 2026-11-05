@@ -28,6 +28,7 @@ La agenda se extiende al cruzar la fecha y cubre tres dias futuros. Conserva ser
 | POST | `/api/operaciones/{id}/pedidos` | 202 con el estado del comando de alta |
 | GET | `/api/operaciones/{id}/comandos/{comandoId}` | Estado de aceptacion, aplicacion o rechazo |
 | GET | `/api/operaciones/{id}/pedidos` | Pedidos paginados del registro vivo |
+| GET | `/api/operaciones/{id}/pedidos/{pedido}/rutas` | Camino de cada unidad que lleva el pedido hasta su entrega |
 | GET | `/api/operaciones/{id}/metricas` | Indicadores acumulados |
 | POST | `/api/operaciones/{id}/averias` | 202 con el comando de averia |
 | PUT | `/api/operaciones/{id}/parametros` | 202 con el comando de parametros |

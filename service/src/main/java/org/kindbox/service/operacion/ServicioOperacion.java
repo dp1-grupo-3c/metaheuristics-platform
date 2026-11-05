@@ -20,7 +20,9 @@ import org.kindbox.core.operacion.SolicitudParametrosOperacion;
 import org.kindbox.core.operacion.SolicitudPedidoOperacion;
 import org.kindbox.core.operacion.VistaOperacion;
 import org.kindbox.core.operacion.VistaPedidoOperacion;
+import org.kindbox.core.simulacion.EnvioPedido;
 import org.kindbox.service.dto.PaginaPedidosOperacion;
+import org.kindbox.service.dto.RutasPedido;
 import org.kindbox.service.dto.SolicitudOperacion;
 import org.kindbox.service.error.ConflictoDeEstado;
 import org.kindbox.service.error.ErrorDeDatos;
@@ -158,6 +160,14 @@ public class ServicioOperacion implements AutoCloseable {
         int hasta = Math.min(desde + tamano, filas.size());
         return new PaginaPedidosOperacion(id, vista.revision(), filas.subList(desde, hasta), pagina, tamano,
                 filas.size(), (filas.size() + tamano - 1) / tamano);
+    }
+
+    public synchronized RutasPedido rutasPedido(String id, int idPedido, Integer paquete) {
+        VistaOperacion vista = requerir(id).vista();
+        VistaPedidoOperacion pedido = vista.pedidos().stream().filter(p -> p.id() == idPedido).findFirst()
+                .orElseThrow(() -> new RecursoNoEncontrado("El pedido " + idPedido + " no existe en la operacion"));
+        return RutasPedido.de(pedido.id(), pedido.x(), pedido.y(), pedido.cantidad(),
+                EnvioPedido.rutas(vista.instantanea(), idPedido), paquete);
     }
 
     private boolean coincide(VistaPedidoOperacion pedido, String filtro) {

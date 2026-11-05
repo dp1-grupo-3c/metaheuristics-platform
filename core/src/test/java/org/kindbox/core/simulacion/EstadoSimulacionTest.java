@@ -148,6 +148,8 @@ class EstadoSimulacionTest {
         assertEquals(List.of(-1L, 61L, 61L, 245L), enRuta.stream().map(VistaUnidad.PedidoABordo::minutoSalida).toList());
         assertEquals(List.of(5, 9, 7, 8), enRuta.stream().map(VistaUnidad.PedidoABordo::pendienteDelPedido).toList(),
                 "sin registrar falta el pedido entero");
+        assertEquals(List.of(1, 3, 5, 7), enRuta.stream().map(VistaUnidad.PedidoABordo::nodosHastaEntrega).toList(),
+                "nodos del camino pendiente hasta cada entrega, incluida");
 
         // Sirviendo la primera recarga, lo cargado ya incluye esos paquetes.
         u.llegarA(1);
@@ -156,6 +158,8 @@ class EstadoSimulacionTest {
                 "la entrega ya hecha sale de la lista");
         assertEquals(List.of(0, 0, 1), recargando.stream().map(VistaUnidad.PedidoABordo::viaje).toList(),
                 "la recarga en curso ya no separa viajes");
+        assertEquals(List.of(2, 4, 6), recargando.stream().map(VistaUnidad.PedidoABordo::nodosHastaEntrega).toList(),
+                "el camino pendiente empieza en la parada donde esta");
     }
 
     @Test

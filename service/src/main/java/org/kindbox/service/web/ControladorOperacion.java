@@ -7,6 +7,7 @@ import org.kindbox.core.operacion.SolicitudPedidoOperacion;
 import org.kindbox.core.operacion.VistaOperacion;
 import org.kindbox.core.simulacion.MetricasSimulacion;
 import org.kindbox.service.dto.PaginaPedidosOperacion;
+import org.kindbox.service.dto.RutasPedido;
 import org.kindbox.service.dto.SolicitudOperacion;
 import org.kindbox.service.operacion.ServicioOperacion;
 import org.springframework.http.ResponseEntity;
@@ -69,6 +70,13 @@ public class ControladorOperacion {
             @RequestParam(name = "busqueda", required = false) String busqueda,
             @RequestParam(name = "soloActivos", defaultValue = "false") boolean soloActivos) {
         return servicio.pedidos(id, pagina, tamano, busqueda, soloActivos);
+    }
+
+    // Camino de cada unidad que lleva el pedido hasta su entrega; con paquete, solo la que lo lleva.
+    @GetMapping("/{id}/pedidos/{pedido}/rutas")
+    public RutasPedido rutasPedido(@PathVariable("id") String id, @PathVariable("pedido") int pedido,
+            @RequestParam(name = "paquete", required = false) Integer paquete) {
+        return servicio.rutasPedido(id, pedido, paquete);
     }
 
     @GetMapping("/{id}/metricas")

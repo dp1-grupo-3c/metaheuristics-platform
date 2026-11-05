@@ -332,6 +332,15 @@ la cantidad del pedido: primero los entregados y luego los pendientes por orden 
 replanificacion que reparta el pedido de otra forma puede cambiar esa numeracion. Todo se calcula
 sobre la ultima fotografia, cuyas unidades traen en `pedidosABordo` los mismos datos.
 
+Para resaltar en el mapa la ruta de un envio, `GET /api/simulaciones/{id}/pedidos/{pedido}/rutas`
+(o `/api/operaciones/{id}/...` en la operacion diaria) devuelve `idPedido`, `destinoX`, `destinoY`,
+`cantidad` y `rutas`. Cada ruta trae su `envio`, con la misma numeracion del listado, y su `camino`:
+pares x,y desde la posicion actual de la unidad hasta la entrega, incluida. Con `?paquete=n` solo
+queda la ruta que lleva ese paquete (un producto); sin el, todas las del pedido (el envio entero).
+Un pedido que no existe, o que aun no se registra, responde 404; un paquete fuera del pedido, 400;
+y un pedido sin unidad asignada trae `rutas` vacio. Cada pedido de `pedidosABordo` trae ademas
+`nodosHastaEntrega`, para cortar el mismo tramo desde `caminoPendiente`.
+
 La flota se edita con `PUT /api/parametros/flota`, con cuerpo
 `{"unidades":{"AUTO":{"cantidad":10,"kmPorHora":40},...}}`; en cada tipo la cantidad (0 a 99) y
 la velocidad son opcionales. Se valida todo antes de aplicar: la velocidad cambia en caliente y

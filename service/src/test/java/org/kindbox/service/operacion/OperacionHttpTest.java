@@ -102,6 +102,23 @@ class OperacionHttpTest {
                 .andExpect(jsonPath("$.pedidosRegistrados").value(1));
     }
 
+    @Test void lasRutasDeUnPedidoSeConsultanPorHttp() throws Exception {
+        String id = iniciar();
+        mvc.perform(post("/api/operaciones/{id}/pedidos", id).contentType(MediaType.APPLICATION_JSON)
+                .content(cuerpo("ruta", 2))).andExpect(status().isAccepted());
+        servicio.actualizar();
+        mvc.perform(get("/api/operaciones/{id}/pedidos/{pedido}/rutas", id, 1))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.idPedido").value(1))
+                .andExpect(jsonPath("$.destinoX").value(28)).andExpect(jsonPath("$.destinoY").value(14))
+                .andExpect(jsonPath("$.cantidad").value(2)).andExpect(jsonPath("$.rutas").isArray());
+        mvc.perform(get("/api/operaciones/{id}/pedidos/{pedido}/rutas", id, 1).param("paquete", "2"))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/operaciones/{id}/pedidos/{pedido}/rutas", id, 1).param("paquete", "3"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/operaciones/{id}/pedidos/{pedido}/rutas", id, 99))
+                .andExpect(status().isNotFound());
+    }
+
     @Test void validacionYConflictosTienenRespuestaEstable() throws Exception {
         String id = iniciar();
         mvc.perform(post("/api/operaciones")).andExpect(status().isConflict());

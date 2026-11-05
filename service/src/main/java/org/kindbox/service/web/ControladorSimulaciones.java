@@ -10,6 +10,7 @@ import org.kindbox.service.dto.PaginaPedidos;
 import org.kindbox.service.dto.RespuestaAveria;
 import org.kindbox.service.dto.ResultadoCargaAverias;
 import org.kindbox.service.dto.ResumenCorrida;
+import org.kindbox.service.dto.RutasPedido;
 import org.kindbox.service.dto.SolicitudAveria;
 import org.kindbox.service.dto.SolicitudSimulacion;
 import org.kindbox.service.error.SolicitudInvalida;
@@ -100,6 +101,13 @@ public class ControladorSimulaciones {
                                  @RequestParam(name = "tamano", required = false) Integer tamano,
                                  @RequestParam(name = "soloActivos", defaultValue = "true") boolean soloActivos) {
         return servicio.pedidos(id, busqueda, pagina, tamano, soloActivos);
+    }
+
+    // Camino de cada unidad que lleva el pedido hasta su entrega; con paquete, solo la que lo lleva.
+    @GetMapping("/{id}/pedidos/{pedido}/rutas")
+    public RutasPedido rutasPedido(@PathVariable("id") String id, @PathVariable("pedido") int pedido,
+                                   @RequestParam(name = "paquete", required = false) Integer paquete) {
+        return servicio.rutasPedido(id, pedido, paquete);
     }
 
     /** Registro individual de una averia: placa y tipo. */

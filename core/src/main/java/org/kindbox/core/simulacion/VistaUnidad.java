@@ -73,7 +73,9 @@ public record VistaUnidad(
      */
     public record PedidoABordo(int idPedido, int enLaUnidad, int totalDelPedido, int viaje,
                                // Paquetes del pedido aun sin entregar, almacen y salida del viaje, y llegada.
-                               int pendienteDelPedido, int idAlmacenCarga, long minutoSalida, long minutoLlegada) {
+                               int pendienteDelPedido, int idAlmacenCarga, long minutoSalida, long minutoLlegada,
+                               // Nodos de caminoPendiente desde la posicion actual hasta la entrega, incluida.
+                               int nodosHastaEntrega) {
 
         /** Indica si los paquetes ya van en la unidad, y no esperan una recarga posterior. */
         public boolean cargado() {

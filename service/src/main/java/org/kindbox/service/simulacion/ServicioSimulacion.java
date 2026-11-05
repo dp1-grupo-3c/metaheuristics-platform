@@ -42,6 +42,7 @@ import org.kindbox.core.simulacion.ModoReloj;
 import org.kindbox.core.simulacion.MotorSimulacion;
 import org.kindbox.core.simulacion.ObservadorSimulacion;
 import org.kindbox.core.simulacion.ResultadoSimulacion;
+import org.kindbox.core.simulacion.RutaEnvio;
 import org.kindbox.core.simulacion.TipoEscenario;
 import org.kindbox.core.simulacion.UnidadEnCurso;
 import org.kindbox.core.simulacion.VistaAlmacen;
@@ -53,6 +54,7 @@ import org.kindbox.service.dto.PaginaPedidos;
 import org.kindbox.service.dto.RespuestaAveria;
 import org.kindbox.service.dto.ResultadoCargaAverias;
 import org.kindbox.service.dto.ResumenCorrida;
+import org.kindbox.service.dto.RutasPedido;
 import org.kindbox.service.dto.SolicitudSimulacion;
 import org.kindbox.service.error.ConflictoDeEstado;
 import org.kindbox.service.error.ErrorDeDatos;
@@ -439,6 +441,20 @@ public class ServicioSimulacion {
         int hasta = Math.min(desde + filasPorPagina, total);
         return new PaginaPedidos(filtradas.subList(desde, hasta), numeroPagina, filasPorPagina,
                 total, totalPaginas, filtro, soloActivos);
+    }
+
+    // Solo cuentan los pedidos ya registrados en el minuto simulado, como en el listado.
+    public RutasPedido rutasPedido(String id, int idPedido, Integer paquete) {
+        Corrida corrida = requerir(id);
+        long minuto = minutoSimulado(corrida);
+        List<Pedido> conocidos = corrida.motor() == null ? corrida.datos().pedidos()
+                : corrida.motor().pedidosConocidos();
+        Pedido pedido = conocidos.stream().filter(p -> p.id() == idPedido && p.minutoRegistro() <= minuto)
+                .findFirst().orElseThrow(() -> new RecursoNoEncontrado(
+                        "No existe el pedido " + idPedido + " en la corrida " + id));
+        InstantaneaSimulacion foto = corrida.instantanea();
+        List<RutaEnvio> rutas = foto == null ? List.of() : EnvioPedido.rutas(foto, idPedido);
+        return RutasPedido.de(pedido.id(), pedido.x(), pedido.y(), pedido.cantidad(), rutas, paquete);
     }
 
     private static boolean coincide(Pedido pedido, String filtro) {
