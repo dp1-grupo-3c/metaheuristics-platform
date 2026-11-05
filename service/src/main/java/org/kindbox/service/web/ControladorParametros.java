@@ -1,19 +1,29 @@
 package org.kindbox.service.web;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import org.kindbox.core.io.RepositorioDatos;
 import org.kindbox.core.modelo.Almacen;
 import org.kindbox.core.modelo.AtributosAveria;
 import org.kindbox.core.modelo.ParametrosOperacion;
 import org.kindbox.core.modelo.TipoAveria;
 import org.kindbox.core.modelo.TipoUnidad;
 import org.kindbox.service.dto.SolicitudAtributosAveria;
+import org.kindbox.service.dto.SolicitudFlota;
 import org.kindbox.service.dto.SolicitudSemaforo;
 import org.kindbox.service.dto.SolicitudVelocidad;
 import org.kindbox.service.dto.VistaParametros;
+import org.kindbox.service.error.ConflictoDeEstado;
+import org.kindbox.service.error.ErrorDeDatos;
 import org.kindbox.service.error.SolicitudInvalida;
+import org.kindbox.service.operacion.CoordinadorEjecucion;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -43,9 +53,14 @@ public class ControladorParametros {
     private static final Logger LOG = LoggerFactory.getLogger(ControladorParametros.class);
 
     private final ParametrosOperacion parametros;
+    private final RepositorioDatos repositorio;
+    private final CoordinadorEjecucion coordinador;
 
-    public ControladorParametros(ParametrosOperacion parametros) {
+    public ControladorParametros(ParametrosOperacion parametros, RepositorioDatos repositorio,
+                                 CoordinadorEjecucion coordinador) {
         this.parametros = parametros;
+        this.repositorio = repositorio;
+        this.coordinador = coordinador;
     }
 
     /** Parametros de operacion vigentes. */
@@ -94,6 +109,74 @@ public class ControladorParametros {
             throw new SolicitudInvalida(e.getMessage(), e);
         }
         LOG.info("Umbrales del semaforo cambiados a ambar={} y verde={}", solicitud.ambar(), solicitud.verde());
+        return vista();
+    }
+
+    // Se valida todo antes de aplicar; la velocidad va en caliente y la cantidad exige no tener ejecuciones.
+    @PutMapping("/flota")
+    public synchronized VistaParametros flota(@RequestBody SolicitudFlota solicitud) {
+        if (solicitud == null || solicitud.unidades() == null || solicitud.unidades().isEmpty()) {
+            throw new SolicitudInvalida("Faltan las unidades por tipo, por ejemplo"
+                    + " {\"unidades\":{\"AUTO\":{\"cantidad\":10,\"kmPorHora\":40}}}");
+        }
+        Map<TipoUnidad, Integer> cantidades = new EnumMap<>(TipoUnidad.class);
+        Map<TipoUnidad, Double> velocidades = new EnumMap<>(TipoUnidad.class);
+        Set<TipoUnidad> vistos = EnumSet.noneOf(TipoUnidad.class);
+        for (Map.Entry<String, SolicitudFlota.UnidadesTipo> entrada : solicitud.unidades().entrySet()) {
+            TipoUnidad tipo = resolverTipo(entrada.getKey());
+            if (!vistos.add(tipo)) {
+                throw new SolicitudInvalida("El tipo " + tipo.name() + " aparece mas de una vez");
+            }
+            SolicitudFlota.UnidadesTipo unidades = entrada.getValue();
+            if (unidades == null || (unidades.cantidad() == null && unidades.kmPorHora() == null)) {
+                throw new SolicitudInvalida("Falta la cantidad o la velocidad de " + tipo.name());
+            }
+            if (unidades.cantidad() != null) {
+                double cantidad = unidades.cantidad().doubleValue();
+                if (cantidad != Math.rint(cantidad) || cantidad < 0 || cantidad > 99) {
+                    throw new SolicitudInvalida("La cantidad de " + tipo.name()
+                            + " debe ser un entero entre 0 y 99 y es " + unidades.cantidad());
+                }
+                cantidades.put(tipo, (int) cantidad);
+            }
+            if (unidades.kmPorHora() != null) {
+                double kmPorHora = unidades.kmPorHora().doubleValue();
+                if (!(kmPorHora > 0) || !Double.isFinite(kmPorHora)) {
+                    throw new SolicitudInvalida("Velocidad invalida para " + tipo.name() + ": " + unidades.kmPorHora());
+                }
+                velocidades.put(tipo, kmPorHora);
+            }
+        }
+
+        Map<TipoUnidad, Integer> vigentes;
+        try {
+            vigentes = repositorio.cantidadesFlotaVigentes();
+        } catch (IOException e) {
+            throw new ErrorDeDatos("No se pudo leer la flota del directorio de datos", e);
+        }
+        Map<TipoUnidad, Integer> nuevas = new EnumMap<>(vigentes);
+        nuevas.putAll(cantidades);
+        if (!nuevas.equals(vigentes)) {
+            String activa = coordinador.ejecucionActiva();
+            if (activa != null) {
+                throw new ConflictoDeEstado("Hay una ejecucion activa de " + activa
+                        + "; la cantidad de unidades solo se puede cambiar sin ejecuciones en curso");
+            }
+            try {
+                repositorio.cantidadesFlota(nuevas);
+            } catch (IllegalArgumentException e) {
+                throw new SolicitudInvalida(e.getMessage(), e);
+            } catch (IOException e) {
+                throw new ErrorDeDatos("No se pudo leer la flota del directorio de datos", e);
+            }
+            LOG.info("Cantidades de la flota cambiadas a {}; rigen desde la proxima ejecucion", nuevas);
+        }
+        for (Map.Entry<TipoUnidad, Double> entrada : velocidades.entrySet()) {
+            if (parametros.velocidad(entrada.getKey()) != entrada.getValue()) {
+                parametros.velocidad(entrada.getKey(), entrada.getValue());
+                LOG.info("Velocidad de {} cambiada a {} Km/h", entrada.getKey().etiqueta(), entrada.getValue());
+            }
+        }
         return vista();
     }
 
@@ -159,21 +242,32 @@ public class ControladorParametros {
                 + ". Los admitidos son AUTO, MOTO y BICICLETA, o los prefijos TA, TM y TB");
     }
 
+    // Una flota ilegible no debe impedir consultar el resto de los parametros.
+    private Map<String, Integer> cantidades() {
+        Map<String, Integer> cantidades = new LinkedHashMap<>();
+        try {
+            repositorio.cantidadesFlotaVigentes().forEach((tipo, n) -> cantidades.put(tipo.name(), n));
+        } catch (IOException | IllegalArgumentException e) {
+            LOG.warn("No se pudieron leer las cantidades de la flota: {}", e.getMessage());
+        }
+        return cantidades;
+    }
+
     private VistaParametros vista() {
         ParametrosOperacion.Instantanea vigentes = parametros.instantanea();
         Map<String, Double> velocidades = new LinkedHashMap<>();
-        List<VistaParametros.FichaTipoUnidad> tipos = new java.util.ArrayList<>();
+        List<VistaParametros.FichaTipoUnidad> tipos = new ArrayList<>();
         for (TipoUnidad tipo : TipoUnidad.values()) {
             velocidades.put(tipo.name(), vigentes.velocidad(tipo));
             tipos.add(new VistaParametros.FichaTipoUnidad(tipo.name(), tipo.prefijo(), tipo.etiqueta(),
                     tipo.capacidad(), vigentes.velocidad(tipo), tipo.velocidadPorDefecto(), tipo.costoPorKm()));
         }
-        List<VistaParametros.FichaAveria> averias = new java.util.ArrayList<>();
+        List<VistaParametros.FichaAveria> averias = new ArrayList<>();
         for (TipoAveria tipo : TipoAveria.values()) {
             averias.add(new VistaParametros.FichaAveria(tipo.codigo(), tipo.atributos(),
                     tipo.trasladaAlmacenCentral(), regla(tipo)));
         }
-        return new VistaParametros(velocidades, tipos, vigentes.umbralSemaforoAmbar(),
+        return new VistaParametros(velocidades, tipos, cantidades(), vigentes.umbralSemaforoAmbar(),
                 vigentes.umbralSemaforoVerde(), 0, Almacen.CAPACIDAD_INTERMEDIO,
                 vigentes.minutosAcondicionamiento(), vigentes.minutosAlimentacion(),
                 vigentes.minutosSeparacionCambioTurno(), vigentes.minutosTrasvase(), averias, vigentes.version());

@@ -6,9 +6,12 @@ import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -56,6 +59,8 @@ public final class RepositorioDatos {
     public static final String ARCHIVO_FLOTA_ALTERNATIVO = "flota.csv";
 
     private final Path raiz;
+    // Cantidades por tipo fijadas en caliente; null usa las del archivo de flota.
+    private volatile Map<TipoUnidad, Integer> cantidadesFlota;
 
     public RepositorioDatos(Path raiz) {
         if (raiz == null) {
@@ -180,8 +185,53 @@ public final class RepositorioDatos {
 
     // ------------------------------------------------------------------ flota
 
-    /** Lee la flota, o usa la del enunciado si el directorio de datos no la trae. */
+    // Reemplaza las cantidades del archivo de flota en las cargas siguientes; null las restablece.
+    public void cantidadesFlota(Map<TipoUnidad, Integer> cantidades) throws IOException {
+        if (cantidades == null) {
+            cantidadesFlota = null;
+            return;
+        }
+        Map<TipoUnidad, Integer> copia = new EnumMap<>(TipoUnidad.class);
+        for (Map.Entry<TipoUnidad, Integer> entrada : cantidades.entrySet()) {
+            if (entrada.getKey() == null || entrada.getValue() == null) {
+                throw new IllegalArgumentException("Cada cantidad necesita su tipo de unidad y su valor");
+            }
+            copia.put(entrada.getKey(), entrada.getValue());
+        }
+        // Se prueba contra la flota base para no dejar un ajuste que impida cargar escenarios.
+        new LectorFlota().conCantidades(flotaBase(new ArrayList<>()), copia);
+        cantidadesFlota = Collections.unmodifiableMap(copia);
+    }
+
+    // Unidades por tipo de la flota que recibiria la proxima carga, con el ajuste aplicado.
+    public Map<TipoUnidad, Integer> cantidadesFlotaVigentes() throws IOException {
+        LectorFlota.FlotaLeida flota = cargarFlota(new ArrayList<>());
+        Map<TipoUnidad, Integer> cantidades = new EnumMap<>(TipoUnidad.class);
+        for (TipoUnidad tipo : TipoUnidad.values()) {
+            cantidades.put(tipo, flota.cantidadDeTipo(tipo));
+        }
+        return cantidades;
+    }
+
     private LectorFlota.FlotaLeida cargarFlota(List<String> avisos) throws IOException {
+        LectorFlota.FlotaLeida flota = flotaBase(avisos);
+        Map<TipoUnidad, Integer> ajuste = cantidadesFlota;
+        if (ajuste == null) {
+            return flota;
+        }
+        LectorFlota.FlotaLeida ajustada = new LectorFlota().conCantidades(flota, ajuste);
+        List<String> partes = new ArrayList<>();
+        for (TipoUnidad tipo : TipoUnidad.values()) {
+            int n = ajustada.cantidadDeTipo(tipo);
+            String nombre = tipo.etiqueta().toLowerCase(Locale.ROOT);
+            partes.add(n + " " + (n == 1 ? nombre : nombre + "s"));
+        }
+        avisos.add("Flota ajustada por parametro: " + String.join(", ", partes));
+        return ajustada;
+    }
+
+    /** Lee la flota, o usa la del enunciado si el directorio de datos no la trae. */
+    private LectorFlota.FlotaLeida flotaBase(List<String> avisos) throws IOException {
         LectorFlota lector = new LectorFlota();
         Path archivo = raiz.resolve(LectorFlota.NOMBRE_ARCHIVO);
         if (!Files.isRegularFile(archivo)) {

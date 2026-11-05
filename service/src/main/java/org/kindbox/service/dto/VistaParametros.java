@@ -29,6 +29,7 @@ import org.kindbox.core.modelo.AtributosAveria;
 public record VistaParametros(
         Map<String, Double> velocidades,
         List<FichaTipoUnidad> tipos,
+        Map<String, Integer> cantidades,
         int umbralSemaforoAmbar,
         int umbralSemaforoVerde,
         int capacidadMinima,
@@ -78,6 +79,7 @@ public record VistaParametros(
     public VistaParametros {
         velocidades = Collections.unmodifiableMap(new LinkedHashMap<>(velocidades));
         tipos = List.copyOf(tipos);
+        cantidades = Collections.unmodifiableMap(new LinkedHashMap<>(cantidades));
         averias = List.copyOf(averias);
     }
 }

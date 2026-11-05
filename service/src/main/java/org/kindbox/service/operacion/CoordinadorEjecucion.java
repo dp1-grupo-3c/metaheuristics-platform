@@ -13,6 +13,11 @@ public class CoordinadorEjecucion {
         return activa;
     }
 
+    // Tipo de la ejecucion que tiene la reserva, o null si no hay ninguna.
+    public synchronized String ejecucionActiva() {
+        return activa == null ? null : activa.tipo;
+    }
+
     public final class Reserva implements AutoCloseable {
         private final String tipo;
 

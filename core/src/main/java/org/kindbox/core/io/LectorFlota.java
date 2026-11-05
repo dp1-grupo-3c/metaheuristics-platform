@@ -7,6 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -125,6 +126,66 @@ public final class LectorFlota {
         agregarSerie(unidades, TipoUnidad.MOTO, 15);
         agregarSerie(unidades, TipoUnidad.BICICLETA, 12);
         return new FlotaLeida(unidades, Map.of(), Map.of(), Map.of());
+    }
+
+    // Ajusta la cantidad por tipo: conserva las primeras unidades y completa con codigos TTNN libres.
+    // Los tipos que no aparecen en el mapa conservan la cantidad de la flota base.
+    public FlotaLeida conCantidades(FlotaLeida base, Map<TipoUnidad, Integer> cantidades) {
+        if (base == null || cantidades == null) {
+            throw new IllegalArgumentException("Faltan la flota base o las cantidades por tipo");
+        }
+        TipoUnidad[] tipos = TipoUnidad.values();
+        int[] objetivo = new int[tipos.length];
+        for (TipoUnidad tipo : tipos) {
+            objetivo[tipo.ordinal()] = base.cantidadDeTipo(tipo);
+        }
+        for (Map.Entry<TipoUnidad, Integer> entrada : cantidades.entrySet()) {
+            if (entrada.getKey() == null || entrada.getValue() == null) {
+                throw new IllegalArgumentException("Cada cantidad necesita su tipo de unidad y su valor");
+            }
+            int cantidad = entrada.getValue();
+            if (cantidad < 0 || cantidad > CORRELATIVO_MAXIMO) {
+                throw new IllegalArgumentException("La cantidad de " + entrada.getKey().etiqueta()
+                        + " debe estar entre 0 y " + CORRELATIVO_MAXIMO + " y es " + cantidad);
+            }
+            objetivo[entrada.getKey().ordinal()] = cantidad;
+        }
+        int total = 0;
+        for (int cantidad : objetivo) {
+            total += cantidad;
+        }
+        if (total == 0) {
+            throw new IllegalArgumentException("La flota no puede quedar sin unidades");
+        }
+
+        List<UnidadTransporte> unidades = new ArrayList<>(total);
+        Set<String> usados = new HashSet<>();
+        int[] incluidas = new int[tipos.length];
+        for (UnidadTransporte unidad : base.unidades()) {
+            usados.add(unidad.codigo());
+            int i = unidad.tipo().ordinal();
+            if (incluidas[i] < objetivo[i]) {
+                unidades.add(unidad);
+                incluidas[i]++;
+            }
+        }
+        for (TipoUnidad tipo : tipos) {
+            int i = tipo.ordinal();
+            int correlativo = 0;
+            while (incluidas[i] < objetivo[i]) {
+                correlativo++;
+                if (correlativo > CORRELATIVO_MAXIMO) {
+                    throw new IllegalArgumentException("No quedan codigos libres para completar "
+                            + objetivo[i] + " unidades de tipo " + tipo.etiqueta());
+                }
+                String codigo = codigo(tipo, correlativo);
+                if (usados.add(codigo)) {
+                    unidades.add(new UnidadTransporte(codigo, tipo, nodoInicial));
+                    incluidas[i]++;
+                }
+            }
+        }
+        return new FlotaLeida(unidades, base.capacidades(), base.velocidades(), base.costos());
     }
 
     private void agregarSerie(List<UnidadTransporte> unidades, TipoUnidad tipo, int cantidad) {

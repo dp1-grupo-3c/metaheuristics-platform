@@ -295,6 +295,14 @@ tipos 2 y 3), `turnosHastaReincorporacion` (1 a 9, lo usa el tipo 2) y `diasMant
 siguientes y `GET /api/parametros` devuelve en `averias` los valores vigentes con la regla en
 texto. Un valor fuera de rango responde 400.
 
+La flota se edita con `PUT /api/parametros/flota`, con cuerpo
+`{"unidades":{"AUTO":{"cantidad":10,"kmPorHora":40},...}}`; en cada tipo la cantidad (0 a 99) y
+la velocidad son opcionales. Se valida todo antes de aplicar: la velocidad cambia en caliente y
+la cantidad rige desde la proxima ejecucion, conservando las primeras unidades del archivo de
+flota y completando con codigos TTNN libres. Cambiar la cantidad con una simulacion u operacion
+en curso responde 409 y un valor invalido o una flota vacia responde 400. La respuesta, como la
+de `GET /api/parametros`, trae en `cantidades` las unidades vigentes por tipo.
+
 El registro de clientes se publica en `/api/clientes`: `POST` registra, `GET` lista (admite
 `busqueda` por documento o nombre), `GET /{documento}` busca y `PUT /{documento}` edita. Una
 persona natural se identifica con DNI de 8 digitos y una empresa con RUC de 11 que empieza con
