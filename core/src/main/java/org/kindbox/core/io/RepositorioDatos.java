@@ -1,21 +1,26 @@
 package org.kindbox.core.io;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.StringJoiner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -488,6 +493,76 @@ public final class RepositorioDatos {
                 : existentes.get(0);
         boolean reemplazado = escribirAtomico(origen, destino);
         return new ArchivoGuardado(relativa(destino), bloqueos.size(), reemplazado);
+    }
+
+    /**
+     * Agrega un bloqueo al archivo del mes, o de los meses, que abarca.
+     *
+     * <p>El formato solo admite dias del mes del archivo, de modo que un bloqueo que cruza de
+     * mes se parte en un registro por mes: el primero termina a las 23:59 del ultimo dia y el
+     * siguiente empieza a las 00:00, y ese minuto queda libre. Todos los registros se validan
+     * antes de escribir el primero, para no dejar el bloqueo a medias.</p>
+     *
+     * @param coordenadas pares x,y de la poligonal, en orden
+     * @param inicio      instante de activacion, al minuto
+     * @param fin         instante de desactivacion, al minuto y posterior al inicio
+     * @return un archivo guardado por cada mes, con los registros que quedaron en el
+     */
+    public synchronized List<ArchivoGuardado> agregarBloqueo(int[] coordenadas, LocalDateTime inicio,
+                                                             LocalDateTime fin) throws IOException {
+        if (!fin.isAfter(inicio)) {
+            throw new IllegalArgumentException("El fin del bloqueo debe ser posterior a su inicio");
+        }
+        StringJoiner poligonal = new StringJoiner(",");
+        for (int coordenada : coordenadas) {
+            poligonal.add(String.valueOf(coordenada));
+        }
+        Path temporal = Files.createTempDirectory("kindbox-bloqueo-");
+        try {
+            Map<YearMonth, Path> preparados = new LinkedHashMap<>();
+            for (YearMonth mes = YearMonth.from(inicio); !mes.isAfter(YearMonth.from(fin)); mes = mes.plusMonths(1)) {
+                LocalDateTime desde = mes.equals(YearMonth.from(inicio)) ? inicio : mes.atDay(1).atStartOfDay();
+                LocalDateTime hastaDelMes = mes.atEndOfMonth().atTime(23, 59);
+                LocalDateTime hasta = fin.isBefore(hastaDelMes) ? fin : hastaDelMes;
+                if (hasta.isAfter(desde)) {
+                    preparados.put(mes, prepararBloqueo(temporal, mes, registroBloqueo(desde, hasta, poligonal.toString())));
+                }
+            }
+            if (preparados.isEmpty()) {
+                throw new IllegalArgumentException("El bloqueo debe durar al menos un minuto dentro de un mes");
+            }
+            List<ArchivoGuardado> guardados = new ArrayList<>();
+            for (Map.Entry<YearMonth, Path> preparado : preparados.entrySet()) {
+                guardados.add(guardarBloqueos(preparado.getKey(), preparado.getValue()));
+            }
+            return guardados;
+        } finally {
+            try (Stream<Path> flujo = Files.walk(temporal)) {
+                flujo.sorted(Comparator.reverseOrder()).forEach(p -> p.toFile().delete());
+            }
+        }
+    }
+
+    private static String registroBloqueo(LocalDateTime desde, LocalDateTime hasta, String poligonal) {
+        return String.format(Locale.ROOT, "%02dd%02dh%02dm-%02dd%02dh%02dm:%s", desde.getDayOfMonth(), desde.getHour(),
+                desde.getMinute(), hasta.getDayOfMonth(), hasta.getHour(), hasta.getMinute(), poligonal);
+    }
+
+    // Copia del archivo del mes con el registro al final, ya validada entera.
+    private Path prepararBloqueo(Path temporal, YearMonth mes, String registro) throws IOException {
+        List<Path> existentes = coincidencias(raiz.resolve(DIRECTORIO_BLOQUEOS), nombresBloqueos(mes));
+        if (existentes.size() > 1) {
+            throw new IllegalStateException("Hay mas de un archivo de bloqueos de " + mes + ": "
+                    + relativas(existentes) + ". Conserve uno solo antes de agregar otro");
+        }
+        Path copia = Files.createDirectory(temporal.resolve(mes.toString())).resolve("bloqueo-manual.txt");
+        byte[] actuales = existentes.isEmpty() ? new byte[0] : Files.readAllBytes(existentes.get(0));
+        boolean cerrado = actuales.length == 0 || actuales[actuales.length - 1] == '\n';
+        Files.write(copia, actuales);
+        Files.writeString(copia, (cerrado ? "" : "\n") + registro + "\n", StandardCharsets.ISO_8859_1,
+                StandardOpenOption.APPEND);
+        new LectorBloqueos(CalendarioEscenario.desde(mes)).leer(copia, mes);
+        return copia;
     }
 
     // El plan va al subdirectorio del ano de su primera fecha, porque el nombre no lleva el ano.

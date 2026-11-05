@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.List;
 import java.util.Map;
@@ -112,6 +113,52 @@ class CargaDeDatosTest {
         RepositorioDatos.DatosEscenario datos = repositorio.cargarMes(YearMonth.of(2026, 2));
         assertEquals(2, datos.bloqueos().size());
         sinTemporales();
+    }
+
+    @Test
+    void agregarBloqueoCreaElArchivoDelMesYLoReutiliza() throws Exception {
+        List<RepositorioDatos.ArchivoGuardado> primero = repositorio.agregarBloqueo(new int[] {12, 20, 13, 20},
+                LocalDateTime.of(2026, 9, 2, 10, 30), LocalDateTime.of(2026, 9, 2, 18, 0));
+        assertEquals(1, primero.size());
+        assertEquals("bloqueos/202609.bloqueadas", primero.get(0).ruta());
+        assertEquals(1, primero.get(0).registros());
+        assertFalse(primero.get(0).reemplazado());
+
+        // Un archivo sin salto de linea final no debe pegar el registro nuevo al anterior.
+        Path archivo = raiz.resolve("bloqueos/202609.bloqueadas");
+        Files.writeString(archivo, Files.readString(archivo).stripTrailing());
+        List<RepositorioDatos.ArchivoGuardado> segundo = repositorio.agregarBloqueo(new int[] {1, 1, 1, 5, 4, 5},
+                LocalDateTime.of(2026, 9, 3, 0, 0), LocalDateTime.of(2026, 9, 4, 0, 0));
+        assertEquals(2, segundo.get(0).registros());
+        assertTrue(segundo.get(0).reemplazado());
+        assertEquals(List.of("02d10h30m-02d18h00m:12,20,13,20", "03d00h00m-04d00h00m:1,1,1,5,4,5"),
+                Files.readAllLines(archivo));
+    }
+
+    @Test
+    void agregarBloqueoParteElRegistroAlCruzarDeMes() throws Exception {
+        List<RepositorioDatos.ArchivoGuardado> guardados = repositorio.agregarBloqueo(new int[] {12, 20, 13, 20},
+                LocalDateTime.of(2026, 9, 30, 22, 0), LocalDateTime.of(2026, 10, 1, 2, 0));
+        assertEquals(2, guardados.size());
+        assertEquals(List.of("30d22h00m-30d23h59m:12,20,13,20"),
+                Files.readAllLines(raiz.resolve("bloqueos/202609.bloqueadas")));
+        assertEquals(List.of("01d00h00m-01d02h00m:12,20,13,20"),
+                Files.readAllLines(raiz.resolve("bloqueos/202610.bloqueadas")));
+
+        // Terminar justo a medianoche del dia 1 no deja un registro vacio en el mes siguiente.
+        assertEquals(1, repositorio.agregarBloqueo(new int[] {1, 1, 2, 1},
+                LocalDateTime.of(2026, 11, 30, 22, 0), LocalDateTime.of(2026, 12, 1, 0, 0)).size());
+        assertFalse(Files.exists(raiz.resolve("bloqueos/202612.bloqueadas")));
+    }
+
+    @Test
+    void agregarBloqueoInvalidoNoEscribeNada() {
+        LocalDateTime inicio = LocalDateTime.of(2026, 9, 30, 22, 0);
+        LocalDateTime fin = LocalDateTime.of(2026, 10, 1, 2, 0);
+        assertThrows(IllegalArgumentException.class, () -> repositorio.agregarBloqueo(new int[] {1, 1, 2, 2}, inicio, fin));
+        assertThrows(IllegalArgumentException.class, () -> repositorio.agregarBloqueo(new int[] {1, 1, 500, 1}, inicio, fin));
+        assertThrows(IllegalArgumentException.class, () -> repositorio.agregarBloqueo(new int[] {1, 1, 2, 1}, fin, inicio));
+        assertFalse(Files.exists(raiz.resolve("bloqueos")));
     }
 
     @Test

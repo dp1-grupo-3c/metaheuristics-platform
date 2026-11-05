@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.kindbox.core.io.RepositorioDatos;
 import org.kindbox.service.operacion.CoordinadorEjecucion;
+import org.springframework.http.MediaType;
 import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.mock.web.MockMultipartFile;
@@ -108,6 +110,36 @@ class ControladorDatosTest {
         Files.writeString(raiz.resolve("bloqueos/2026/bloqueo.2603.txt"), "");
         mvc.perform(multipart("/api/datos/bloqueos").file(archivo("202603.bloqueadas", BLOQUEO)))
                 .andExpect(status().isConflict());
+    }
+
+    static String bloqueo(String nodos, String inicio, String fin) {
+        return "{\"nodos\":" + nodos + ",\"inicio\":\"" + inicio + "\",\"fin\":\"" + fin + "\"}";
+    }
+
+    @Test
+    void bloqueoManual() throws Exception {
+        mvc.perform(post("/api/datos/bloqueos/manual").contentType(MediaType.APPLICATION_JSON)
+                        .content(bloqueo("[{\"x\":12,\"y\":20},{\"x\":13,\"y\":20}]", "2026-09-02T10:30", "2026-09-02T18:00")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].ruta").value("bloqueos/202609.bloqueadas"))
+                .andExpect(jsonPath("$[0].registros").value(1));
+        assertEquals("02d10h30m-02d18h00m:12,20,13,20\n", Files.readString(raiz.resolve("bloqueos/202609.bloqueadas")));
+    }
+
+    @Test
+    void bloqueoManualInvalido() throws Exception {
+        String dosNodos = "[{\"x\":1,\"y\":1},{\"x\":2,\"y\":1}]";
+        for (String cuerpo : new String[] {
+                bloqueo("[{\"x\":1,\"y\":1}]", "2026-09-02T10:30", "2026-09-02T18:00"),
+                bloqueo("[{\"x\":1,\"y\":1},{\"x\":2,\"y\":2}]", "2026-09-02T10:30", "2026-09-02T18:00"),
+                bloqueo("[{\"x\":1},{\"x\":2,\"y\":1}]", "2026-09-02T10:30", "2026-09-02T18:00"),
+                bloqueo(dosNodos, "2026-09-02T18:00", "2026-09-02T10:30"),
+                bloqueo(dosNodos, "2026-09-02T10:30:15", "2026-09-02T18:00"),
+                "{\"nodos\":" + dosNodos + "}"}) {
+            mvc.perform(post("/api/datos/bloqueos/manual").contentType(MediaType.APPLICATION_JSON).content(cuerpo))
+                    .andExpect(status().isBadRequest());
+        }
+        assertFalse(Files.exists(raiz.resolve("bloqueos")));
     }
 
     @Test
