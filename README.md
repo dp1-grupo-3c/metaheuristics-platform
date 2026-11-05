@@ -303,6 +303,24 @@ flota y completando con codigos TTNN libres. Cambiar la cantidad con una simulac
 en curso responde 409 y un valor invalido o una flota vacia responde 400. La respuesta, como la
 de `GET /api/parametros`, trae en `cantidades` las unidades vigentes por tipo.
 
+Los archivos de datos se cargan con `/api/datos`, sin arrancar un escenario. `GET /api/datos`
+lista, con rutas relativas al directorio de datos, la flota, las ventas, los bloqueos y los planes
+de mantenimiento que usaria la carga. Los tres `POST` reciben un formulario `multipart/form-data`
+con el archivo en la parte `archivo`, lo validan con el lector correspondiente antes de escribir
+nada y lo guardan con un temporal y un movimiento atomico. Responden la `ruta` guardada, los
+`registros` validados y si se `reemplazo` un archivo anterior. Un archivo mal formado responde
+400.
+
+`POST /api/datos/flota` reemplaza `flota.txt` y descarta el ajuste de cantidades de
+`PUT /api/parametros/flota`. Con una simulacion u operacion en curso responde 409.
+
+`POST /api/datos/bloqueos` admite `?mes=AAAA-MM`; sin el, el mes se deduce del nombre
+(`AAAAMM.bloqueadas` o `bloqueo.AAMM.txt`). Reemplaza el archivo que ya tenga ese mes donde este o
+crea `bloqueos/AAAAMM.bloqueadas`. Si el mes tiene mas de un archivo responde 409.
+
+`POST /api/datos/mantenimiento` exige el nombre `mant.preventivo.m1.m2` y guarda el plan en
+`mantenimiento/<ano de su primera fecha>/`, reemplazando el del mismo nombre.
+
 El registro de clientes se publica en `/api/clientes`: `POST` registra, `GET` lista (admite
 `busqueda` por documento o nombre), `GET /{documento}` busca y `PUT /{documento}` edita. Una
 persona natural se identifica con DNI de 8 digitos y una empresa con RUC de 11 que empieza con

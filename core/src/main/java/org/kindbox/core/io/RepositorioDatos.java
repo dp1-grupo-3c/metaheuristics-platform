@@ -1,8 +1,10 @@
 package org.kindbox.core.io;
 
 import java.io.IOException;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
@@ -14,6 +16,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import org.kindbox.core.modelo.Bloqueo;
 import org.kindbox.core.modelo.Mantenimiento;
@@ -57,6 +61,12 @@ public final class RepositorioDatos {
     public static final String DIRECTORIO_MANTENIMIENTO = "mantenimiento";
     /** Nombre alternativo del archivo de flota, tal como llega de la hoja del curso. */
     public static final String ARCHIVO_FLOTA_ALTERNATIVO = "flota.csv";
+
+    // Nombres mensuales que reconoce la carga de escenarios.
+    private static final Pattern NOMBRE_VENTAS = Pattern.compile("(?i)ventas\\d{6}(\\.txt)?|ventas\\.\\d{6}\\.txt");
+    private static final Pattern NOMBRE_BLOQUEOS = Pattern.compile("(?i)\\d{6}\\.bloqueadas(\\.txt)?|bloqueo\\.\\d{4}\\.txt");
+    private static final Pattern MES_BLOQUEOS = Pattern.compile(
+            "(?i)(\\d{4})(\\d{2})\\.?bloqueadas(\\.txt)?|bloqueo\\.(\\d{2})(\\d{2})\\.txt");
 
     private final Path raiz;
     // Cantidades por tipo fijadas en caliente; null usa las del archivo de flota.
@@ -233,11 +243,8 @@ public final class RepositorioDatos {
     /** Lee la flota, o usa la del enunciado si el directorio de datos no la trae. */
     private LectorFlota.FlotaLeida flotaBase(List<String> avisos) throws IOException {
         LectorFlota lector = new LectorFlota();
-        Path archivo = raiz.resolve(LectorFlota.NOMBRE_ARCHIVO);
-        if (!Files.isRegularFile(archivo)) {
-            archivo = raiz.resolve(ARCHIVO_FLOTA_ALTERNATIVO);
-        }
-        if (!Files.isRegularFile(archivo)) {
+        Path archivo = archivoFlota();
+        if (archivo == null) {
             avisos.add("No se encontro " + raiz.resolve(LectorFlota.NOMBRE_ARCHIVO)
                     + "; se usa la flota del enunciado: 10 autos, 15 motos y 12 bicicletas");
             return lector.flotaPorDefecto();
@@ -245,6 +252,15 @@ public final class RepositorioDatos {
         LectorFlota.FlotaLeida flota = lector.leer(archivo);
         avisarDiscrepancias(flota, archivo.getFileName().toString(), avisos);
         return flota;
+    }
+
+    // flota.txt tiene prioridad sobre flota.csv; null si no hay ninguno.
+    private Path archivoFlota() {
+        Path archivo = raiz.resolve(LectorFlota.NOMBRE_ARCHIVO);
+        if (!Files.isRegularFile(archivo)) {
+            archivo = raiz.resolve(ARCHIVO_FLOTA_ALTERNATIVO);
+        }
+        return Files.isRegularFile(archivo) ? archivo : null;
     }
 
     /**
@@ -349,14 +365,18 @@ public final class RepositorioDatos {
         return bloqueos;
     }
 
+    private static List<String> nombresBloqueos(YearMonth mes) {
+        String base = LectorBloqueos.nombreDeArchivo(mes);
+        String periodoDp1 = String.format("%02d%02d", mes.getYear() % 100, mes.getMonthValue());
+        return List.of(base, base + ".txt", "bloqueo." + periodoDp1 + ".txt");
+    }
+
     /** Bloqueos de un mes cuya ventana toca {@code (0, minutoFin)}; vacio si el mes no tiene archivo. */
     private List<Bloqueo> bloqueosDelMes(LectorBloqueos lector, YearMonth mes, long minutoFin,
                                          List<String> avisos) throws IOException {
         Path directorio = raiz.resolve(DIRECTORIO_BLOQUEOS);
         String base = LectorBloqueos.nombreDeArchivo(mes);
-        String periodoDp1 = String.format("%02d%02d", mes.getYear() % 100, mes.getMonthValue());
-        Path archivo = localizarMensual(directorio, List.of(
-                base, base + ".txt", "bloqueo." + periodoDp1 + ".txt"));
+        Path archivo = localizarMensual(directorio, nombresBloqueos(mes));
         if (archivo == null) {
             avisos.add("No se encontro el archivo de bloqueos de " + mes + " (" + directorio.resolve(base)
                     + "); el mes se omite");
@@ -387,19 +407,7 @@ public final class RepositorioDatos {
             throws IOException {
         LectorMantenimiento lector = new LectorMantenimiento();
         Path directorio = raiz.resolve(DIRECTORIO_MANTENIMIENTO);
-        Set<Path> encontrados = new LinkedHashSet<>(
-                localizarTodos(directorio, LectorMantenimiento.PREFIJO_ARCHIVO));
-        // DP1 publica los planes directamente en la raiz junto a flota.txt.
-        if (Files.isDirectory(raiz)) {
-            try (Stream<Path> flujo = Files.list(raiz)) {
-                flujo.filter(Files::isRegularFile)
-                        .filter(p -> p.getFileName().toString().regionMatches(true, 0,
-                                LectorMantenimiento.PREFIJO_ARCHIVO, 0,
-                                LectorMantenimiento.PREFIJO_ARCHIVO.length()))
-                        .forEach(encontrados::add);
-            }
-        }
-        List<Path> archivos = encontrados.stream().sorted(Comparator.comparing(Path::toString)).toList();
+        List<Path> archivos = planesDeMantenimiento();
         if (archivos.isEmpty()) {
             avisos.add("No se encontro ningun archivo " + LectorMantenimiento.PREFIJO_ARCHIVO + "m1.m2 en "
                     + directorio + " ni en " + raiz + "; el escenario corre sin mantenimiento preventivo");
@@ -428,24 +436,164 @@ public final class RepositorioDatos {
         return mantenimientos;
     }
 
+    private List<Path> planesDeMantenimiento() throws IOException {
+        Set<Path> encontrados = new LinkedHashSet<>(
+                localizarTodos(raiz.resolve(DIRECTORIO_MANTENIMIENTO), LectorMantenimiento.PREFIJO_ARCHIVO));
+        // DP1 publica los planes directamente en la raiz junto a flota.txt.
+        if (Files.isDirectory(raiz)) {
+            try (Stream<Path> flujo = Files.list(raiz)) {
+                flujo.filter(Files::isRegularFile)
+                        .filter(p -> p.getFileName().toString().regionMatches(true, 0,
+                                LectorMantenimiento.PREFIJO_ARCHIVO, 0,
+                                LectorMantenimiento.PREFIJO_ARCHIVO.length()))
+                        .forEach(encontrados::add);
+            }
+        }
+        return encontrados.stream().sorted(Comparator.comparing(Path::toString)).toList();
+    }
+
+    // ------------------------------------------------------- carga de archivos
+
+    // Archivos que usaria la carga de escenarios, con rutas relativas a la raiz.
+    public Inventario inventario() throws IOException {
+        Path flota = archivoFlota();
+        return new Inventario(flota == null ? null : relativa(flota),
+                relativas(coincidencias(raiz.resolve(DIRECTORIO_VENTAS), NOMBRE_VENTAS)),
+                relativas(coincidencias(raiz.resolve(DIRECTORIO_BLOQUEOS), NOMBRE_BLOQUEOS)),
+                relativas(planesDeMantenimiento()));
+    }
+
+    // Reemplaza flota.txt y descarta el ajuste de cantidades, que se referia a la flota anterior.
+    public synchronized ArchivoGuardado guardarFlota(Path origen) throws IOException {
+        LectorFlota.FlotaLeida flota = new LectorFlota().leer(exigirArchivo(origen));
+        Path destino = raiz.resolve(LectorFlota.NOMBRE_ARCHIVO);
+        boolean reemplazado = escribirAtomico(origen, destino);
+        cantidadesFlota = null;
+        return new ArchivoGuardado(relativa(destino), flota.unidades().size(), reemplazado);
+    }
+
+    // Sin mes se deduce del nombre del archivo; reemplaza el archivo del mes donde este.
+    public synchronized ArchivoGuardado guardarBloqueos(YearMonth mes, Path origen) throws IOException {
+        exigirArchivo(origen);
+        YearMonth periodo = mes != null ? mes : mesDeArchivoBloqueos(origen.getFileName().toString());
+        List<Bloqueo> bloqueos = new LectorBloqueos(CalendarioEscenario.desde(periodo)).leer(origen, periodo);
+        Path directorio = raiz.resolve(DIRECTORIO_BLOQUEOS);
+        List<Path> existentes = coincidencias(directorio, nombresBloqueos(periodo));
+        if (existentes.size() > 1) {
+            throw new IllegalStateException("Hay mas de un archivo de bloqueos de " + periodo + ": "
+                    + relativas(existentes) + ". Conserve uno solo antes de cargar otro");
+        }
+        Path destino = existentes.isEmpty()
+                ? directorio.resolve(LectorBloqueos.nombreDeArchivo(periodo))
+                : existentes.get(0);
+        boolean reemplazado = escribirAtomico(origen, destino);
+        return new ArchivoGuardado(relativa(destino), bloqueos.size(), reemplazado);
+    }
+
+    // El plan va al subdirectorio del ano de su primera fecha, porque el nombre no lleva el ano.
+    public synchronized ArchivoGuardado guardarMantenimiento(String nombre, Path origen) throws IOException {
+        String prefijo = LectorMantenimiento.PREFIJO_ARCHIVO;
+        if (nombre == null || nombre.contains("/") || nombre.contains("\\")
+                || !nombre.regionMatches(true, 0, prefijo, 0, prefijo.length()) || nombre.length() == prefijo.length()) {
+            throw new IllegalArgumentException("El plan de mantenimiento debe llamarse " + prefijo
+                    + "m1.m2, por ejemplo " + prefijo + "09.10, y se recibio \"" + nombre + "\"");
+        }
+        List<Mantenimiento> entradas = new LectorMantenimiento().leer(exigirArchivo(origen));
+        if (entradas.isEmpty()) {
+            throw new IllegalArgumentException("El plan de mantenimiento " + nombre + " no trae ninguna fecha");
+        }
+        Path destino = raiz.resolve(DIRECTORIO_MANTENIMIENTO)
+                .resolve(String.valueOf(entradas.get(0).fecha().getYear())).resolve(nombre);
+        boolean reemplazado = escribirAtomico(origen, destino);
+        return new ArchivoGuardado(relativa(destino), entradas.size(), reemplazado);
+    }
+
+    // Acepta AAAAMM.bloqueadas, AAAAMMbloqueadas, cualquiera de ellos con .txt, y bloqueo.AAMM.txt.
+    public static YearMonth mesDeArchivoBloqueos(String nombre) {
+        Matcher m = nombre == null ? null : MES_BLOQUEOS.matcher(nombre);
+        if (m == null || !m.matches()) {
+            throw new IllegalArgumentException("No se puede deducir el mes del archivo de bloqueos \"" + nombre
+                    + "\"; se esperaba AAAAMM.bloqueadas o bloqueo.AAMM.txt, o indicar el mes");
+        }
+        int ano = m.group(1) != null ? Integer.parseInt(m.group(1)) : 2000 + Integer.parseInt(m.group(4));
+        int mes = Integer.parseInt(m.group(1) != null ? m.group(2) : m.group(5));
+        if (mes < 1 || mes > 12) {
+            throw new IllegalArgumentException("El archivo de bloqueos \"" + nombre + "\" declara el mes "
+                    + mes + ", que no existe");
+        }
+        return YearMonth.of(ano, mes);
+    }
+
+    private static Path exigirArchivo(Path origen) {
+        if (origen == null || !Files.isRegularFile(origen)) {
+            throw new IllegalArgumentException("No existe el archivo a cargar: " + origen);
+        }
+        return origen;
+    }
+
+    // Copia a un temporal del mismo directorio y lo mueve de un golpe sobre el destino.
+    private static boolean escribirAtomico(Path origen, Path destino) throws IOException {
+        Path directorio = destino.toAbsolutePath().getParent();
+        Files.createDirectories(directorio);
+        boolean existia = Files.exists(destino);
+        Path temporal = Files.createTempFile(directorio, ".carga-", ".tmp");
+        try {
+            Files.copy(origen, temporal, StandardCopyOption.REPLACE_EXISTING);
+            try {
+                Files.move(temporal, destino, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } catch (AtomicMoveNotSupportedException e) {
+                Files.move(temporal, destino, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } finally {
+            Files.deleteIfExists(temporal);
+        }
+        return existia;
+    }
+
+    private String relativa(Path archivo) {
+        return raiz.toAbsolutePath().normalize().relativize(archivo.toAbsolutePath().normalize())
+                .toString().replace('\\', '/');
+    }
+
+    private List<String> relativas(List<Path> archivos) {
+        return archivos.stream().map(this::relativa).toList();
+    }
+
+    private static List<Path> coincidencias(Path directorio, Pattern nombre) throws IOException {
+        if (!Files.isDirectory(directorio)) {
+            return List.of();
+        }
+        try (Stream<Path> flujo = Files.walk(directorio)) {
+            return flujo.filter(Files::isRegularFile)
+                    .filter(p -> nombre.matcher(p.getFileName().toString()).matches())
+                    .sorted(Comparator.comparing(Path::toString))
+                    .toList();
+        }
+    }
+
     // ------------------------------------------------------- busqueda de archivos
 
     /** Coincidencias exactas, ignorando mayusculas, para un unico mes del escenario. */
     private static Path localizarMensual(Path directorio, List<String> nombres) throws IOException {
-        if (!Files.isDirectory(directorio)) return null;
-        List<Path> archivos;
-        try (Stream<Path> flujo = Files.walk(directorio)) {
-            archivos = flujo.filter(Files::isRegularFile)
-                    .filter(p -> nombres.stream().anyMatch(n ->
-                            n.equalsIgnoreCase(p.getFileName().toString())))
-                    .sorted(Comparator.comparing(Path::toString))
-                    .toList();
-        }
+        List<Path> archivos = coincidencias(directorio, nombres);
         if (archivos.size() > 1) {
             throw new IOException("Archivos mensuales ambiguos en " + directorio
                     + ": " + archivos + ". Conserve un solo archivo por mes; no se combinan copias.");
         }
         return archivos.isEmpty() ? null : archivos.get(0);
+    }
+
+    private static List<Path> coincidencias(Path directorio, List<String> nombres) throws IOException {
+        if (!Files.isDirectory(directorio)) {
+            return List.of();
+        }
+        try (Stream<Path> flujo = Files.walk(directorio)) {
+            return flujo.filter(Files::isRegularFile)
+                    .filter(p -> nombres.stream().anyMatch(n ->
+                            n.equalsIgnoreCase(p.getFileName().toString())))
+                    .sorted(Comparator.comparing(Path::toString))
+                    .toList();
+        }
     }
 
     /**
@@ -469,6 +617,19 @@ public final class RepositorioDatos {
                     .toList();
         }
     }
+
+    // Archivos de datos presentes; flota es null si no hay archivo y se usaria la del enunciado.
+    public record Inventario(String flota, List<String> ventas, List<String> bloqueos, List<String> mantenimiento) {
+
+        public Inventario {
+            ventas = List.copyOf(ventas);
+            bloqueos = List.copyOf(bloqueos);
+            mantenimiento = List.copyOf(mantenimiento);
+        }
+    }
+
+    // Ruta relativa a la raiz del archivo guardado, registros validados y si piso uno anterior.
+    public record ArchivoGuardado(String ruta, int registros, boolean reemplazado) {}
 
     /**
      * Un mes de un escenario abierto.
