@@ -400,6 +400,15 @@ Rige desde la siguiente carga: una corrida en curso no lo ve.
 `POST /api/datos/mantenimiento` exige el nombre `mant.preventivo.m1.m2` y guarda el plan en
 `mantenimiento/<ano de su primera fecha>/`, reemplazando el del mismo nombre.
 
+El tamano del mapa y los almacenes se editan con `/api/parametros/mundo`. `GET` devuelve el `mapa`,
+los `almacenes`, la `version` y en `ejecucionActiva` lo que impide editar. `PUT` recibe
+`{"mapa":{"largoKm":90,"anchoKm":60},"almacenes":[{"id":0,"x":27,"y":14},{"id":1,"x":12,"y":38,"capacidad":800},...]}`
+con todos los almacenes existentes: no se agregan ni se quitan. Se guarda en
+`kindbox.archivo-parametros-mundo`, rige desde la siguiente corrida y responde 409 con una
+simulacion u operacion en curso. Las demas secciones de ese archivo se guardan, pero el motor
+todavia no las lee. Si el mapa se achica, un pedido o bloqueo que quede fuera hace que el inicio de
+la corrida responda 400.
+
 El registro de clientes se publica en `/api/clientes`: `POST` registra, `GET` lista (admite
 `busqueda` por documento o nombre), `GET /{documento}` busca y `PUT /{documento}` edita. Una
 persona natural se identifica con DNI de 8 digitos y una empresa con RUC de 11 que empieza con

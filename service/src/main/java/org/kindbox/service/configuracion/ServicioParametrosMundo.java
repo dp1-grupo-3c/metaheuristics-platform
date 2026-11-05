@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
@@ -58,6 +59,12 @@ public class ServicioParametrosMundo {
             escribir(enunciado);
             this.vigente = new Versionados(1, enunciado);
         }
+    }
+
+    // Solo con Spring: el nucleo es global y las pruebas que crean el servicio no deben tocarlo.
+    @PostConstruct
+    void aplicarAlArrancar() {
+        vigente.parametros().aplicarAlNucleo();
     }
 
     /** Version vigente. Una corrida la toma al arrancar y no vuelve a consultarla. */

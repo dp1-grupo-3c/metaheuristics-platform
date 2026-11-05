@@ -235,7 +235,7 @@ class RegistroBloqueosTest {
         assertFalse(vacio.bloqueada(nodo(10, 10), nodo(11, 10), 500));
 
         boolean[] mascara = vacio.mascaraBloqueada(1234);
-        assertEquals(RegistroBloqueos.TOTAL_ARISTAS, mascara.length);
+        assertEquals(RegistroBloqueos.totalAristas(), mascara.length);
         for (boolean bloqueada : mascara) {
             assertFalse(bloqueada, "la mascara de un registro vacio no puede tener ninguna arista marcada");
         }

@@ -458,7 +458,7 @@ class CotaInferiorPropiedadTest {
         }
         boolean[] mascara = null;
         if (conBloqueos) {
-            mascara = new boolean[RegistroBloqueos.TOTAL_ARISTAS];
+            mascara = new boolean[RegistroBloqueos.totalAristas()];
             for (int b = 0; b < ARISTAS_BLOQUEADAS; b++) {
                 bloquear(mascara, aleatorio.siguienteEntero(Ciudad.TOTAL_NODOS),
                         aleatorio.siguienteEntero(RegistroBloqueos.DIRECCIONES));

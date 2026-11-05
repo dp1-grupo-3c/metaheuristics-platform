@@ -334,7 +334,7 @@ class VerificadorRestriccionesTest {
         nodos[k++] = pedido.nodoDestino();
         nodos[k] = unidad.nodo();
 
-        boolean[] mascara = new boolean[RegistroBloqueos.TOTAL_ARISTAS];
+        boolean[] mascara = new boolean[RegistroBloqueos.totalAristas()];
         for (int direccion = 0; direccion < RegistroBloqueos.DIRECCIONES; direccion++) {
             int vecino = RegistroBloqueos.nodoVecino(pedido.nodoDestino(), direccion);
             if (vecino < 0) {

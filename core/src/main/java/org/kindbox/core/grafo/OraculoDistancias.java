@@ -22,9 +22,10 @@ import org.kindbox.core.modelo.Ciudad;
  */
 public final class OraculoDistancias {
 
-    /** Mascara sin ninguna arista bloqueada, usada cuando el llamante no entrega una. */
-    private static final boolean[] SIN_BLOQUEOS = new boolean[RegistroBloqueos.TOTAL_ARISTAS];
     private static final int[] SIN_CAMINO = new int[0];
+
+    /** Mascara sin ninguna arista bloqueada, usada cuando el llamante no entrega una. */
+    private final boolean[] sinBloqueos = new boolean[RegistroBloqueos.totalAristas()];
 
     /** Cola de la busqueda en anchura. Cada nodo entra a lo sumo una vez. */
     private final int[] cola = new int[Ciudad.TOTAL_NODOS];
@@ -42,7 +43,7 @@ public final class OraculoDistancias {
      * puede confiar en esa propiedad del juego de datos.</p>
      *
      * @param nodoOrigen        nodo desde el que se mide
-     * @param aristaBloqueada   mascara de {@link RegistroBloqueos#TOTAL_ARISTAS} posiciones,
+     * @param aristaBloqueada   mascara de {@link RegistroBloqueos#totalAristas()} posiciones,
      *                          o {@code null} si no hay ningun bloqueo vigente
      * @param distanciaSalida   arreglo de {@link Ciudad#TOTAL_NODOS} posiciones que recibe
      *                          la distancia en kilometros
@@ -58,10 +59,10 @@ public final class OraculoDistancias {
             throw new IllegalArgumentException("Los arreglos de salida deben tener "
                     + Ciudad.TOTAL_NODOS + " posiciones");
         }
-        boolean[] bloqueada = aristaBloqueada == null ? SIN_BLOQUEOS : aristaBloqueada;
-        if (bloqueada.length != RegistroBloqueos.TOTAL_ARISTAS) {
+        boolean[] bloqueada = aristaBloqueada == null ? sinBloqueos : aristaBloqueada;
+        if (bloqueada.length != RegistroBloqueos.totalAristas()) {
             throw new IllegalArgumentException("La mascara de bloqueos debe tener "
-                    + RegistroBloqueos.TOTAL_ARISTAS + " posiciones");
+                    + RegistroBloqueos.totalAristas() + " posiciones");
         }
 
         Arrays.fill(distanciaSalida, MatrizDistancias.INALCANZABLE);

@@ -528,7 +528,7 @@ public class ServicioSimulacion {
         if (corrida == null) {
             corrida = ultimaCorrida();
         }
-        if (corrida != null && corrida.instantanea() != null) {
+        if (corrida != null && corrida.instantanea() != null && mismaRed(corrida.instantanea().almacenes())) {
             return corrida.instantanea().almacenes();
         }
         ParametrosOperacion.Instantanea vigentes = parametros.instantanea();
@@ -542,6 +542,23 @@ public class ServicioSimulacion {
                             : ColorSemaforo.deInventario(almacen.capacidad(), vigentes)));
         }
         return vistas;
+    }
+
+    // La ultima corrida pudo terminar con otra red: tras editarla ya no describe el reposo.
+    private static boolean mismaRed(List<VistaAlmacen> vistas) {
+        List<Almacen> red = Almacen.todos();
+        if (vistas.size() != red.size()) {
+            return false;
+        }
+        for (int i = 0; i < vistas.size(); i++) {
+            VistaAlmacen vista = vistas.get(i);
+            Almacen almacen = red.get(i);
+            if (vista.id() != almacen.id() || vista.x() != Ciudad.x(almacen.nodo()) || vista.y() != Ciudad.y(almacen.nodo())
+                    || (!almacen.central() && vista.capacidad() != almacen.capacidad())) {
+                return false;
+            }
+        }
+        return true;
     }
 
     // -------------------------------------------------------------- averias

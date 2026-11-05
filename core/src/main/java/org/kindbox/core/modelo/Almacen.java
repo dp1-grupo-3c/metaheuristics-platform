@@ -22,8 +22,16 @@ public record Almacen(int id, String nombre, int nodo, boolean central, int capa
     /** Minuto del dia en que se produce la recarga diaria (23:59:59, redondeado al minuto 1439). */
     public static final int MINUTO_RECARGA_DIARIA = 1439;
 
-    /** Almacen central, de inventario ilimitado. */
+    // Red configurada; null mientras rija la del enunciado. Cada corrida la toma al arrancar.
+    private static volatile java.util.List<Almacen> configurados;
+
+    /** Almacen central vigente, de inventario ilimitado. */
     public static Almacen crearCentral() {
+        return todos().stream().filter(Almacen::central).findFirst().orElseThrow();
+    }
+
+    /** Almacen central del enunciado. */
+    private static Almacen centralDelEnunciado() {
         return new Almacen(0, "Almacen Central", Ciudad.nodo(27, 14), true, Integer.MAX_VALUE);
     }
 
@@ -37,8 +45,15 @@ public record Almacen(int id, String nombre, int nodo, boolean central, int capa
         return new Almacen(2, "Almacen Intermedio Este", Ciudad.nodo(57, 27), false, CAPACIDAD_INTERMEDIO);
     }
 
-    /** Los tres almacenes de la empresa, en orden de identificador. */
+    /** Los almacenes vigentes de la empresa, en orden de identificador. */
     public static java.util.List<Almacen> todos() {
-        return java.util.List.of(crearCentral(), intermedioNorOeste(), intermedioEste());
+        java.util.List<Almacen> vigentes = configurados;
+        return vigentes != null ? vigentes
+                : java.util.List.of(centralDelEnunciado(), intermedioNorOeste(), intermedioEste());
+    }
+
+    /** Reemplaza la red de almacenes para las corridas que arranquen despues. */
+    public static void configurar(java.util.List<Almacen> almacenes) {
+        configurados = java.util.List.copyOf(almacenes);
     }
 }
