@@ -36,6 +36,8 @@ public record VistaUnidad(
         int y,
         int cargaABordo,
         int capacidad,
+        // Semaforo de ocupacion; vacio cuando no lleva carga.
+        ColorSemaforo color,
         int[] caminoRecorrido,
         int[] caminoPendiente,
         int destinoX,

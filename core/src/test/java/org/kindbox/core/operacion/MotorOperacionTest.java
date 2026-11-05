@@ -266,12 +266,23 @@ class MotorOperacionTest {
     @Test void parametrosSonPropiosDeCadaOperacion() throws Exception {
         var reloj = new Reloj("2026-10-28T17:00:00Z");
         try (var uno = crear(reloj, new Constructivo()); var dos = crear(reloj, new Constructivo())) {
-            uno.aceptar(new SolicitudParametrosOperacion("parametros", Map.of(TipoUnidad.AUTO, 20.0), 100, 200));
+            uno.aceptar(new SolicitudParametrosOperacion("parametros", Map.of(TipoUnidad.AUTO, 20.0), 100, 200, 30, 60));
             uno.actualizar();
             assertEquals(20, uno.vista().parametros().velocidad(TipoUnidad.AUTO));
             assertEquals(40, dos.vista().parametros().velocidad(TipoUnidad.AUTO));
             assertEquals(500, dos.vista().parametros().umbralSemaforoVerde());
+            assertEquals(30, uno.vista().parametros().umbralOcupacionAmbar());
+            assertEquals(60, uno.vista().parametros().umbralOcupacionRojo());
+            assertEquals(50, dos.vista().parametros().umbralOcupacionAmbar());
         }
+    }
+
+    @Test void losUmbralesDeOcupacionSeValidanAlRecibirse() {
+        assertThrows(IllegalArgumentException.class,
+                () -> new SolicitudParametrosOperacion("a", Map.of(), null, null, 30, null));
+        assertThrows(IllegalArgumentException.class,
+                () -> new SolicitudParametrosOperacion("b", Map.of(), null, null, 70, 60));
+        assertEquals(40, new SolicitudParametrosOperacion("c", Map.of(), null, null, 40, 90).ocupacionAmbar());
     }
 
     @Test void detenerRechazaComandosPendientesYConservaLaConsulta() throws Exception {

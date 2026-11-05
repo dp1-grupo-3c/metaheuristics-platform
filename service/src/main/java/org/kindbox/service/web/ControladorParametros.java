@@ -99,16 +99,40 @@ public class ControladorParametros {
      * @param solicitud umbral inferior del intervalo ambar y del intervalo verde
      */
     @PutMapping("/semaforo")
-    public VistaParametros semaforo(@RequestBody SolicitudSemaforo solicitud) {
-        if (solicitud == null || solicitud.ambar() == null || solicitud.verde() == null) {
+    public synchronized VistaParametros semaforo(@RequestBody SolicitudSemaforo solicitud) {
+        boolean almacenes = solicitud != null && (solicitud.ambar() != null || solicitud.verde() != null);
+        boolean unidades = solicitud != null
+                && (solicitud.ocupacionAmbar() != null || solicitud.ocupacionRojo() != null);
+        if (!almacenes && !unidades) {
+            throw new SolicitudInvalida("Faltan los umbrales ambar y verde del semaforo de almacenes,"
+                    + " u ocupacionAmbar y ocupacionRojo del de unidades");
+        }
+        if (almacenes && (solicitud.ambar() == null || solicitud.verde() == null)) {
             throw new SolicitudInvalida("Faltan los umbrales ambar y verde del semaforo");
         }
+        if (unidades && (solicitud.ocupacionAmbar() == null || solicitud.ocupacionRojo() == null)) {
+            throw new SolicitudInvalida("Faltan los umbrales ocupacionAmbar y ocupacionRojo del semaforo de unidades");
+        }
+        // Se validan los dos pares antes de aplicar para no dejar un cambio a medias.
         try {
-            parametros.umbralesSemaforo(solicitud.ambar(), solicitud.verde());
+            if (almacenes) {
+                ParametrosOperacion.exigirUmbralesSemaforo(solicitud.ambar(), solicitud.verde());
+            }
+            if (unidades) {
+                ParametrosOperacion.exigirUmbralesOcupacion(solicitud.ocupacionAmbar(), solicitud.ocupacionRojo());
+            }
         } catch (IllegalArgumentException e) {
             throw new SolicitudInvalida(e.getMessage(), e);
         }
-        LOG.info("Umbrales del semaforo cambiados a ambar={} y verde={}", solicitud.ambar(), solicitud.verde());
+        if (almacenes) {
+            parametros.umbralesSemaforo(solicitud.ambar(), solicitud.verde());
+            LOG.info("Umbrales del semaforo cambiados a ambar={} y verde={}", solicitud.ambar(), solicitud.verde());
+        }
+        if (unidades) {
+            parametros.umbralesOcupacion(solicitud.ocupacionAmbar(), solicitud.ocupacionRojo());
+            LOG.info("Umbrales de ocupacion de unidades cambiados a ambar={}% y rojo={}%",
+                    solicitud.ocupacionAmbar(), solicitud.ocupacionRojo());
+        }
         return vista();
     }
 
@@ -268,7 +292,8 @@ public class ControladorParametros {
                     tipo.trasladaAlmacenCentral(), regla(tipo)));
         }
         return new VistaParametros(velocidades, tipos, cantidades(), vigentes.umbralSemaforoAmbar(),
-                vigentes.umbralSemaforoVerde(), 0, Almacen.CAPACIDAD_INTERMEDIO,
+                vigentes.umbralSemaforoVerde(), vigentes.umbralOcupacionAmbar(), vigentes.umbralOcupacionRojo(),
+                0, Almacen.CAPACIDAD_INTERMEDIO,
                 vigentes.minutosAcondicionamiento(), vigentes.minutosAlimentacion(),
                 vigentes.minutosSeparacionCambioTurno(), vigentes.minutosTrasvase(), averias, vigentes.version());
     }

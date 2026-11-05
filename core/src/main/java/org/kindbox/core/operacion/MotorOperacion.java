@@ -170,6 +170,9 @@ public final class MotorOperacion implements AutoCloseable, ObservadorSimulacion
                     contexto.parametros().velocidad(entrada.getKey(), entrada.getValue());
                 }
                 if (solicitud.ambar() != null) contexto.parametros().umbralesSemaforo(solicitud.ambar(), solicitud.verde());
+                if (solicitud.ocupacionAmbar() != null) {
+                    contexto.parametros().umbralesOcupacion(solicitud.ocupacionAmbar(), solicitud.ocupacionRojo());
+                }
                 ejecucion.solicitarPlanOperacion();
             } else {
                 throw new IllegalArgumentException("El comando operativo no esta reconocido");

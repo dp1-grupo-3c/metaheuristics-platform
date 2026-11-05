@@ -1,6 +1,7 @@
 package org.kindbox.core.simulacion;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -103,6 +104,49 @@ class ColorSemaforoTest {
         assertEquals(ColorSemaforo.AMBAR, ColorSemaforo.deInventario(499, p), "un paquete por debajo del verde");
         assertEquals(ColorSemaforo.AMBAR, ColorSemaforo.deInventario(250, p), "borde inferior del ambar");
         assertEquals(ColorSemaforo.ROJO, ColorSemaforo.deInventario(249, p), "un paquete por debajo del ambar");
-        assertEquals(ColorSemaforo.ROJO, ColorSemaforo.deInventario(0, p), "almacen vacio");
+        assertEquals(ColorSemaforo.ROJO, ColorSemaforo.deInventario(1, p), "un solo paquete sigue en rojo");
+        assertEquals(ColorSemaforo.VACIO, ColorSemaforo.deInventario(0, p), "almacen vacio");
+    }
+
+    @Test
+    @DisplayName("La ocupacion de una unidad va de vacio a rojo segun los porcentajes vigentes")
+    void bordesDeLaOcupacion() {
+        ParametrosOperacion.Instantanea p = porDefecto();
+        assertEquals(50, p.umbralOcupacionAmbar(), "umbral ambar por defecto");
+        assertEquals(80, p.umbralOcupacionRojo(), "umbral rojo por defecto");
+        assertEquals(ColorSemaforo.VACIO, ColorSemaforo.deOcupacion(0, 24, p), "sin carga");
+        assertEquals(ColorSemaforo.VERDE, ColorSemaforo.deOcupacion(1, 24, p), "casi vacia");
+        assertEquals(ColorSemaforo.VERDE, ColorSemaforo.deOcupacion(11, 24, p), "por debajo del 50 %");
+        assertEquals(ColorSemaforo.AMBAR, ColorSemaforo.deOcupacion(12, 24, p), "borde del ambar");
+        assertEquals(ColorSemaforo.AMBAR, ColorSemaforo.deOcupacion(19, 24, p), "por debajo del 80 %");
+        assertEquals(ColorSemaforo.ROJO, ColorSemaforo.deOcupacion(20, 24, p), "por encima del 80 %");
+        assertEquals(ColorSemaforo.ROJO, ColorSemaforo.deOcupacion(24, 24, p), "llena");
+        assertEquals(ColorSemaforo.ROJO, ColorSemaforo.deOcupacion(4, 0, p), "carga sin capacidad");
+
+        ParametrosOperacion parametros = new ParametrosOperacion();
+        parametros.umbralesOcupacion(25, 50);
+        ParametrosOperacion.Instantanea q = parametros.instantanea();
+        assertEquals(ColorSemaforo.VERDE, ColorSemaforo.deOcupacion(5, 24, q), "por debajo del 25 %");
+        assertEquals(ColorSemaforo.AMBAR, ColorSemaforo.deOcupacion(6, 24, q), "borde del nuevo ambar");
+        assertEquals(ColorSemaforo.ROJO, ColorSemaforo.deOcupacion(12, 24, q), "borde del nuevo rojo");
+    }
+
+    @Test
+    @DisplayName("Los umbrales de ocupacion invalidos se rechazan sin tocar los vigentes")
+    void umbralesDeOcupacionInvalidos() {
+        ParametrosOperacion parametros = new ParametrosOperacion();
+        long version = parametros.version();
+        assertThrows(IllegalArgumentException.class, () -> parametros.umbralesOcupacion(0, 50));
+        assertThrows(IllegalArgumentException.class, () -> parametros.umbralesOcupacion(60, 60));
+        assertThrows(IllegalArgumentException.class, () -> parametros.umbralesOcupacion(70, 40));
+        assertThrows(IllegalArgumentException.class, () -> parametros.umbralesOcupacion(50, 101));
+        assertEquals(50, parametros.umbralOcupacionAmbar());
+        assertEquals(80, parametros.umbralOcupacionRojo());
+        assertEquals(version, parametros.version(), "un rechazo no cambia la version");
+
+        parametros.umbralesOcupacion(1, 100);
+        assertEquals(version + 1, parametros.version());
+        assertEquals(1, parametros.instantanea().umbralOcupacionAmbar());
+        assertEquals(100, parametros.instantanea().umbralOcupacionRojo());
     }
 }

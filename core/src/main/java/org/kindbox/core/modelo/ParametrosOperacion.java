@@ -28,6 +28,9 @@ public final class ParametrosOperacion {
     public static final int MINUTOS_SEPARACION_CAMBIO_TURNO_POR_DEFECTO = 60;
     /** Tiempo de trasvase de carga entre unidades, en minutos (respuesta 13). */
     public static final int MINUTOS_TRASVASE_POR_DEFECTO = 30;
+    // Semaforo de ocupacion de las unidades, en porcentaje de su capacidad.
+    public static final int UMBRAL_OCUPACION_AMBAR_POR_DEFECTO = 50;
+    public static final int UMBRAL_OCUPACION_ROJO_POR_DEFECTO = 80;
 
     private final ReentrantLock candado = new ReentrantLock();
 
@@ -38,6 +41,8 @@ public final class ParametrosOperacion {
     private volatile int minutosTrasvase = MINUTOS_TRASVASE_POR_DEFECTO;
     private volatile int umbralSemaforoVerde = 500;
     private volatile int umbralSemaforoAmbar = 250;
+    private volatile int umbralOcupacionAmbar = UMBRAL_OCUPACION_AMBAR_POR_DEFECTO;
+    private volatile int umbralOcupacionRojo = UMBRAL_OCUPACION_ROJO_POR_DEFECTO;
     private volatile long version;
 
     public ParametrosOperacion() {
@@ -147,12 +152,49 @@ public final class ParametrosOperacion {
 
     /** Fija los umbrales del semaforo de almacenes exigido por el requisito no funcional (d). */
     public void umbralesSemaforo(int ambar, int verde) {
+        exigirUmbralesSemaforo(ambar, verde);
+        candado.lock();
+        try {
+            this.umbralSemaforoAmbar = ambar;
+            this.umbralSemaforoVerde = verde;
+            version++;
+        } finally {
+            candado.unlock();
+        }
+    }
+
+    public static void exigirUmbralesSemaforo(int ambar, int verde) {
         if (ambar < 0 || verde <= ambar) {
             throw new IllegalArgumentException("Umbrales de semaforo invalidos: ambar=" + ambar + " verde=" + verde);
         }
-        this.umbralSemaforoAmbar = ambar;
-        this.umbralSemaforoVerde = verde;
-        bumpVersion();
+    }
+
+    public int umbralOcupacionAmbar() {
+        return umbralOcupacionAmbar;
+    }
+
+    public int umbralOcupacionRojo() {
+        return umbralOcupacionRojo;
+    }
+
+    // Ambar desde ambar% de ocupacion y rojo desde rojo%; sin carga la unidad queda en vacio.
+    public void umbralesOcupacion(int ambar, int rojo) {
+        exigirUmbralesOcupacion(ambar, rojo);
+        candado.lock();
+        try {
+            this.umbralOcupacionAmbar = ambar;
+            this.umbralOcupacionRojo = rojo;
+            version++;
+        } finally {
+            candado.unlock();
+        }
+    }
+
+    public static void exigirUmbralesOcupacion(int ambar, int rojo) {
+        if (ambar < 1 || rojo <= ambar || rojo > 100) {
+            throw new IllegalArgumentException("Umbrales de ocupacion invalidos: ambar=" + ambar + " rojo=" + rojo
+                    + "; deben cumplir 1 <= ambar < rojo <= 100");
+        }
     }
 
     /** Numero de version, que se incrementa con cada cambio. Permite detectar reconfiguraciones. */
@@ -172,7 +214,8 @@ public final class ParametrosOperacion {
                 velocidadPorTipo[t.ordinal()] = velocidades.get(t);
             }
             return new Instantanea(velocidadPorTipo, minutosAcondicionamiento, minutosAlimentacion,
-                    minutosSeparacionCambioTurno, minutosTrasvase, umbralSemaforoAmbar, umbralSemaforoVerde, version);
+                    minutosSeparacionCambioTurno, minutosTrasvase, umbralSemaforoAmbar, umbralSemaforoVerde,
+                    umbralOcupacionAmbar, umbralOcupacionRojo, version);
         } finally {
             candado.unlock();
         }
@@ -214,6 +257,9 @@ public final class ParametrosOperacion {
             int minutosTrasvase,
             int umbralSemaforoAmbar,
             int umbralSemaforoVerde,
+            // Porcentajes de ocupacion de las unidades.
+            int umbralOcupacionAmbar,
+            int umbralOcupacionRojo,
             long version) {
 
         public Instantanea {
@@ -227,7 +273,9 @@ public final class ParametrosOperacion {
             }
             if (minutosAcondicionamiento <= 0 || minutosAlimentacion <= 0
                     || minutosSeparacionCambioTurno < 0 || minutosTrasvase <= 0
-                    || umbralSemaforoAmbar < 0 || umbralSemaforoVerde <= umbralSemaforoAmbar) {
+                    || umbralSemaforoAmbar < 0 || umbralSemaforoVerde <= umbralSemaforoAmbar
+                    || umbralOcupacionAmbar < 1 || umbralOcupacionRojo <= umbralOcupacionAmbar
+                    || umbralOcupacionRojo > 100) {
                 throw new IllegalArgumentException("La instantanea contiene parametros operativos invalidos");
             }
             velocidadKmH = velocidadKmH.clone();

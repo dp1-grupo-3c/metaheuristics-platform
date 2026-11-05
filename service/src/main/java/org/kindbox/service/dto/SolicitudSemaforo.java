@@ -11,5 +11,6 @@ package org.kindbox.service.dto;
  * @param ambar umbral inferior del intervalo ambar, en unidades del producto P
  * @param verde umbral inferior del intervalo verde, en unidades del producto P
  */
-public record SolicitudSemaforo(Integer ambar, Integer verde) {
+// ocupacionAmbar y ocupacionRojo son porcentajes de carga de las unidades; cada par es opcional.
+public record SolicitudSemaforo(Integer ambar, Integer verde, Integer ocupacionAmbar, Integer ocupacionRojo) {
 }

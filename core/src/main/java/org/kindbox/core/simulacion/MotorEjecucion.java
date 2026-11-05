@@ -1529,7 +1529,7 @@ public class MotorEjecucion {
         UnidadEnCurso[] unidades = estado.unidades();
         List<VistaUnidad> vistas = new ArrayList<>(unidades.length);
         for (UnidadEnCurso u : unidades) {
-            vistas.add(estado.vistaDe(u, minuto));
+            vistas.add(estado.vistaDe(u, minuto, parametrosVigentes));
         }
         return new InstantaneaSimulacion(minuto, calendario.aFecha(minuto), estadoCorrida,
                 milisegundosReales(), vistas, estado.vistasDeAlmacenes(), estado.vistasDeBloqueos(minuto),

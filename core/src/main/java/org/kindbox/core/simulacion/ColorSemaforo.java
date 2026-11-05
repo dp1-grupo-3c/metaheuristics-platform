@@ -16,7 +16,9 @@ public enum ColorSemaforo {
 
     VERDE,
     AMBAR,
-    ROJO;
+    ROJO,
+    // Almacen sin stock o unidad sin carga.
+    VACIO;
 
     /**
      * Color del inventario de un almacen segun los umbrales vigentes.
@@ -24,6 +26,9 @@ public enum ColorSemaforo {
      * @param disponible unidades del producto P disponibles
      */
     public static ColorSemaforo deInventario(int disponible, ParametrosOperacion.Instantanea parametros) {
+        if (disponible <= 0) {
+            return VACIO;
+        }
         if (disponible >= parametros.umbralSemaforoVerde()) {
             return VERDE;
         }
@@ -57,5 +62,20 @@ public enum ColorSemaforo {
             return VERDE;
         }
         return fraccion >= corteAmbar ? AMBAR : ROJO;
+    }
+
+    // Ocupacion de una unidad: mas carga es menos espacio libre, de verde a rojo.
+    public static ColorSemaforo deOcupacion(int carga, int capacidad, ParametrosOperacion.Instantanea parametros) {
+        if (carga <= 0) {
+            return VACIO;
+        }
+        if (capacidad <= 0) {
+            return ROJO;
+        }
+        double porcentaje = 100.0 * carga / capacidad;
+        if (porcentaje >= parametros.umbralOcupacionRojo()) {
+            return ROJO;
+        }
+        return porcentaje >= parametros.umbralOcupacionAmbar() ? AMBAR : VERDE;
     }
 }

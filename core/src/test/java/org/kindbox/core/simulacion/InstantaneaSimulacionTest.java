@@ -22,7 +22,8 @@ import org.kindbox.core.modelo.TipoUnidad;
 class InstantaneaSimulacionTest {
 
     private static VistaUnidad unidad(String codigo, TipoUnidad tipo, EstadoUnidad estado, int tipoAveria) {
-        return new VistaUnidad(codigo, tipo, estado, 0, 0, 0, tipo.capacidad(), new int[0], new int[0],
+        return new VistaUnidad(codigo, tipo, estado, 0, 0, 0, tipo.capacidad(), ColorSemaforo.VACIO,
+                new int[0], new int[0],
                 -1, -1, 0L, List.of(), tipoAveria);
     }
 

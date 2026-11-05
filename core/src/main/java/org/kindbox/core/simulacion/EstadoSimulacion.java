@@ -539,7 +539,7 @@ public final class EstadoSimulacion {
      * la carga actual y el resto aun no se ha cargado. Si la unidad esta sirviendo un
      * abastecimiento, esa recarga ya se sumo a la carga y no cuenta.</p>
      */
-    public VistaUnidad vistaDe(UnidadEnCurso u, long minuto) {
+    public VistaUnidad vistaDe(UnidadEnCurso u, long minuto, ParametrosOperacion.Instantanea parametros) {
         UnidadTransporte unidad = u.unidad();
         int nodo = u.nodoActual(minuto);
         int destinoX = -1;
@@ -573,6 +573,7 @@ public final class EstadoSimulacion {
         }
         return new VistaUnidad(unidad.codigo(), unidad.tipo(), unidad.estado(),
                 Ciudad.x(nodo), Ciudad.y(nodo), unidad.cargaABordo(), unidad.capacidad(),
+                ColorSemaforo.deOcupacion(unidad.cargaABordo(), unidad.capacidad(), parametros),
                 u.caminoRecorrido(minuto), u.caminoPendiente(minuto),
                 destinoX, destinoY, minutosHastaDestino, aBordo,
                 u.averia() == null ? 0 : u.averia().codigo());

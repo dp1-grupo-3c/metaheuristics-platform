@@ -288,6 +288,14 @@ metodo no mapeado en esa ruta, 409 para una operacion que choca con el estado (a
 corrida ya en curso, o averiar una unidad ya averiada o en mantenimiento), 413 para un archivo
 de averias por encima del limite y 415 para un tipo de contenido que el extremo no sabe leer.
 
+El semaforo se configura con `PUT /api/parametros/semaforo`: `{"ambar":250,"verde":500}` fija
+los umbrales de inventario de los almacenes intermedios, en paquetes, y
+`{"ocupacionAmbar":50,"ocupacionRojo":80}` los de ocupacion de las unidades, en porcentaje de su
+capacidad (1 <= ambar < rojo <= 100). Cada par es opcional pero va completo, y se valida todo
+antes de aplicar. Los colores son `VERDE`, `AMBAR`, `ROJO` y `VACIO`: un almacen sin stock o una
+unidad sin carga salen en `VACIO`, y cada unidad de la fotografia trae su `color`. En la operacion
+diaria los mismos campos van en `PUT /api/operaciones/{id}/parametros`.
+
 Los atributos de las averias se cambian con `PUT /api/parametros/averias`, por ejemplo
 `{"tipo":2,"turnosHastaReincorporacion":3}`: `minutosEnElLugar` (1 a 1440; hasta 480 en los
 tipos 2 y 3), `turnosHastaReincorporacion` (1 a 9, lo usa el tipo 2) y `diasMantenimiento` (1 a

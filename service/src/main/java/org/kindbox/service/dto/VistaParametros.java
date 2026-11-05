@@ -32,6 +32,9 @@ public record VistaParametros(
         Map<String, Integer> cantidades,
         int umbralSemaforoAmbar,
         int umbralSemaforoVerde,
+        // Porcentajes de ocupacion del semaforo de las unidades.
+        int umbralOcupacionAmbar,
+        int umbralOcupacionRojo,
         int capacidadMinima,
         int capacidadMaxima,
         int minutosAcondicionamiento,

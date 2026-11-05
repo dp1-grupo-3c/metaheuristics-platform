@@ -135,7 +135,7 @@ class EstadoSimulacionTest {
                 pedido(3, 7, 0L, 36), pedido(4, 8, 0L, 36)));
         UnidadEnCurso u = autoConRecargas(estado);
 
-        List<VistaUnidad.PedidoABordo> enRuta = estado.vistaDe(u, 0L).pedidosABordo();
+        List<VistaUnidad.PedidoABordo> enRuta = estado.vistaDe(u, 0L, new ParametrosOperacion().instantanea()).pedidosABordo();
         assertEquals(List.of(1, 2, 3, 4), enRuta.stream().map(VistaUnidad.PedidoABordo::idPedido).toList(),
                 "la lista conserva todas las entregas pendientes, en orden");
         assertEquals(List.of(0, 1, 1, 2), enRuta.stream().map(VistaUnidad.PedidoABordo::viaje).toList(),
@@ -144,10 +144,27 @@ class EstadoSimulacionTest {
 
         // Sirviendo la primera recarga, lo cargado ya incluye esos paquetes.
         u.llegarA(1);
-        List<VistaUnidad.PedidoABordo> recargando = estado.vistaDe(u, 61L).pedidosABordo();
+        List<VistaUnidad.PedidoABordo> recargando = estado.vistaDe(u, 61L, new ParametrosOperacion().instantanea()).pedidosABordo();
         assertEquals(List.of(2, 3, 4), recargando.stream().map(VistaUnidad.PedidoABordo::idPedido).toList(),
                 "la entrega ya hecha sale de la lista");
         assertEquals(List.of(0, 0, 1), recargando.stream().map(VistaUnidad.PedidoABordo::viaje).toList(),
                 "la recarga en curso ya no separa viajes");
+    }
+
+    @Test
+    @DisplayName("La vista de la unidad trae el color de su ocupacion con los umbrales recibidos")
+    void elColorDeLaUnidadSigueSuCarga() {
+        EstadoSimulacion estado = estadoCon(List.of());
+        UnidadEnCurso u = estado.unidad(estado.indiceDeUnidad("TA01"));
+        ParametrosOperacion parametros = new ParametrosOperacion();
+        ParametrosOperacion.Instantanea porDefecto = parametros.instantanea();
+
+        assertEquals(ColorSemaforo.VACIO, estado.vistaDe(u, 0L, porDefecto).color(), "sale sin carga");
+        u.unidad().cargaABordo(12);
+        assertEquals(ColorSemaforo.AMBAR, estado.vistaDe(u, 0L, porDefecto).color(), "12 de 24 es la mitad");
+
+        parametros.umbralesOcupacion(20, 40);
+        assertEquals(ColorSemaforo.ROJO, estado.vistaDe(u, 0L, parametros.instantanea()).color(),
+                "con los umbrales nuevos la mitad ya es rojo");
     }
 }

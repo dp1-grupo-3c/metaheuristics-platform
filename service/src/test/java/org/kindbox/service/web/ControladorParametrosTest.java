@@ -169,4 +169,44 @@ class ControladorParametrosTest {
         assertEquals(10, repositorio.cantidadesFlotaVigentes().get(TipoUnidad.AUTO));
         assertEquals(0, parametros.version());
     }
+
+    @Test
+    void elSemaforoAceptaElCuerpoAnteriorYLosUmbralesDeUnidades() throws Exception {
+        mvc.perform(put("/api/parametros/semaforo").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ambar\":100,\"verde\":300}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.umbralSemaforoAmbar").value(100))
+                .andExpect(jsonPath("$.umbralSemaforoVerde").value(300))
+                .andExpect(jsonPath("$.umbralOcupacionAmbar").value(50))
+                .andExpect(jsonPath("$.umbralOcupacionRojo").value(80));
+
+        mvc.perform(put("/api/parametros/semaforo").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ocupacionAmbar\":40,\"ocupacionRojo\":90}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.umbralSemaforoVerde").value(300))
+                .andExpect(jsonPath("$.umbralOcupacionAmbar").value(40))
+                .andExpect(jsonPath("$.umbralOcupacionRojo").value(90))
+                .andExpect(jsonPath("$.version").value(2));
+    }
+
+    @Test
+    void elSemaforoRechazaUmbralesIncompletosOInvalidosSinAplicarNada() throws Exception {
+        String[] cuerpos = {
+                "{}",
+                "{\"ambar\":100}",
+                "{\"ocupacionRojo\":90}",
+                "{\"ambar\":300,\"verde\":100}",
+                "{\"ocupacionAmbar\":0,\"ocupacionRojo\":50}",
+                "{\"ocupacionAmbar\":60,\"ocupacionRojo\":101}",
+                "{\"ambar\":100,\"verde\":300,\"ocupacionAmbar\":90,\"ocupacionRojo\":40}"
+        };
+        for (String cuerpo : cuerpos) {
+            mvc.perform(put("/api/parametros/semaforo").contentType(MediaType.APPLICATION_JSON).content(cuerpo))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.codigoError").value("SOLICITUD_INVALIDA"));
+        }
+        assertEquals(250, parametros.umbralSemaforoAmbar());
+        assertEquals(50, parametros.umbralOcupacionAmbar());
+        assertEquals(0, parametros.version());
+    }
 }
