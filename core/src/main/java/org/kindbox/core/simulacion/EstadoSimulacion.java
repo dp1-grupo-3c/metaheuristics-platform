@@ -265,6 +265,19 @@ public final class EstadoSimulacion {
     }
 
     public int incorporarPedido(Pedido pedido) {
+        int indice = anexarPedido(pedido);
+        registrarPedido(indice);
+        return indice;
+    }
+
+    /**
+     * Anade un pedido que llegara mas adelante, sin registrarlo: no cuenta como pendiente ni
+     * entra en los vencimientos hasta que se procese su llegada con {@link #registrarPedido(int)}.
+     * Es como el escenario abierto incorpora los pedidos de cada mes que carga por adelantado.
+     *
+     * @return posicion del pedido, que es la referencia de su evento de llegada
+     */
+    public int anexarPedido(Pedido pedido) {
         if (indicePorIdPedido.containsKey(pedido.id())) {
             throw new IllegalArgumentException("El identificador de pedido ya existe");
         }
@@ -279,8 +292,12 @@ public final class EstadoSimulacion {
         }
         pedidos.add(pedido);
         indicePorIdPedido.put(pedido.id(), indice);
-        registrarPedido(indice);
         return indice;
+    }
+
+    /** Cantidad de pedidos conocidos, hayan llegado o no. */
+    public int cantidadPedidos() {
+        return pedidos.size();
     }
 
     public void actualizarBloqueos(RegistroBloqueos registro) {
@@ -515,6 +532,12 @@ public final class EstadoSimulacion {
      * itinerario vigente. El producto P es fungible y la carga a bordo es un unico numero,
      * de modo que esa derivacion es la unica lectura fiel de "que lleva esta unidad": lo que
      * le queda por entregar segun el plan comprometido.</p>
+     *
+     * <p>Un itinerario largo intercala paradas de abastecimiento: el programador inserta una
+     * cada vez que la carga no alcanza para la siguiente entrega. Cada entrega lleva por eso
+     * el numero de recargas que la preceden, de modo que el viaje {@code 0} es lo que cubre
+     * la carga actual y el resto aun no se ha cargado. Si la unidad esta sirviendo un
+     * abastecimiento, esa recarga ya se sumo a la carga y no cuenta.</p>
      */
     public VistaUnidad vistaDe(UnidadEnCurso u, long minuto) {
         UnidadTransporte unidad = u.unidad();
@@ -533,14 +556,19 @@ public final class EstadoSimulacion {
         if (ruta != null && u.indiceParada() != UnidadEnCurso.SIN_PARADA) {
             int desde = u.indiceParada() < 0 ? 0 : (u.sirviendo() ? u.indiceParada() + 1 : u.indiceParada());
             List<Parada> paradas = ruta.paradas();
+            int viaje = 0;
             for (int k = desde; k < paradas.size(); k++) {
                 Parada p = paradas.get(k);
+                if (p.tipo() == TipoParada.ABASTECIMIENTO) {
+                    viaje++;
+                    continue;
+                }
                 if (p.tipo() != TipoParada.ENTREGA) {
                     continue;
                 }
                 int indicePedido = indiceDePedido(p.idPedido());
                 int total = indicePedido < 0 ? p.cantidad() : pedidos.get(indicePedido).cantidad();
-                aBordo.add(new VistaUnidad.PedidoABordo(p.idPedido(), p.cantidad(), total));
+                aBordo.add(new VistaUnidad.PedidoABordo(p.idPedido(), p.cantidad(), total, viaje));
             }
         }
         return new VistaUnidad(unidad.codigo(), unidad.tipo(), unidad.estado(),

@@ -18,6 +18,12 @@ public enum EstadoCorrida {
      * el escenario de colapso es el desenlace esperado y su instante es la metrica.
      */
     COLAPSADA,
+    /**
+     * El escenario abierto se quedo sin datos antes de colapsar: falta el archivo de ventas
+     * de un mes y los pedidos que quedaban se entregaron sin que ninguno venciera. No hay
+     * instante de colapso que medir, solo la cota de que la flota aguanto hasta ahi.
+     */
+    DATOS_AGOTADOS,
     /** Terminada por un error interno. */
     FALLIDA
 }

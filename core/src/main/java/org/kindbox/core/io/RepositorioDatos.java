@@ -114,6 +114,70 @@ public final class RepositorioDatos {
                 cargarMantenimientos(primerDia, ultimoDia, avisos), avisos);
     }
 
+    /**
+     * Abre un escenario sin fecha de fin, como el de colapso.
+     *
+     * <p>Carga de inmediato la flota, todo el mantenimiento preventivo desde {@code primerDia}
+     * y el mes de {@code primerDia}, y devuelve la fuente que entrega los meses siguientes a
+     * medida que el motor los pide. Asi el escenario no queda acotado por una fecha de fin
+     * elegida de antemano ni obliga a leer meses que la corrida quiza nunca alcance.</p>
+     *
+     * @param primerDia primer dia del escenario, cuyas 00:00 son el minuto interno cero
+     * @return datos del primer mes y fuente de los siguientes, que comparten calendario y
+     *         numeracion de pedidos
+     */
+    public CargaAbierta abrir(LocalDate primerDia) throws IOException {
+        if (primerDia == null) {
+            throw new IllegalArgumentException("El escenario necesita un primer dia");
+        }
+        CalendarioEscenario calendario = CalendarioEscenario.desde(primerDia);
+        List<String> avisos = new ArrayList<>();
+        LectorFlota.FlotaLeida flota = cargarFlota(avisos);
+        List<Mantenimiento> mantenimientos = cargarMantenimientos(primerDia, LocalDate.MAX, avisos);
+
+        FuenteMensual fuente = new FuenteMensual(calendario);
+        YearMonth mes = YearMonth.from(primerDia);
+        TramoMensual primero = fuente.cargar(mes);
+        avisos.addAll(primero.avisos());
+        DatosEscenario inicio = new DatosEscenario(calendario, primerDia, mes.atEndOfMonth(), flota,
+                primero.pedidos(), primero.bloqueos(), mantenimientos, avisos);
+        return new CargaAbierta(inicio, fuente);
+    }
+
+    /**
+     * Fuente de los meses de un escenario abierto. Conserva el siguiente identificador de
+     * pedido entre llamadas, de modo que los meses encadenados no repiten identificadores.
+     */
+    private final class FuenteMensual implements FuenteTramos {
+
+        private final CalendarioEscenario calendario;
+        private final LectorVentas lectorVentas;
+        private final LectorBloqueos lectorBloqueos;
+        private int siguienteId;
+
+        FuenteMensual(CalendarioEscenario calendario) {
+            this.calendario = calendario;
+            this.lectorVentas = new LectorVentas(calendario);
+            this.lectorBloqueos = new LectorBloqueos(calendario);
+        }
+
+        @Override
+        public synchronized TramoMensual cargar(YearMonth mes) throws IOException {
+            List<String> avisos = new ArrayList<>();
+            long minutoFin = calendario.aMinutos(mes.plusMonths(1).atDay(1).atStartOfDay());
+            LecturaVentas lectura = pedidosDelMes(lectorVentas, mes, siguienteId, minutoFin, avisos);
+            if (lectura == null) {
+                return new TramoMensual(mes, false, List.of(), List.of(), avisos);
+            }
+            siguienteId += lectura.leidos();
+            List<Pedido> pedidos = new ArrayList<>(lectura.aceptados());
+            pedidos.sort(Comparator.comparingLong(Pedido::minutoRegistro).thenComparingInt(Pedido::id));
+            List<Bloqueo> bloqueos = new ArrayList<>(bloqueosDelMes(lectorBloqueos, mes, minutoFin, avisos));
+            bloqueos.sort(Comparator.comparingLong(Bloqueo::minutoInicio).thenComparingLong(Bloqueo::minutoFin));
+            return new TramoMensual(mes, true, pedidos, bloqueos, avisos);
+        }
+    }
+
     // ------------------------------------------------------------------ flota
 
     /** Lee la flota, o usa la del enunciado si el directorio de datos no la trae. */
@@ -164,41 +228,60 @@ public final class RepositorioDatos {
     private List<Pedido> cargarPedidos(CalendarioEscenario calendario, LocalDate primerDia, LocalDate ultimoDia,
                                        long minutoFin, List<String> avisos) throws IOException {
         LectorVentas lector = new LectorVentas(calendario);
-        Path directorio = raiz.resolve(DIRECTORIO_VENTAS);
         List<Pedido> pedidos = new ArrayList<>();
         int siguienteId = 0;
 
         for (YearMonth mes = YearMonth.from(primerDia); !mes.isAfter(YearMonth.from(ultimoDia)); mes = mes.plusMonths(1)) {
-            String base = LectorVentas.nombreDeArchivo(mes);
-            Path archivo = localizarMensual(directorio, List.of(
-                    base, base + ".txt",
-                    "ventas." + String.format("%04d%02d", mes.getYear(), mes.getMonthValue()) + ".txt"));
-            if (archivo == null) {
-                avisos.add("No se encontro el archivo de ventas de " + mes + " (" + directorio.resolve(base)
-                        + "); el mes se omite");
+            LecturaVentas lectura = pedidosDelMes(lector, mes, siguienteId, minutoFin, avisos);
+            if (lectura == null) {
                 continue;
             }
-            List<Pedido> leidos = lector.leer(archivo, mes, siguienteId);
             // Los identificadores se reservan aunque el pedido se descarte, de modo que los
             // meses encadenados nunca reutilicen un identificador ya emitido.
-            siguienteId += leidos.size();
-            int descartados = 0;
-            for (Pedido p : leidos) {
-                if (p.minutoRegistro() >= 0 && p.minutoRegistro() < minutoFin) {
-                    pedidos.add(p);
-                } else {
-                    descartados++;
-                }
-            }
-            if (descartados > 0) {
-                avisos.add(archivo.getFileName()
-                        + ": pedidos omitidos por estar fuera del rango del escenario: " + descartados);
-            }
+            siguienteId += lectura.leidos();
+            pedidos.addAll(lectura.aceptados());
         }
 
         pedidos.sort(Comparator.comparingLong(Pedido::minutoRegistro).thenComparingInt(Pedido::id));
         return pedidos;
     }
+
+    /**
+     * Lee el archivo de ventas de un mes y se queda con los pedidos de {@code [0, minutoFin)}.
+     *
+     * @return la lectura, o {@code null} si el mes no tiene archivo, con el aviso ya anotado
+     */
+    private LecturaVentas pedidosDelMes(LectorVentas lector, YearMonth mes, int primerId, long minutoFin,
+                                        List<String> avisos) throws IOException {
+        Path directorio = raiz.resolve(DIRECTORIO_VENTAS);
+        String base = LectorVentas.nombreDeArchivo(mes);
+        Path archivo = localizarMensual(directorio, List.of(
+                base, base + ".txt",
+                "ventas." + String.format("%04d%02d", mes.getYear(), mes.getMonthValue()) + ".txt"));
+        if (archivo == null) {
+            avisos.add("No se encontro el archivo de ventas de " + mes + " (" + directorio.resolve(base)
+                    + "); el mes se omite");
+            return null;
+        }
+        List<Pedido> leidos = lector.leer(archivo, mes, primerId);
+        List<Pedido> aceptados = new ArrayList<>(leidos.size());
+        int descartados = 0;
+        for (Pedido p : leidos) {
+            if (p.minutoRegistro() >= 0 && p.minutoRegistro() < minutoFin) {
+                aceptados.add(p);
+            } else {
+                descartados++;
+            }
+        }
+        if (descartados > 0) {
+            avisos.add(archivo.getFileName()
+                    + ": pedidos omitidos por estar fuera del rango del escenario: " + descartados);
+        }
+        return new LecturaVentas(aceptados, leidos.size());
+    }
+
+    /** Pedidos aceptados de un archivo mensual y cuantos registros traia en total. */
+    private record LecturaVentas(List<Pedido> aceptados, int leidos) {}
 
     // --------------------------------------------------------------- bloqueos
 
@@ -206,37 +289,45 @@ public final class RepositorioDatos {
     private List<Bloqueo> cargarBloqueos(CalendarioEscenario calendario, LocalDate primerDia, LocalDate ultimoDia,
                                          long minutoFin, List<String> avisos) throws IOException {
         LectorBloqueos lector = new LectorBloqueos(calendario);
-        Path directorio = raiz.resolve(DIRECTORIO_BLOQUEOS);
         List<Bloqueo> bloqueos = new ArrayList<>();
 
         for (YearMonth mes = YearMonth.from(primerDia); !mes.isAfter(YearMonth.from(ultimoDia)); mes = mes.plusMonths(1)) {
-            String base = LectorBloqueos.nombreDeArchivo(mes);
-            String periodoDp1 = String.format("%02d%02d", mes.getYear() % 100, mes.getMonthValue());
-            Path archivo = localizarMensual(directorio, List.of(
-                    base, base + ".txt", "bloqueo." + periodoDp1 + ".txt"));
-            if (archivo == null) {
-                avisos.add("No se encontro el archivo de bloqueos de " + mes + " (" + directorio.resolve(base)
-                        + "); el mes se omite");
-                continue;
-            }
-            List<Bloqueo> leidos = lector.leer(archivo, mes);
-            int descartados = 0;
-            for (Bloqueo b : leidos) {
-                // Solo interesan los bloqueos cuya ventana toca el horizonte del escenario.
-                if (b.minutoFin() > 0 && b.minutoInicio() < minutoFin) {
-                    bloqueos.add(b);
-                } else {
-                    descartados++;
-                }
-            }
-            if (descartados > 0) {
-                avisos.add(archivo.getFileName()
-                        + ": bloqueos omitidos por estar fuera del rango del escenario: " + descartados);
-            }
+            bloqueos.addAll(bloqueosDelMes(lector, mes, minutoFin, avisos));
         }
 
         bloqueos.sort(Comparator.comparingLong(Bloqueo::minutoInicio).thenComparingLong(Bloqueo::minutoFin));
         return bloqueos;
+    }
+
+    /** Bloqueos de un mes cuya ventana toca {@code (0, minutoFin)}; vacio si el mes no tiene archivo. */
+    private List<Bloqueo> bloqueosDelMes(LectorBloqueos lector, YearMonth mes, long minutoFin,
+                                         List<String> avisos) throws IOException {
+        Path directorio = raiz.resolve(DIRECTORIO_BLOQUEOS);
+        String base = LectorBloqueos.nombreDeArchivo(mes);
+        String periodoDp1 = String.format("%02d%02d", mes.getYear() % 100, mes.getMonthValue());
+        Path archivo = localizarMensual(directorio, List.of(
+                base, base + ".txt", "bloqueo." + periodoDp1 + ".txt"));
+        if (archivo == null) {
+            avisos.add("No se encontro el archivo de bloqueos de " + mes + " (" + directorio.resolve(base)
+                    + "); el mes se omite");
+            return List.of();
+        }
+        List<Bloqueo> leidos = lector.leer(archivo, mes);
+        List<Bloqueo> aceptados = new ArrayList<>(leidos.size());
+        int descartados = 0;
+        for (Bloqueo b : leidos) {
+            // Solo interesan los bloqueos cuya ventana toca el horizonte del escenario.
+            if (b.minutoFin() > 0 && b.minutoInicio() < minutoFin) {
+                aceptados.add(b);
+            } else {
+                descartados++;
+            }
+        }
+        if (descartados > 0) {
+            avisos.add(archivo.getFileName()
+                    + ": bloqueos omitidos por estar fuera del rango del escenario: " + descartados);
+        }
+        return aceptados;
     }
 
     // ---------------------------------------------------------- mantenimiento
@@ -328,6 +419,34 @@ public final class RepositorioDatos {
                     .toList();
         }
     }
+
+    /**
+     * Un mes de un escenario abierto.
+     *
+     * @param mes       mes al que pertenece el tramo
+     * @param conVentas si el mes tiene archivo de ventas; sin el, el tramo viene vacio y marca
+     *                  el final de los datos disponibles
+     * @param pedidos   pedidos del mes, ordenados por instante de registro
+     * @param bloqueos  bloqueos del archivo del mes, ordenados por inicio
+     * @param avisos    archivos o registros del mes que no se pudieron cargar
+     */
+    public record TramoMensual(YearMonth mes, boolean conVentas, List<Pedido> pedidos,
+                               List<Bloqueo> bloqueos, List<String> avisos) {
+
+        public TramoMensual {
+            pedidos = List.copyOf(pedidos);
+            bloqueos = List.copyOf(bloqueos);
+            avisos = List.copyOf(avisos);
+        }
+    }
+
+    /**
+     * Escenario abierto: el primer mes ya cargado y la fuente de los siguientes.
+     *
+     * @param inicio    datos del escenario con el primer mes, la flota y el mantenimiento
+     * @param siguientes fuente de los meses posteriores al primero
+     */
+    public record CargaAbierta(DatosEscenario inicio, FuenteTramos siguientes) {}
 
     /**
      * Escenario completo listo para el motor de simulacion.

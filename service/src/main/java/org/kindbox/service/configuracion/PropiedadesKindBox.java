@@ -68,6 +68,20 @@ public class PropiedadesKindBox {
      */
     private String archivoClientes = "clientes/clientes.json";
 
+    /**
+     * Archivo JSON de los parametros del mundo: mapa, almacenes, flota, averias, semaforo,
+     * turnos, plazos y tiempos. Si no existe se crea con los valores del enunciado.
+     */
+    private String archivoParametrosMundo = "config/parametros-mundo.json";
+
+    public String getArchivoParametrosMundo() {
+        return archivoParametrosMundo;
+    }
+
+    public void setArchivoParametrosMundo(String archivoParametrosMundo) {
+        this.archivoParametrosMundo = archivoParametrosMundo;
+    }
+
     public String getDirectorioDatos() {
         return directorioDatos;
     }

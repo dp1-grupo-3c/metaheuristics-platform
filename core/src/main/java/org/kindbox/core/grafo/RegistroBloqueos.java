@@ -12,8 +12,25 @@ import org.kindbox.core.modelo.Ciudad;
  * <p>Materializa la restriccion dura 6 del apartado 2.6 del ISA: los tramos bloqueados no
  * son transitables durante su ventana de vigencia. La respuesta 7 del cuestionario precisa
  * que un nodo bloqueado no se puede atravesar ni se puede girar en el, de modo que una
- * unidad que llega a el debe dar la vuelta en U; ese comportamiento surge solo con retirar
- * del grafo las aristas de la poligonal, que es exactamente lo que hace esta clase.</p>
+ * unidad que llega a el debe dar la vuelta en U.</p>
+ *
+ * <p>Retirar solo las aristas de la poligonal no basta: impide recorrer el bloqueo a lo
+ * largo, pero deja cruzarlo de costado por cualquiera de sus nodos, entrando por una calle
+ * perpendicular y saliendo por la opuesta. Por eso todos los nodos de la poligonal, extremos
+ * incluidos, se tratan como nodos bloqueados: de cada uno se retiran todas las calles salvo
+ * una, su <b>calle de acceso</b>. El nodo queda como un callejon sin salida al que se llega
+ * por esa calle y del que solo se sale por la misma, que es la vuelta en U. Un pedido cuyo
+ * destino cae en un nodo bloqueado sigue siendo atendible, y ninguna ruta lo atraviesa. La
+ * regla vive en la mascara de aristas, de modo que la busqueda en anchura, la matriz y el
+ * camino que sigue cada unidad la respetan sin cambio alguno.</p>
+ *
+ * <p>La calle de acceso se elige de forma determinista: primero una que lleve a un nodo no
+ * bloqueado; en un extremo, la que prolonga la poligonal hacia afuera; y luego el orden
+ * norte, este, sur, oeste. Es una aproximacion: la vuelta en U real podria hacerse por
+ * cualquier lado, segun por donde llegue la unidad, pero la matriz de distancias mide cada
+ * tramo por separado y no recuerda por que calle se entro. Fijar un lado garantiza que la
+ * ruta planificada sea siempre valida, a costa de algun desvio cuando el lado elegido no es
+ * el mas cercano.</p>
  *
  * <p>Una arista de la reticula se codifica como {@code arista = nodo * 4 + direccion}, con
  * {@link #ESTE}, {@link #NORTE}, {@link #OESTE} y {@link #SUR} como direcciones. Como todas
@@ -60,6 +77,17 @@ public final class RegistroBloqueos {
     private final boolean[] mascara;
     /** Aristas marcadas en la mascara vigente, para limpiarla sin recorrerla entera. */
     private final int[] aristasMarcadas;
+
+    /** Nodos de todos los bloqueos concatenados, extremos incluidos, a un kilometro uno de otro. */
+    private final int[] nodos;
+    /** Rango {@code [desplazamientoNodos[b], desplazamientoNodos[b+1])} de los nodos del bloqueo {@code b}. */
+    private final int[] desplazamientoNodos;
+    /** Marca de cada nodo bloqueado en el calculo vigente de la mascara, igual a {@link #sello}. */
+    private final int[] selloNodo = new int[Ciudad.TOTAL_NODOS];
+    private int sello;
+    /** Nodos bloqueados vigentes y su calle de acceso, arreglos de trabajo del calculo de la mascara. */
+    private final int[] nodosVigentes;
+    private final int[] accesoVigente;
     private int cantidadMarcadas;
 
     // Intervalo [desde, hasta) en que la mascara cacheada es valida. El intervalo inicial
@@ -82,6 +110,7 @@ public final class RegistroBloqueos {
         this.minutoInicio = new long[cantidad];
         this.minutoFin = new long[cantidad];
         this.desplazamiento = new int[cantidad + 1];
+        this.desplazamientoNodos = new int[cantidad + 1];
 
         // Primera pasada: se cuentan las aristas para dimensionar el arreglo plano de una vez.
         for (int b = 0; b < cantidad; b++) {
@@ -96,13 +125,18 @@ public final class RegistroBloqueos {
                 aristasDelBloqueo += 2 * Ciudad.distanciaManhattan(nodoA, nodoB);
             }
             desplazamiento[b + 1] = desplazamiento[b] + aristasDelBloqueo;
+            // Una poligonal de n aristas unitarias tiene n + 1 nodos.
+            desplazamientoNodos[b + 1] = desplazamientoNodos[b] + aristasDelBloqueo / 2 + 1;
         }
 
         // Segunda pasada: cada tramo se descompone en aristas unitarias, ida y vuelta.
         this.aristas = new int[desplazamiento[cantidad]];
+        this.nodos = new int[desplazamientoNodos[cantidad]];
         int cursor = 0;
+        int cursorNodos = 0;
         for (int b = 0; b < cantidad; b++) {
             Bloqueo bloqueo = this.bloqueos[b];
+            nodos[cursorNodos++] = bloqueo.nodoOrigenTramo(0);
             for (int t = 0; t < bloqueo.cantidadTramos(); t++) {
                 int nodoA = bloqueo.nodoOrigenTramo(t);
                 int nodoB = bloqueo.nodoDestinoTramo(t);
@@ -113,6 +147,7 @@ public final class RegistroBloqueos {
                     int siguiente = nodoVecino(nodo, direccion);
                     aristas[cursor++] = arista(nodo, direccion);
                     aristas[cursor++] = arista(siguiente, direccionOpuesta(direccion));
+                    nodos[cursorNodos++] = siguiente;
                     nodo = siguiente;
                 }
             }
@@ -120,7 +155,10 @@ public final class RegistroBloqueos {
 
         this.instantesCambio = instantesDeCambio(minutoInicio, minutoFin);
         this.mascara = new boolean[TOTAL_ARISTAS];
-        this.aristasMarcadas = new int[aristas.length];
+        // Ademas de la poligonal se marcan las calles laterales de cada nodo bloqueado.
+        this.aristasMarcadas = new int[TOTAL_ARISTAS];
+        this.nodosVigentes = new int[nodos.length];
+        this.accesoVigente = new int[nodos.length];
     }
 
     /**
@@ -206,7 +244,8 @@ public final class RegistroBloqueos {
     /**
      * Mascara de las aristas bloqueadas vigentes en el instante dado, de dimension
      * {@link #TOTAL_ARISTAS}. La consume la construccion de la matriz de distancias en
-     * cada iteracion de planificacion.
+     * cada iteracion de planificacion. Incluye las aristas de las poligonales y, de cada
+     * nodo bloqueado, todas sus calles salvo la de acceso (ver la documentacion de la clase).
      *
      * <p>Se devuelve siempre el mismo arreglo, recalculado solo cuando el instante sale
      * del intervalo en que el conjunto vigente no cambia. <b>No debe modificarse</b>: una
@@ -239,7 +278,86 @@ public final class RegistroBloqueos {
                 }
             }
         }
+        bloquearNodos(minuto);
         return mascara;
+    }
+
+    /**
+     * Convierte cada nodo de las poligonales vigentes en un callejon sin salida: le deja solo
+     * la calle de acceso. Las calles de acceso se eligen todas antes de marcar ninguna, para
+     * que la eleccion de un nodo no dependa del orden en que se recorren los bloqueos.
+     */
+    private void bloquearNodos(long minuto) {
+        sello++;
+        int vigentes = 0;
+        for (int b = 0; b < bloqueos.length; b++) {
+            if (minuto < minutoInicio[b] || minuto >= minutoFin[b]) {
+                continue;
+            }
+            for (int k = desplazamientoNodos[b]; k < desplazamientoNodos[b + 1]; k++) {
+                int nodo = nodos[k];
+                if (selloNodo[nodo] != sello) {
+                    selloNodo[nodo] = sello;
+                    nodosVigentes[vigentes++] = nodo;
+                }
+            }
+        }
+        for (int i = 0; i < vigentes; i++) {
+            accesoVigente[i] = calleDeAcceso(nodosVigentes[i]);
+        }
+        for (int i = 0; i < vigentes; i++) {
+            int nodo = nodosVigentes[i];
+            for (int direccion = 0; direccion < DIRECCIONES; direccion++) {
+                int vecino = nodoVecino(nodo, direccion);
+                if (vecino < 0 || direccion == accesoVigente[i]) {
+                    continue;
+                }
+                marcar(arista(nodo, direccion));
+                marcar(arista(vecino, direccionOpuesta(direccion)));
+            }
+        }
+    }
+
+    /**
+     * Calle de acceso de un nodo bloqueado, o {@code -1} si todas sus calles son de la
+     * poligonal. Se lee con la mascara que solo tiene las poligonales marcadas.
+     */
+    private int calleDeAcceso(int nodo) {
+        // En un extremo hay una sola arista de poligonal; la prolongacion es la opuesta.
+        int aristasDePoligonal = 0;
+        int direccionPoligonal = -1;
+        for (int direccion = 0; direccion < DIRECCIONES; direccion++) {
+            if (nodoVecino(nodo, direccion) >= 0 && mascara[arista(nodo, direccion)]) {
+                aristasDePoligonal++;
+                direccionPoligonal = direccion;
+            }
+        }
+        int prolongacion = aristasDePoligonal == 1 ? direccionOpuesta(direccionPoligonal) : -1;
+
+        int mejor = -1;
+        int mejorPuntaje = Integer.MIN_VALUE;
+        for (int direccion : ORDEN_ACCESO) {
+            int vecino = nodoVecino(nodo, direccion);
+            if (vecino < 0 || mascara[arista(nodo, direccion)]) {
+                continue;
+            }
+            int puntaje = (selloNodo[vecino] != sello ? 2 : 0) + (direccion == prolongacion ? 1 : 0);
+            if (puntaje > mejorPuntaje) {
+                mejorPuntaje = puntaje;
+                mejor = direccion;
+            }
+        }
+        return mejor;
+    }
+
+    /** Orden de desempate de la calle de acceso. */
+    private static final int[] ORDEN_ACCESO = {NORTE, ESTE, SUR, OESTE};
+
+    private void marcar(int arista) {
+        if (!mascara[arista]) {
+            mascara[arista] = true;
+            aristasMarcadas[cantidadMarcadas++] = arista;
+        }
     }
 
     /**

@@ -11,6 +11,11 @@ package org.kindbox.core.simulacion;
  */
 public enum TipoEvento {
 
+    /**
+     * El escenario abierto carga el mes siguiente al ultimo que tiene. Va antes que todo lo
+     * demas para que los datos del mes esten sembrados cuando se procesen los otros eventos.
+     */
+    CARGA_TRAMO,
     /** Recarga diaria de los almacenes intermedios a capacidad plena, a las 23:59:59. */
     RECARGA_ALMACENES,
     /** Un tramo de calle pasa a estar bloqueado. */

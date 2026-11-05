@@ -23,7 +23,9 @@ import org.kindbox.core.modelo.TipoUnidad;
  * @param destinoX        coordenada X de la proxima parada, o -1 si no tiene ruta
  * @param destinoY        coordenada Y de la proxima parada, o -1 si no tiene ruta
  * @param minutosHastaDestino tiempo estimado de llegada a la proxima parada
- * @param pedidosABordo   pedidos que transporta, con la cantidad que lleva y la total
+ * @param pedidosABordo   entregas que le quedan al itinerario vigente, en el orden en que las
+ *                        hara; {@link PedidoABordo#viaje()} separa las que cubre la carga
+ *                        actual de las que esperan una recarga en almacen
  * @param tipoAveria      codigo de la averia que la inmoviliza, o 0 si esta operativa
  */
 public record VistaUnidad(
@@ -46,10 +48,19 @@ public record VistaUnidad(
      * Renglon de la tarjeta emergente de una unidad.
      *
      * @param idPedido        identificador del pedido
-     * @param enLaUnidad      paquetes de ese pedido que van en esta unidad
+     * @param enLaUnidad      paquetes de ese pedido que esta unidad le entregara en esta parada
      * @param totalDelPedido  paquetes que el pedido pidio en total
+     * @param viaje           tramo de carga en que se entrega: {@code 0} si sale de lo que la
+     *                        unidad ya lleva, es decir antes de su proxima parada de
+     *                        abastecimiento; {@code 1} tras la primera recarga, y asi
+     *                        sucesivamente. Solo el viaje {@code 0} esta a bordo de verdad
      */
-    public record PedidoABordo(int idPedido, int enLaUnidad, int totalDelPedido) {
+    public record PedidoABordo(int idPedido, int enLaUnidad, int totalDelPedido, int viaje) {
+
+        /** Indica si los paquetes ya van en la unidad, y no esperan una recarga posterior. */
+        public boolean cargado() {
+            return viaje == 0;
+        }
     }
 
     public VistaUnidad {

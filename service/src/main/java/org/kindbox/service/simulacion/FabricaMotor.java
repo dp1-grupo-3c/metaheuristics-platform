@@ -1,6 +1,7 @@
 package org.kindbox.service.simulacion;
 
 import java.util.List;
+import org.kindbox.core.io.FuenteTramos;
 import org.kindbox.core.io.RepositorioDatos;
 import org.kindbox.core.metaheuristica.Algoritmo;
 import org.kindbox.core.modelo.ParametrosOperacion;
@@ -40,5 +41,18 @@ public class FabricaMotor {
                                  ParametrosOperacion parametros, Algoritmo algoritmo,
                                  List<ObservadorSimulacion> observadores) {
         return new MotorSimulacion(datos, configuracion, parametros, algoritmo, observadores);
+    }
+
+    /**
+     * Crea el motor de un escenario abierto, que pide cada mes a {@code siguientes} a medida
+     * que avanza en lugar de recibir el rango entero ya cargado.
+     *
+     * @param datos      primer mes del escenario, con la flota y el mantenimiento preventivo
+     * @param siguientes fuente de los meses posteriores al primero
+     */
+    public MotorSimulacion crearAbierto(RepositorioDatos.DatosEscenario datos, ConfiguracionEscenario configuracion,
+                                        ParametrosOperacion parametros, Algoritmo algoritmo,
+                                        List<ObservadorSimulacion> observadores, FuenteTramos siguientes) {
+        return new MotorSimulacion(datos, configuracion, parametros, algoritmo, observadores, siguientes);
     }
 }

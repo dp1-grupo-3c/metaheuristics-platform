@@ -19,6 +19,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.kindbox.core.io.FuenteTramos;
 import org.kindbox.core.io.LectorAverias;
 import org.kindbox.core.io.RepositorioDatos;
 import org.kindbox.core.metaheuristica.Algoritmo;
@@ -217,15 +218,28 @@ public class ServicioSimulacion {
             throw new SolicitudInvalida("El escenario 5D debe cubrir exactamente cinco dias");
         }
 
-        double factor = tipo == TipoEscenario.DIA_A_DIA ? 1.0 : (double) dias * 1440.0 / duracion;
+        double factor = factorAceleracion(tipo, dias, duracion);
         ModoReloj reloj = tipo == TipoEscenario.COLAPSO ? ModoReloj.LIBRE : ModoReloj.ACOMPASADO;
-        ConfiguracionEscenario configuracion = new ConfiguracionEscenario(tipo, primerDia, ultimoDia,
-                salto, factor, reloj, algoritmo, semilla, cadencia, generarAverias,
-                propiedades.getAveriasPorUnidadPorTurno(), arranqueDesdePlanVigente);
+        // El colapso se construye con la misma fabrica que usan los experimentos.
+        ConfiguracionEscenario configuracion = tipo == TipoEscenario.COLAPSO
+                ? ConfiguracionEscenario.colapso(primerDia, salto, algoritmo, semilla, cadencia, generarAverias,
+                        propiedades.getAveriasPorUnidadPorTurno(), arranqueDesdePlanVigente)
+                : new ConfiguracionEscenario(tipo, primerDia, ultimoDia,
+                        salto, factor, reloj, algoritmo, semilla, cadencia, generarAverias,
+                        propiedades.getAveriasPorUnidadPorTurno(), arranqueDesdePlanVigente);
 
+        // El colapso no tiene fecha de fin: arranca con el primer mes y el motor pide los
+        // siguientes a medida que avanza. Los demas escenarios cargan su rango entero.
         RepositorioDatos.DatosEscenario datos;
+        FuenteTramos siguientes = null;
         try {
-            datos = repositorio.cargar(primerDia, ultimoDia);
+            if (tipo == TipoEscenario.COLAPSO) {
+                RepositorioDatos.CargaAbierta carga = repositorio.abrir(primerDia);
+                datos = carga.inicio();
+                siguientes = carga.siguientes();
+            } else {
+                datos = repositorio.cargar(primerDia, ultimoDia);
+            }
         } catch (IOException e) {
             throw new ErrorDeDatos("No se pudo leer el escenario desde " + repositorio.raiz()
                     + ": " + e.getMessage(), e);
@@ -233,16 +247,19 @@ public class ServicioSimulacion {
             throw new SolicitudInvalida("Escenario invalido: " + e.getMessage(), e);
         }
         if (datos.pedidos().isEmpty()) {
-            throw new SolicitudInvalida("El rango " + primerDia + " a " + ultimoDia
-                    + " no tiene ningun pedido en " + repositorio.raiz()
-                    + ". Revise el directorio de datos o elija otras fechas.");
+            throw new SolicitudInvalida((siguientes != null
+                    ? "El mes de " + primerDia + " no tiene ningun pedido en "
+                    : "El rango " + primerDia + " a " + ultimoDia + " no tiene ningun pedido en ")
+                    + repositorio.raiz() + ". Revise el directorio de datos o elija otras fechas.");
         }
 
         String id = "sim-" + String.format(Locale.ROOT, "%03d", contador.incrementAndGet());
         Corrida corrida = new Corrida(id, configuracion, datos, duracion);
         Algoritmo planificador = algoritmos.crear(algoritmo, semilla);
         List<ObservadorSimulacion> observadores = List.of(corrida, publicador.observadorDe(id));
-        MotorSimulacion motor = fabrica.crear(datos, configuracion, parametros, planificador, observadores);
+        MotorSimulacion motor = siguientes != null
+                ? fabrica.crearAbierto(datos, configuracion, parametros, planificador, observadores, siguientes)
+                : fabrica.crear(datos, configuracion, parametros, planificador, observadores);
         corrida.motor(motor);
 
         corridas.put(id, corrida);
@@ -387,7 +404,9 @@ public class ServicioSimulacion {
         EstadoSimulacion mundo = corrida.motor() == null ? null : corrida.motor().estado();
 
         List<FilaPedido> filtradas = new ArrayList<>();
-        for (Pedido pedido : corrida.datos().pedidos()) {
+        List<Pedido> conocidos = corrida.motor() == null ? corrida.datos().pedidos()
+                : corrida.motor().pedidosConocidos();
+        for (Pedido pedido : conocidos) {
             if (pedido.minutoRegistro() > minuto) {
                 continue;
             }
@@ -514,7 +533,7 @@ public class ServicioSimulacion {
             throw new SolicitudInvalida("El archivo de averias esta vacio");
         }
         AnalizadorAverias analizador = new AnalizadorAverias(corrida.datos().calendario(),
-                YearMonth.from(corrida.datos().primerDia()), corrida.datos().minutoFin());
+                YearMonth.from(corrida.datos().primerDia()), corrida.motor().minutoFin());
         AnalizadorAverias.Lectura lectura;
         try {
             lectura = analizador.analizar(contenido, nombreArchivo, codigosDeFlota(corrida));
@@ -589,6 +608,12 @@ public class ServicioSimulacion {
         }
         ConfiguracionEscenario configuracion = corrida.configuracion();
         ResultadoSimulacion resultado = corrida.resultado();
+        MotorSimulacion motor = corrida.motor();
+        List<String> avisos = corrida.datos().avisos();
+        if (motor != null && motor.abierto()) {
+            avisos = new ArrayList<>(avisos);
+            avisos.addAll(motor.avisosDeCarga());
+        }
         long milisegundos = resultado != null ? resultado.milisegundosReales()
                 : instantanea == null ? 0L : instantanea.milisegundosReales();
         return new ResumenCorrida(corrida.id(), configuracion.tipo(), configuracion.algoritmo(),
@@ -596,12 +621,13 @@ public class ServicioSimulacion {
                 corrida.duracionMinutosReales(), configuracion.saltoMinutos(),
                 configuracion.factorAceleracion(), configuracion.minutosEntreFotografias(),
                 configuracion.semilla(), instantanea == null ? 0L : instantanea.minutoSimulado(),
-                corrida.datos().minutoFin(),
+                motor == null ? corrida.datos().minutoFin() : motor.horizonteCargado(),
                 instantanea == null ? corrida.datos().calendario().inicio() : instantanea.fechaHoraSimulada(),
-                milisegundos, corrida.datos().pedidos().size(), corrida.datos().unidades().size(),
+                milisegundos, motor == null ? corrida.datos().pedidos().size() : motor.estado().cantidadPedidos(),
+                corrida.datos().unidades().size(),
                 activas, instantanea == null ? 0 : instantanea.metricas().unidadesEntregadas(),
                 fabrica.descripcion(), corrida.error(),
-                corrida.datos().avisos());
+                avisos);
     }
 
     /**
@@ -711,6 +737,20 @@ public class ServicioSimulacion {
                 i++;
             }
         }
+    }
+
+    /**
+     * Factor K de la corrida. En el colapso el reloj es libre y K solo fija el presupuesto de
+     * cada busqueda, de modo que es constante: si dependiese del rango o de la duracion, la
+     * fecha de fin elegida cambiaria la calidad del planificador y con ella el instante de
+     * colapso.
+     */
+    static double factorAceleracion(TipoEscenario tipo, int dias, int duracionMinutosReales) {
+        return switch (tipo) {
+            case DIA_A_DIA -> 1.0;
+            case COLAPSO -> ConfiguracionEscenario.FACTOR_COLAPSO;
+            case SIMULACION_5D -> (double) dias * 1440.0 / duracionMinutosReales;
+        };
     }
 
     private static int valorPositivo(Integer valor, int porDefecto, String que) {

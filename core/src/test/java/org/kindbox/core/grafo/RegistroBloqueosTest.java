@@ -46,10 +46,60 @@ class RegistroBloqueosTest {
         assertTrue(mascara[RegistroBloqueos.aristaEntre(a, b)]);
         assertTrue(mascara[RegistroBloqueos.aristaEntre(b, a)]);
         assertTrue(mascara[RegistroBloqueos.aristaInversa(RegistroBloqueos.aristaEntre(a, b))]);
-        // Las calles vecinas siguen abiertas: el bloqueo no aisla el nodo.
-        assertFalse(registro.bloqueada(a, nodo(10, 11), 150));
-        assertFalse(registro.bloqueada(b, nodo(12, 10), 150));
+        // Cada extremo conserva solo su calle de acceso, la que prolonga la poligonal: el
+        // nodo no queda aislado, pero tampoco puede atravesarse por las calles laterales.
+        assertFalse(registro.bloqueada(a, nodo(9, 10), 150), "acceso de (10,10)");
+        assertFalse(registro.bloqueada(b, nodo(12, 10), 150), "acceso de (11,10)");
+        assertTrue(registro.bloqueada(a, nodo(10, 11), 150), "calle lateral de un nodo bloqueado");
+        assertTrue(registro.bloqueada(b, nodo(11, 9), 150), "calle lateral de un nodo bloqueado");
     }
+
+    /** Camino minimo entre dos nodos con los bloqueos vigentes en el instante dado. */
+    private static int[] camino(RegistroBloqueos registro, long minuto, int desde, int hasta) {
+        OraculoDistancias oraculo = new OraculoDistancias();
+        int[] distancia = new int[Ciudad.TOTAL_NODOS];
+        int[] predecesor = new int[Ciudad.TOTAL_NODOS];
+        oraculo.distanciasDesde(desde, registro.mascaraBloqueada(minuto), distancia, predecesor);
+        return oraculo.caminoDesdePredecesores(predecesor, desde, hasta);
+    }
+
+    private static boolean pasaPor(int[] camino, int nodo) {
+        for (int k = 1; k < camino.length - 1; k++) {
+            if (camino[k] == nodo) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Test
+    @DisplayName("Ninguna ruta cruza un bloqueo de costado, ni por un nodo interno ni por un extremo")
+    void noSeCruzaPerpendicularmente() {
+        // Bloqueo horizontal de (10,5) a (14,5).
+        RegistroBloqueos registro = new RegistroBloqueos(List.of(tramo(10, 5, 14, 5, 0, 100)));
+        for (int x = 10; x <= 14; x++) {
+            int[] c = camino(registro, 50, nodo(x, 4), nodo(x, 6));
+            assertTrue(c.length - 1 > 2, "cruzar recto por (" + x + ",5) costaria 2 km");
+            for (int k = 10; k <= 14; k++) {
+                assertFalse(pasaPor(c, nodo(k, 5)), "el camino atraviesa el nodo bloqueado (" + k + ",5)");
+            }
+        }
+        // Fuera de la vigencia se vuelve a cruzar recto.
+        assertEquals(3, camino(registro, 150, nodo(12, 4), nodo(12, 6)).length);
+    }
+
+    @Test
+    @DisplayName("A un destino sobre un bloqueo se llega y se sale por la misma calle, en U")
+    void destinoEnUnNodoBloqueado() {
+        RegistroBloqueos registro = new RegistroBloqueos(List.of(tramo(10, 5, 14, 5, 0, 100)));
+        int destino = nodo(12, 5);
+        int[] ida = camino(registro, 50, nodo(12, 8), destino);
+        assertEquals(4, ida.length, "se llega por su calle de acceso, la del norte");
+        int[] vuelta = camino(registro, 50, destino, nodo(12, 2));
+        assertTrue(vuelta.length > 1, "el destino no queda aislado");
+        assertEquals(ida[ida.length - 2], vuelta[1], "se sale por la misma calle por la que se entro");
+    }
+
 
     @Test
     @DisplayName("La ventana de vigencia es cerrada por la izquierda y abierta por la derecha")

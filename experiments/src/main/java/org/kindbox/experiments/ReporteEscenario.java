@@ -12,8 +12,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.Supplier;
 import org.kindbox.core.evaluacion.Programacion;
 import org.kindbox.core.evaluacion.ProgramadorRuta;
+import org.kindbox.core.io.FuenteTramos;
 import org.kindbox.core.io.RepositorioDatos.DatosEscenario;
 import org.kindbox.core.metaheuristica.ResultadoPlanificacion;
 import org.kindbox.core.modelo.Ciudad;
@@ -24,6 +26,7 @@ import org.kindbox.core.problema.Ruta;
 import org.kindbox.core.problema.Solucion;
 import org.kindbox.core.problema.TipoParada;
 import org.kindbox.core.simulacion.ConfiguracionEscenario;
+import org.kindbox.core.simulacion.MotorSimulacion;
 import org.kindbox.core.simulacion.ObservadorSimulacion;
 import org.kindbox.core.simulacion.ResultadoSimulacion;
 
@@ -38,16 +41,40 @@ public final class ReporteEscenario implements ObservadorSimulacion, AutoCloseab
             ConfiguracionEscenario configuracion,
             org.kindbox.core.modelo.ParametrosOperacion parametros,
             org.kindbox.core.metaheuristica.Algoritmo algoritmo) throws IOException {
+        return ejecutar(datos, configuracion, parametros, algoritmo, null);
+    }
+
+    /**
+     * Como {@link #ejecutar(DatosEscenario, ConfiguracionEscenario,
+     * org.kindbox.core.modelo.ParametrosOperacion, org.kindbox.core.metaheuristica.Algoritmo)},
+     * pero con {@code siguientes} no nula corre el escenario abierto: arranca con el mes de
+     * {@code datos} y el motor pide los siguientes a medida que avanza.
+     */
+    public static ResultadoSimulacion ejecutar(DatosEscenario datos,
+            ConfiguracionEscenario configuracion,
+            org.kindbox.core.modelo.ParametrosOperacion parametros,
+            org.kindbox.core.metaheuristica.Algoritmo algoritmo,
+            FuenteTramos siguientes) throws IOException {
         if (!Boolean.parseBoolean(System.getProperty("reporte.habilitado", "true"))) {
-            return new org.kindbox.core.simulacion.MotorSimulacion(
-                    datos, configuracion, parametros, algoritmo, List.of()).ejecutar();
+            return motor(datos, configuracion, parametros, algoritmo, List.of(), siguientes).ejecutar();
         }
         try (ReporteEscenario reporte = crear(datos, configuracion)) {
-            ResultadoSimulacion resultado = new org.kindbox.core.simulacion.MotorSimulacion(
-                    datos, configuracion, parametros, algoritmo, List.of(reporte)).ejecutar();
+            MotorSimulacion motor = motor(datos, configuracion, parametros, algoritmo, List.of(reporte), siguientes);
+            // Los pedidos de los meses que el motor carga despues no estan en datos.
+            reporte.pedidosConocidos = motor::pedidosConocidos;
+            ResultadoSimulacion resultado = motor.ejecutar();
             reporte.generarReporte(resultado);
             return resultado;
         }
+    }
+
+    private static MotorSimulacion motor(DatosEscenario datos, ConfiguracionEscenario configuracion,
+            org.kindbox.core.modelo.ParametrosOperacion parametros,
+            org.kindbox.core.metaheuristica.Algoritmo algoritmo,
+            List<ObservadorSimulacion> observadores, FuenteTramos siguientes) {
+        return siguientes == null
+                ? new MotorSimulacion(datos, configuracion, parametros, algoritmo, observadores)
+                : new MotorSimulacion(datos, configuracion, parametros, algoritmo, observadores, siguientes);
     }
     private static final class Seguimiento {
         final Pedido pedido;
@@ -76,6 +103,8 @@ public final class ReporteEscenario implements ObservadorSimulacion, AutoCloseab
     private long paquetes;
     private boolean finalizado;
     private RuntimeException falloObservador;
+    /** Pedidos que conoce el motor, para seguir los de los meses que carga despues de arrancar. */
+    private Supplier<List<Pedido>> pedidosConocidos;
 
     /** Directorio nuevo por corrida, dentro de -Dreporte.directorio=reportes. */
     public static ReporteEscenario crear(DatosEscenario datos, ConfiguracionEscenario configuracion)
@@ -195,7 +224,7 @@ public final class ReporteEscenario implements ObservadorSimulacion, AutoCloseab
         log("BANCO (cantidad sin asignar por pedido): " + plan.cantidadNoAtendida());
         for (int p = 0; p < instancia.cantidadPedidos(); p++) {
             int id = instancia.pedidoId(p);
-            Seguimiento s = seguimiento.get(id);
+            Seguimiento s = seguir(id);
             int banco = plan.cantidadNoAtendida().getOrDefault(id, 0);
             int cantidad = asignado.getOrDefault(id, 0);
             String unidades = vehiculos.getOrDefault(id, List.of()).stream().distinct().sorted()
@@ -254,7 +283,7 @@ public final class ReporteEscenario implements ObservadorSimulacion, AutoCloseab
     @Override
     public void alDescargarPedido(long minuto, int id, String unidad, int cantidad, int pendiente) {
         paquetes += cantidad;
-        Seguimiento s = seguimiento.get(id);
+        Seguimiento s = seguir(id);
         if (s != null) {
             s.entregado += cantidad;
             historia(s, minuto, "DESCARGA_REAL vehiculo=" + unidad + " cantidad=" + cantidad
@@ -267,7 +296,7 @@ public final class ReporteEscenario implements ObservadorSimulacion, AutoCloseab
     public void alEntregarPedido(long minuto, int id, String unidad, int cantidad,
                                   long desdeRegistro, int plazoHoras) {
         completados++;
-        Seguimiento s = seguimiento.get(id);
+        Seguimiento s = seguir(id);
         if (s != null) s.completadoEn = minuto;
         // No sumar cantidad: las descargas ya se registraron por separado.
         evento(minuto, "PEDIDO_COMPLETADO", id, unidad, cantidad, 0,
@@ -277,7 +306,7 @@ public final class ReporteEscenario implements ObservadorSimulacion, AutoCloseab
     @Override
     public void alIncumplirPedido(long minuto, int id, int restante) {
         incumplidos++;
-        Seguimiento s = seguimiento.get(id);
+        Seguimiento s = seguir(id);
         if (s != null) {
             s.incumplido = true;
             historia(s, minuto, "INCUMPLIMIENTO restante=" + restante);
@@ -410,6 +439,21 @@ public final class ReporteEscenario implements ObservadorSimulacion, AutoCloseab
         return new PrintWriter(Files.newBufferedWriter(directorio.resolve(nombre), StandardCharsets.UTF_8,
                 java.nio.file.StandardOpenOption.CREATE_NEW, java.nio.file.StandardOpenOption.WRITE));
     }
+    /**
+     * Seguimiento del pedido. Si el pedido llego en un mes cargado despues de arrancar, se
+     * incorporan los pedidos nuevos que conoce el motor antes de buscarlo otra vez.
+     */
+    private Seguimiento seguir(int id) {
+        Seguimiento s = seguimiento.get(id);
+        if (s == null && pedidosConocidos != null) {
+            for (Pedido pedido : pedidosConocidos.get()) {
+                seguimiento.putIfAbsent(pedido.id(), new Seguimiento(pedido));
+            }
+            s = seguimiento.get(id);
+        }
+        return s;
+    }
+
     private String instante(long minuto) { return datos.calendario().aFecha(minuto).toString(); }
     private void historia(Seguimiento s, long minuto, String detalle) {
         s.historia.append("min=").append(minuto).append(" ").append(instante(minuto))
