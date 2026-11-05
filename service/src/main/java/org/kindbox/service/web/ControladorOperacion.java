@@ -8,6 +8,7 @@ import org.kindbox.core.operacion.VistaOperacion;
 import org.kindbox.core.simulacion.EnviosAlmacen;
 import org.kindbox.core.simulacion.MetricasSimulacion;
 import org.kindbox.service.dto.PaginaPedidosOperacion;
+import org.kindbox.service.dto.ReportePlan;
 import org.kindbox.service.dto.RutasPedido;
 import org.kindbox.service.dto.SolicitudOperacion;
 import org.kindbox.service.operacion.ServicioOperacion;
@@ -71,6 +72,12 @@ public class ControladorOperacion {
             @RequestParam(name = "busqueda", required = false) String busqueda,
             @RequestParam(name = "soloActivos", defaultValue = "false") boolean soloActivos) {
         return servicio.pedidos(id, pagina, tamano, busqueda, soloActivos);
+    }
+
+    // Ultimo plan comprometido; detenida la operacion es el reporte de su cierre.
+    @GetMapping("/{id}/plan")
+    public ReportePlan plan(@PathVariable("id") String id) {
+        return servicio.reportePlan(id);
     }
 
     // En transito, salidas de las proximas horas y entregas de las ultimas horas de un almacen.

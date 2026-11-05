@@ -359,6 +359,15 @@ Cada lista trae su total de paquetes. `horas` va de 1 a 24, porque el motor guar
 ultimo dia simulado; por defecto es 4. Un almacen que no existe responde 404 y una ventana fuera de
 rango, 400.
 
+`GET /api/simulaciones/{id}/plan` y `GET /api/operaciones/{id}/plan` devuelven el reporte de la
+ultima planificacion estable, que es el ultimo plan que el motor comprometio. Trae `escenario`,
+`estado`, `terminado`, `fechaHora`, las `metricas` y el `plan`. El plan trae minuto y fecha,
+`algoritmo`, `kilometros`, `costo`, `paquetesPlanificados`, `sinAsignar` (paquetes que quedaron sin
+unidad, por pedido) y `rutas`. Cada ruta lleva sus `paradas` con tipo, coordenadas, pedido o
+almacen, cantidad, y llegada y salida comprometidas. Al terminar una simulacion 5D o de colapso, o
+al detener la operacion diaria, `terminado` es verdadero y el plan es el que estaba vigente al
+cierre. Antes de la primera planificacion, `plan` viene nulo.
+
 La flota se edita con `PUT /api/parametros/flota`, con cuerpo
 `{"unidades":{"AUTO":{"cantidad":10,"kmPorHora":40},...}}`; en cada tipo la cantidad (0 a 99) y
 la velocidad son opcionales. Se valida todo antes de aplicar: la velocidad cambia en caliente y

@@ -29,6 +29,7 @@ La agenda se extiende al cruzar la fecha y cubre tres dias futuros. Conserva ser
 | GET | `/api/operaciones/{id}/comandos/{comandoId}` | Estado de aceptacion, aplicacion o rechazo |
 | GET | `/api/operaciones/{id}/pedidos` | Pedidos paginados del registro vivo |
 | GET | `/api/operaciones/{id}/pedidos/{pedido}/rutas` | Camino de cada unidad que lleva el pedido hasta su entrega |
+| GET | `/api/operaciones/{id}/plan` | Reporte de la ultima planificacion estable; tras detener, la del cierre |
 | GET | `/api/operaciones/{id}/almacenes/{almacen}/envios` | Envios en transito, por salir y entregados del almacen en `horas` (1 a 24, por defecto 4) |
 | GET | `/api/operaciones/{id}/metricas` | Indicadores acumulados |
 | POST | `/api/operaciones/{id}/averias` | 202 con el comando de averia |

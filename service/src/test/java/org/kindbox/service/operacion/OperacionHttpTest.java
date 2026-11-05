@@ -134,6 +134,17 @@ class OperacionHttpTest {
                 .andExpect(status().isBadRequest());
     }
 
+    @Test void elReporteDelPlanSigueDisponibleAlDetener() throws Exception {
+        String id = iniciar();
+        mvc.perform(get("/api/operaciones/{id}/plan", id)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.escenario").value("OPERACION_DIARIA"))
+                .andExpect(jsonPath("$.terminado").value(false));
+        mvc.perform(post("/api/operaciones/{id}/detener", id)).andExpect(status().isOk());
+        mvc.perform(get("/api/operaciones/{id}/plan", id)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.estado").value("DETENIDA")).andExpect(jsonPath("$.terminado").value(true));
+        mvc.perform(get("/api/operaciones/{id}/plan", "no-existe")).andExpect(status().isNotFound());
+    }
+
     @Test void validacionYConflictosTienenRespuestaEstable() throws Exception {
         String id = iniciar();
         mvc.perform(post("/api/operaciones")).andExpect(status().isConflict());

@@ -24,6 +24,7 @@ import org.kindbox.core.simulacion.EnvioPedido;
 import org.kindbox.core.simulacion.EnviosAlmacen;
 import org.kindbox.core.simulacion.VistaAlmacen;
 import org.kindbox.service.dto.PaginaPedidosOperacion;
+import org.kindbox.service.dto.ReportePlan;
 import org.kindbox.service.dto.RutasPedido;
 import org.kindbox.service.dto.SolicitudOperacion;
 import org.kindbox.service.error.ConflictoDeEstado;
@@ -163,6 +164,15 @@ public class ServicioOperacion implements AutoCloseable {
         int hasta = Math.min(desde + tamano, filas.size());
         return new PaginaPedidosOperacion(id, vista.revision(), filas.subList(desde, hasta), pagina, tamano,
                 filas.size(), (filas.size() + tamano - 1) / tamano);
+    }
+
+    // Al detener la operacion, el plan que devuelve es el de su cierre.
+    public synchronized ReportePlan reportePlan(String id) {
+        MotorOperacion motor = requerir(id);
+        VistaOperacion vista = motor.vista();
+        return new ReportePlan(id, "OPERACION_DIARIA", vista.estado().name(),
+                vista.estado() != VistaOperacion.Estado.EN_CURSO, vista.fechaHoraOperativa(), motor.ultimoPlan(),
+                vista.instantanea().metricas());
     }
 
     public synchronized EnviosAlmacen enviosAlmacen(String id, int idAlmacen, Integer horas) {

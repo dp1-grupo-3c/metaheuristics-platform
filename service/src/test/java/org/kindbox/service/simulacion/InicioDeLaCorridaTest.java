@@ -78,6 +78,7 @@ class InicioDeLaCorridaTest {
             assertEquals(630L, resumen.minutoInicial());
             assertEquals(630L + 5 * 1440L, resumen.minutosHorizonte(), "el cierre se corre con el arranque");
             assertTrue(resumen.avance() < 0.01, "recien arrancada el avance es casi cero: " + resumen.avance());
+            assertEquals("SIMULACION_5D", servicio.reportePlan(resumen.id()).escenario());
         } finally {
             servicio.cancelar(resumen.id());
         }

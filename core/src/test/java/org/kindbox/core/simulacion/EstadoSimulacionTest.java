@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.kindbox.core.grafo.RegistroBloqueos;
@@ -18,6 +19,7 @@ import org.kindbox.core.modelo.ParametrosOperacion;
 import org.kindbox.core.modelo.UnidadTransporte;
 import org.kindbox.core.problema.Parada;
 import org.kindbox.core.problema.Ruta;
+import org.kindbox.core.problema.TipoParada;
 
 /**
  * Contabilidad de pedidos y de kilometros del estado del mundo simulado.
@@ -230,5 +232,31 @@ class EstadoSimulacionTest {
         estado.anotarEntrega(2000L, 4, "TA01", 0, 4);
         assertEquals(List.of(2, 3, 4), estado.entregasRecientes().stream().map(EntregaRegistrada::idPedido).toList());
         assertEquals(LocalDate.of(2026, 9, 2).atTime(9, 20), estado.entregasRecientes().get(2).fechaHora());
+    }
+
+    @Test
+    @DisplayName("El plan vigente recoge la ruta comprometida de cada unidad y lo que quedo sin asignar")
+    void elPlanVigenteRecogeLasRutasComprometidas() {
+        EstadoSimulacion estado = estadoCon(List.of(pedido(1, 5, 0L, 36), pedido(2, 9, 0L, 36),
+                pedido(3, 7, 0L, 36), pedido(4, 8, 0L, 36)));
+        autoConRecargas(estado);
+
+        PlanVigente plan = PlanVigente.de(0L, CalendarioEscenario.desde(DIA), "PRUEBA", estado.unidades(),
+                Map.of(9, 3));
+        assertEquals(1, plan.rutas().size(), "solo el auto tiene itinerario");
+        PlanVigente.RutaPlan ruta = plan.rutas().get(0);
+        assertEquals("TA01", ruta.codigoUnidad());
+        assertEquals(7, ruta.paradas().size());
+        assertEquals(List.of(0L, 61L, 62L, 123L, 184L, 245L, 246L),
+                ruta.paradas().stream().map(PlanVigente.ParadaPlan::minutoLlegada).toList());
+        PlanVigente.ParadaPlan recarga = ruta.paradas().get(1);
+        assertEquals(TipoParada.ABASTECIMIENTO, recarga.tipo());
+        assertEquals(2, recarga.idAlmacen());
+        assertEquals(List.of(11, 10), List.of(recarga.x(), recarga.y()));
+        assertEquals(DIA.atTime(1, 1), recarga.fechaHoraLlegada());
+        assertEquals(29, plan.paquetesPlanificados(), "5 + 9 + 7 + 8");
+        assertEquals(5, plan.kilometros());
+        assertEquals(Map.of(9, 3), plan.sinAsignar());
+        assertEquals("PRUEBA", plan.algoritmo());
     }
 }

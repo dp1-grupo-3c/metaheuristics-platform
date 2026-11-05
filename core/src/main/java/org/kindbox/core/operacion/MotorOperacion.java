@@ -25,6 +25,7 @@ import org.kindbox.core.problema.InstanciaPlanificacion;
 import org.kindbox.core.simulacion.ConfiguracionEscenario;
 import org.kindbox.core.simulacion.EntregaRegistrada;
 import org.kindbox.core.simulacion.EnvioPedido;
+import org.kindbox.core.simulacion.PlanVigente;
 import org.kindbox.core.simulacion.ModoReloj;
 import org.kindbox.core.simulacion.MotorEjecucion;
 import org.kindbox.core.simulacion.ObservadorSimulacion;
@@ -118,6 +119,10 @@ public final class MotorOperacion implements AutoCloseable, ObservadorSimulacion
     }
 
     public VistaOperacion vista() { return vista; }
+
+    public PlanVigente ultimoPlan() {
+        return ejecucion.ultimoPlan();
+    }
 
     public List<EntregaRegistrada> entregasRecientes() {
         return ejecucion.entregasRecientes();

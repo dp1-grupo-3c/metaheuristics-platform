@@ -190,6 +190,12 @@ class MotorOperacionTest {
             var unidad = vista.instantanea().unidades().stream()
                     .filter(u -> u.codigo().equals(envios.getFirst().codigoUnidad())).findFirst().orElseThrow();
             assertTrue(unidad.pedidosABordo().stream().anyMatch(p -> p.idPedido() == pedido.id()));
+            var plan = motor.ultimoPlan();
+            assertNotNull(plan);
+            assertTrue(plan.rutas().stream().flatMap(r -> r.paradas().stream()).anyMatch(p -> p.idPedido() == pedido.id()),
+                    "el plan vigente incluye el pedido");
+            motor.close();
+            assertEquals(plan, motor.ultimoPlan(), "al cerrar la operacion queda su ultimo plan");
         }
     }
 

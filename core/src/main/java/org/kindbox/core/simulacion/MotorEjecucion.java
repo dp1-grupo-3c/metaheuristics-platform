@@ -73,6 +73,8 @@ public class MotorEjecucion {
     private final long minutoFin;
     // Minuto en que arranca el reloj de la simulacion; la operacion usa el de su arranque.
     private final long minutoInicial;
+    // Ultimo plan comprometido, que es el reporte de la ultima planificacion estable.
+    private volatile PlanVigente ultimoPlan;
     private final boolean operacion;
     /** Fuente de los meses siguientes en el escenario abierto; nula en los de horizonte fijo. */
     private final FuenteTramos fuenteTramos;
@@ -396,6 +398,10 @@ public class MotorEjecucion {
      * Pedidos conocidos, hayan llegado o no. Se copian bajo el candado porque el escenario
      * abierto amplia la lista mientras corre.
      */
+    public PlanVigente ultimoPlan() {
+        return ultimoPlan;
+    }
+
     // Entregas de las ultimas 24 horas simuladas, leidas bajo el candado del motor.
     public List<EntregaRegistrada> entregasRecientes() {
         candado.lock();
@@ -1413,6 +1419,8 @@ public class MotorEjecucion {
             }
             comprometerUnidad(u, i, fotografia, ruta);
         }
+        ultimoPlan = PlanVigente.de(minutoActual, calendario, algoritmo.nombre(), estado.unidades(),
+                solucion.cantidadNoAtendida());
     }
 
     private void comprometerUnidad(UnidadEnCurso u, int indiceEnInstancia, Fotografia fotografia, Ruta ruta) {

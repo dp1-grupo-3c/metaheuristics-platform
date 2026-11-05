@@ -44,6 +44,7 @@ import org.kindbox.core.simulacion.MetricasSimulacion;
 import org.kindbox.core.simulacion.ModoReloj;
 import org.kindbox.core.simulacion.MotorSimulacion;
 import org.kindbox.core.simulacion.ObservadorSimulacion;
+import org.kindbox.core.simulacion.PlanVigente;
 import org.kindbox.core.simulacion.ResultadoSimulacion;
 import org.kindbox.core.simulacion.RutaEnvio;
 import org.kindbox.core.simulacion.TipoEscenario;
@@ -54,6 +55,7 @@ import org.kindbox.service.dto.DetalleCorrida;
 import org.kindbox.service.dto.FilaPedido;
 import org.kindbox.service.dto.MensajeVisualizador;
 import org.kindbox.service.dto.PaginaPedidos;
+import org.kindbox.service.dto.ReportePlan;
 import org.kindbox.service.dto.RespuestaAveria;
 import org.kindbox.service.dto.ResultadoCargaAverias;
 import org.kindbox.service.dto.ResumenCorrida;
@@ -457,6 +459,16 @@ public class ServicioSimulacion {
         int hasta = Math.min(desde + filasPorPagina, total);
         return new PaginaPedidos(filtradas.subList(desde, hasta), numeroPagina, filasPorPagina,
                 total, totalPaginas, filtro, soloActivos);
+    }
+
+    // Al terminar la corrida, el plan que devuelve es el reporte de su ultima planificacion estable.
+    public ReportePlan reportePlan(String id) {
+        Corrida corrida = requerir(id);
+        InstantaneaSimulacion foto = corrida.instantanea();
+        PlanVigente plan = corrida.motor() == null ? null : corrida.motor().ultimoPlan();
+        return new ReportePlan(id, corrida.configuracion().tipo().name(), corrida.estado().name(), !corrida.enCurso(),
+                foto == null ? corrida.configuracion().fechaHoraInicio() : foto.fechaHoraSimulada(), plan,
+                foto == null ? null : foto.metricas());
     }
 
     // Envios del almacen segun la ultima fotografia y entregas de las ultimas horas.

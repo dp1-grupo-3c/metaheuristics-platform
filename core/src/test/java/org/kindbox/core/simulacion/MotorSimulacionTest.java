@@ -352,6 +352,17 @@ class MotorSimulacionTest {
         assertTrue(fases.getOrDefault(VistaUnidad.Fase.LLEGANDO, 0) > 0, "ninguna unidad en camino: " + fases);
         assertTrue(fases.getOrDefault(VistaUnidad.Fase.SALIENDO, 0) > 0, "ninguna unidad por salir: " + fases);
         assertTrue(enMarchaAlReplanificar[0] > 0, "ninguna replanificacion encontro unidades en marcha");
+        PlanVigente plan = motor.ultimoPlan();
+        assertNotNull(plan, "la corrida deja su ultimo plan");
+        assertEquals(java.util.Collections.max(replanificaciones), plan.minuto(), "es el de la ultima replanificacion");
+        for (PlanVigente.RutaPlan ruta : plan.rutas()) {
+            long anterior = Long.MIN_VALUE;
+            for (PlanVigente.ParadaPlan parada : ruta.paradas()) {
+                assertTrue(parada.minutoLlegada() >= anterior && parada.minutoSalida() >= parada.minutoLlegada(),
+                        ruta.codigoUnidad() + " tiene horarios desordenados");
+                anterior = parada.minutoSalida();
+            }
+        }
         assertTrue(errores.isEmpty(), errores.size() + " incoherencias: " + errores.subList(0, Math.min(5, errores.size())));
     }
 

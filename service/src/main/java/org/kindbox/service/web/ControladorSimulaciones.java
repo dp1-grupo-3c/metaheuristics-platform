@@ -8,6 +8,7 @@ import org.kindbox.core.simulacion.MetricasSimulacion;
 import org.kindbox.core.simulacion.ResultadoSimulacion;
 import org.kindbox.service.dto.DetalleCorrida;
 import org.kindbox.service.dto.PaginaPedidos;
+import org.kindbox.service.dto.ReportePlan;
 import org.kindbox.service.dto.RespuestaAveria;
 import org.kindbox.service.dto.ResultadoCargaAverias;
 import org.kindbox.service.dto.ResumenCorrida;
@@ -102,6 +103,12 @@ public class ControladorSimulaciones {
                                  @RequestParam(name = "tamano", required = false) Integer tamano,
                                  @RequestParam(name = "soloActivos", defaultValue = "true") boolean soloActivos) {
         return servicio.pedidos(id, busqueda, pagina, tamano, soloActivos);
+    }
+
+    // Ultimo plan comprometido; terminada la corrida es el reporte de su ultima planificacion estable.
+    @GetMapping("/{id}/plan")
+    public ReportePlan plan(@PathVariable("id") String id) {
+        return servicio.reportePlan(id);
     }
 
     // En transito, salidas de las proximas horas y entregas de las ultimas horas de un almacen.
