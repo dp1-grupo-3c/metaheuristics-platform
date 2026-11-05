@@ -12,6 +12,7 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -288,6 +289,68 @@ class MotorSimulacionTest {
         assertTrue(errores.isEmpty(), "fotografias incoherentes: " + errores.subList(0, Math.min(5, errores.size())));
     }
 
+    @Test
+    @DisplayName("Los tiempos del tramo y el almacen de origen de cada unidad son coherentes en toda la corrida")
+    void losTiemposDelTramoSonCoherentes(@TempDir Path raiz) throws IOException {
+        // Salto corto y mas pedidos para que haya replanificaciones con unidades en marcha.
+        ConfiguracionEscenario configuracion = new ConfiguracionEscenario(TipoEscenario.DIA_A_DIA, PRIMER_DIA,
+                PRIMER_DIA, 30, FACTOR_LIBRE, ModoReloj.LIBRE, BusquedaAdaptativaVecindadAmplia.NOMBRE, SEMILLA,
+                1, false, 0.0, false);
+        MotorSimulacion motor = new MotorSimulacion(escenario(raiz, PRIMER_DIA, 40.0),
+                configuracion, new ParametrosOperacion(), new PlanificadorConstructivo(), List.of());
+        List<String> errores = new ArrayList<>();
+        Map<String, VistaUnidad> anteriores = new HashMap<>();
+        Map<VistaUnidad.Fase, Integer> fases = new HashMap<>();
+        Set<Long> replanificaciones = new HashSet<>();
+        int[] enMarchaAlReplanificar = new int[1];
+        motor.agregarObservador(new ObservadorSimulacion() {
+            @Override
+            public void alReplanificar(long minutoSimulado, String algoritmo, int pedidosPendientes,
+                                       int pedidosNoAtendidos, double costo, long milisegundos) {
+                replanificaciones.add(minutoSimulado);
+            }
+
+            @Override
+            public void alTomarFotografia(InstantaneaSimulacion foto) {
+                long ahora = foto.minutoSimulado();
+                for (VistaUnidad u : foto.unidades()) {
+                    if (replanificaciones.contains(ahora) && u.fase() == VistaUnidad.Fase.LLEGANDO) {
+                        enMarchaAlReplanificar[0]++;
+                    }
+                    fases.merge(u.fase(), 1, Integer::sum);
+                    long salida = u.minutoSalidaTramo();
+                    long llegada = u.minutoLlegadaTramo();
+                    boolean bien = switch (u.fase()) {
+                        case SIN_RUTA -> salida == -1L && llegada == -1L;
+                        case LLEGANDO -> salida >= 0 && salida <= ahora && llegada >= ahora;
+                        case SALIENDO -> salida >= ahora && (llegada == -1L || llegada >= salida);
+                    };
+                    if (!bien) {
+                        errores.add(u.codigo() + " " + u.fase() + " " + salida + "-" + llegada + " en " + ahora);
+                    }
+                    if (u.cargaABordo() > 0 && (u.idAlmacenOrigen() < 0 || u.minutoSalidaAlmacen() < 0)) {
+                        errores.add(u.codigo() + " lleva carga sin almacen de origen en " + ahora);
+                    }
+                    VistaUnidad previa = anteriores.put(u.codigo(), u);
+                    // Si sigue en marcha, la salida solo cambia al partir de la parada a la que iba.
+                    if (previa != null && previa.fase() == VistaUnidad.Fase.LLEGANDO
+                            && u.fase() == VistaUnidad.Fase.LLEGANDO && previa.minutoSalidaTramo() != salida
+                            && (u.x() != previa.destinoX() || u.y() != previa.destinoY())) {
+                        errores.add(u.codigo() + " cambio su salida en marcha en " + ahora);
+                    }
+                }
+            }
+        });
+
+        ResultadoSimulacion resultado = motor.ejecutar();
+
+        assertEquals(EstadoCorrida.CULMINADA, resultado.estado(), resultado.mensaje());
+        assertTrue(fases.getOrDefault(VistaUnidad.Fase.LLEGANDO, 0) > 0, "ninguna unidad en camino: " + fases);
+        assertTrue(fases.getOrDefault(VistaUnidad.Fase.SALIENDO, 0) > 0, "ninguna unidad por salir: " + fases);
+        assertTrue(enMarchaAlReplanificar[0] > 0, "ninguna replanificacion encontro unidades en marcha");
+        assertTrue(errores.isEmpty(), errores.size() + " incoherencias: " + errores.subList(0, Math.min(5, errores.size())));
+    }
+
     // -------------------------------------------------------------- escenario
 
     /**
@@ -295,8 +358,13 @@ class MotorSimulacionTest {
      * {@code datagen} y lo carga con el repositorio, igual que una corrida real.
      */
     private static RepositorioDatos.DatosEscenario escenario(Path raiz, LocalDate ultimoDia) throws IOException {
+        return escenario(raiz, ultimoDia, PEDIDOS_POR_DIA);
+    }
+
+    private static RepositorioDatos.DatosEscenario escenario(Path raiz, LocalDate ultimoDia, double pedidosPorDia)
+            throws IOException {
         YearMonth mes = YearMonth.from(PRIMER_DIA);
-        new GeneradorVentas(PerfilDemanda.LIGERO.conPedidosPorDiaInicial(PEDIDOS_POR_DIA), mes)
+        new GeneradorVentas(PerfilDemanda.LIGERO.conPedidosPorDiaInicial(pedidosPorDia), mes)
                 .escribirMes(mes, raiz.resolve(RepositorioDatos.DIRECTORIO_VENTAS));
         new GeneradorBloqueos(SEMILLA, 1.0)
                 .escribirMes(mes, raiz.resolve(RepositorioDatos.DIRECTORIO_BLOQUEOS));

@@ -65,6 +65,9 @@ public final class UnidadEnCurso {
     private int indiceParada = SIN_PARADA;
     private boolean sirviendo;
     private long minutoSalidaTramo;
+    private long minutoUltimaSalida = -1L;
+    private int idAlmacenOrigen = -1;
+    private long minutoSalidaAlmacen = -1L;
     /** Velocidad con que se comprometio el itinerario; un cambio se aplica al replanificar. */
     private ParametrosOperacion.Instantanea parametrosMovimiento = new ParametrosOperacion().instantanea();
     private long minutoFinServicioHeredado = Long.MIN_VALUE;
@@ -132,6 +135,7 @@ public final class UnidadEnCurso {
         this.sirviendo = false;
         this.minutoFinServicioHeredado = Long.MIN_VALUE;
         this.indiceCobrado = 0;
+        this.minutoUltimaSalida = this.indiceParada == SIN_PARADA ? -1L : minutoSalidaTramo;
     }
 
     /** Asigna un itinerario capturando los parametros usados para programar sus llegadas. */
@@ -153,6 +157,7 @@ public final class UnidadEnCurso {
         this.indiceParada = SIN_PARADA;
         this.sirviendo = false;
         this.minutoSalidaTramo = 0L;
+        this.minutoUltimaSalida = -1L;
         this.minutoFinServicioHeredado = Long.MIN_VALUE;
         this.indiceCobrado = 0;
         this.secuenciaMovimiento = -1L;
@@ -223,6 +228,30 @@ public final class UnidadEnCurso {
         this.indiceParada = k;
         this.sirviendo = false;
         this.minutoSalidaTramo = minuto;
+        this.minutoUltimaSalida = minuto;
+    }
+
+    // Minuto en que arranco desde su ultima detencion; una replanificacion en marcha lo conserva.
+    public long minutoUltimaSalida() {
+        return minutoUltimaSalida;
+    }
+
+    public void minutoUltimaSalida(long minuto) {
+        this.minutoUltimaSalida = minuto;
+    }
+
+    // Ultimo almacen donde cargo y minuto en que sale o salio de el.
+    public void cargarEnAlmacen(int idAlmacen, long minutoSalida) {
+        this.idAlmacenOrigen = idAlmacen;
+        this.minutoSalidaAlmacen = minutoSalida;
+    }
+
+    public int idAlmacenOrigen() {
+        return idAlmacenOrigen;
+    }
+
+    public long minutoSalidaAlmacen() {
+        return minutoSalidaAlmacen;
     }
 
     /**

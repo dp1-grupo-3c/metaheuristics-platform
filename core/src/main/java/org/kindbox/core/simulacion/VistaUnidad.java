@@ -48,7 +48,17 @@ public record VistaUnidad(
         // Minutos de la averia vigente, o -1 si la unidad esta operativa.
         long minutoInicioAveria,
         long minutoFinAveriaEnElLugar,
-        long minutoReincorporacion) {
+        long minutoReincorporacion,
+        // Tramo en curso, o el siguiente si esta detenida: salida, llegada y si va llegando o saliendo.
+        Fase fase,
+        long minutoSalidaTramo,
+        long minutoLlegadaTramo,
+        // Ultimo almacen donde cargo y minuto en que sale o salio de el, o -1.
+        int idAlmacenOrigen,
+        long minutoSalidaAlmacen) {
+
+    // LLEGANDO va hacia una parada, SALIENDO espera salir de una, SIN_RUTA no tiene itinerario.
+    public enum Fase { LLEGANDO, SALIENDO, SIN_RUTA }
 
     /**
      * Renglon de la tarjeta emergente de una unidad.

@@ -571,12 +571,30 @@ public final class EstadoSimulacion {
                 aBordo.add(new VistaUnidad.PedidoABordo(p.idPedido(), p.cantidad(), total, viaje));
             }
         }
+        VistaUnidad.Fase fase = VistaUnidad.Fase.SIN_RUTA;
+        long salidaTramo = -1L;
+        long llegadaTramo = -1L;
+        int k = u.indiceParada();
+        if (k == UnidadEnCurso.SERVICIO_HEREDADO) {
+            fase = VistaUnidad.Fase.SALIENDO;
+            salidaTramo = u.minutoSalidaParadaEnCurso();
+            llegadaTramo = u.cantidadParadas() > 0 ? u.minutoLlegadaParada(0) : -1L;
+        } else if (k >= 0 && u.sirviendo()) {
+            fase = VistaUnidad.Fase.SALIENDO;
+            salidaTramo = u.minutoSalidaParada(k);
+            llegadaTramo = k + 1 < u.cantidadParadas() ? u.minutoLlegadaParada(k + 1) : -1L;
+        } else if (k >= 0) {
+            salidaTramo = u.minutoUltimaSalida();
+            llegadaTramo = u.minutoLlegadaParada(k);
+            fase = minuto < salidaTramo ? VistaUnidad.Fase.SALIENDO : VistaUnidad.Fase.LLEGANDO;
+        }
         return new VistaUnidad(unidad.codigo(), unidad.tipo(), unidad.estado(),
                 Ciudad.x(nodo), Ciudad.y(nodo), unidad.cargaABordo(), unidad.capacidad(),
                 ColorSemaforo.deOcupacion(unidad.cargaABordo(), unidad.capacidad(), parametros),
                 u.caminoRecorrido(minuto), u.caminoPendiente(minuto),
                 destinoX, destinoY, minutosHastaDestino, aBordo,
                 u.averia() == null ? 0 : u.averia().codigo(),
-                u.minutoInicioAveria(), u.minutoFinAveriaEnElLugar(), u.minutoReincorporacion());
+                u.minutoInicioAveria(), u.minutoFinAveriaEnElLugar(), u.minutoReincorporacion(),
+                fase, salidaTramo, llegadaTramo, u.idAlmacenOrigen(), u.minutoSalidaAlmacen());
     }
 }

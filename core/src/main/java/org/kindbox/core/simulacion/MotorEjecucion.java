@@ -1062,6 +1062,7 @@ public class MotorEjecucion {
             }
             case ABASTECIMIENTO -> {
                 abastecer(u, parada);
+                u.cargarEnAlmacen(parada.idAlmacen(), u.minutoSalidaParada(k));
                 u.unidad().estado(EstadoUnidad.ABASTECIENDO);
             }
             case ALIMENTACION -> {
@@ -1392,6 +1393,9 @@ public class MotorEjecucion {
         int nodoFisico = u.nodoEn(indiceNodo);
         cobrarKilometros(u, indiceNodo);
         long finServicio = u.sirviendo() ? u.minutoSalidaParadaEnCurso() : Long.MIN_VALUE;
+        boolean enMarcha = u.indiceParada() >= 0 && !u.sirviendo() && u.minutoUltimaSalida() >= 0
+                && u.minutoUltimaSalida() <= minuto;
+        long salidaPrevia = u.minutoUltimaSalida();
         u.invalidarMovimiento();
 
         if (ruta == null || ruta.paradas().isEmpty()) {
@@ -1435,6 +1439,10 @@ public class MotorEjecucion {
         long salidaTramo = nodoRedireccion != nodoFisico ? minuto : Math.max(minuto, ruta.minutoInicio());
         u.asignarItinerario(ruta, Arrays.copyOf(caminoTrabajo, longitudTrabajo),
                 desplazamiento, llegadas, salidas, salidaTramo, instancia.parametros());
+        // La unidad que ya iba en marcha no vuelve a salir por cambiar de plan.
+        if (enMarcha && salidaTramo <= minuto) {
+            u.minutoUltimaSalida(salidaPrevia);
+        }
         u.unidad().nodo(nodoFisico);
         if (finServicio > minuto) {
             u.marcarServicioHeredado(finServicio);

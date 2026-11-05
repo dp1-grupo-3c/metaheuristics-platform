@@ -167,4 +167,43 @@ class EstadoSimulacionTest {
         assertEquals(ColorSemaforo.ROJO, estado.vistaDe(u, 0L, parametros.instantanea()).color(),
                 "con los umbrales nuevos la mitad ya es rojo");
     }
+
+    @Test
+    @DisplayName("La vista distingue si la unidad va llegando o esta por salir y de que almacen salio")
+    void elTramoYElOrigenDeLaUnidad() {
+        EstadoSimulacion estado = estadoCon(List.of(pedido(1, 5, 0L, 36), pedido(2, 9, 0L, 36),
+                pedido(3, 7, 0L, 36), pedido(4, 8, 0L, 36)));
+        ParametrosOperacion.Instantanea p = new ParametrosOperacion().instantanea();
+
+        VistaUnidad sinRuta = estado.vistaDe(estado.unidad(estado.indiceDeUnidad("TM01")), 0L, p);
+        assertEquals(VistaUnidad.Fase.SIN_RUTA, sinRuta.fase());
+        assertEquals(List.of(-1L, -1L, -1L), List.of(sinRuta.minutoSalidaTramo(), sinRuta.minutoLlegadaTramo(),
+                sinRuta.minutoSalidaAlmacen()));
+        assertEquals(-1, sinRuta.idAlmacenOrigen());
+
+        UnidadEnCurso u = autoConRecargas(estado);
+        u.llegarA(1);
+        u.cargarEnAlmacen(2, 61L);
+        VistaUnidad cargando = estado.vistaDe(u, 61L, p);
+        assertEquals(VistaUnidad.Fase.SALIENDO, cargando.fase(), "sirviendo una parada esta por salir");
+        assertEquals(61L, cargando.minutoSalidaTramo(), "sale cuando termina el abastecimiento");
+        assertEquals(62L, cargando.minutoLlegadaTramo(), "llega a la parada siguiente");
+        assertEquals(2, cargando.idAlmacenOrigen());
+
+        u.partirHacia(2, 61L);
+        VistaUnidad enCamino = estado.vistaDe(u, 61L, p);
+        assertEquals(VistaUnidad.Fase.LLEGANDO, enCamino.fase());
+        assertEquals(List.of(61L, 62L, 61L), List.of(enCamino.minutoSalidaTramo(), enCamino.minutoLlegadaTramo(),
+                enCamino.minutoSalidaAlmacen()));
+
+        int[] camino = {Ciudad.nodo(5, 5), Ciudad.nodo(6, 5)};
+        Parada entrega = Parada.entrega(camino[1], 1, 2, 130, 190, 1);
+        UnidadEnCurso bici = estado.unidad(estado.indiceDeUnidad("TB01"));
+        bici.asignarItinerario(new Ruta("TB01", TipoUnidad.BICICLETA, camino[0], 120L, List.of(entrega)), camino,
+                new int[] {1}, new long[] {130L}, new long[] {190L}, 120L, p);
+        VistaUnidad esperando = estado.vistaDe(bici, 100L, p);
+        assertEquals(VistaUnidad.Fase.SALIENDO, esperando.fase(), "antes de su hora de salida espera");
+        assertEquals(List.of(120L, 130L), List.of(esperando.minutoSalidaTramo(), esperando.minutoLlegadaTramo()));
+        assertEquals(VistaUnidad.Fase.LLEGANDO, estado.vistaDe(bici, 125L, p).fase());
+    }
 }

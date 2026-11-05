@@ -313,6 +313,15 @@ En la fotografia, cada unidad averiada trae `minutoInicioAveria`, `minutoFinAver
 lugar hasta reincorporarse; los tipos 2 y 3 pasan al almacen central al cumplir `minutosEnElLugar`.
 Los tres minutos se fijan al averiarse, asi que cambiar los atributos no altera una averia en curso.
 
+Para buscar y ordenar las unidades por sus tiempos, cada una trae `fase`, `minutoSalidaTramo` y
+`minutoLlegadaTramo`. `LLEGANDO` va hacia su proxima parada: la salida es cuando arranco desde su
+ultima detencion, que una replanificacion en marcha no mueve, y la llegada es la de esa parada.
+`SALIENDO` esta detenida en una parada o espera su hora de salida: la salida es cuando partira y la
+llegada, la de la parada siguiente. `SIN_RUTA` no tiene itinerario y lleva -1 en ambos. Ademas,
+`idAlmacenOrigen` y `minutoSalidaAlmacen` dicen en que almacen cargo por ultima vez y cuando sale o
+salio de el (-1 si aun no cargo). Los minutos hasta el destino o desde el origen se obtienen
+restandolos de `minutoSimulado`.
+
 La flota se edita con `PUT /api/parametros/flota`, con cuerpo
 `{"unidades":{"AUTO":{"cantidad":10,"kmPorHora":40},...}}`; en cada tipo la cantidad (0 a 99) y
 la velocidad son opcionales. Se valida todo antes de aplicar: la velocidad cambia en caliente y
