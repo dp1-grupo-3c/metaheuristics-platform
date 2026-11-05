@@ -61,6 +61,6 @@ public record ResultadoSimulacion(
 
     /** Dias simulados completos que alcanzo la corrida. */
     public double diasSimulados() {
-        return minutoFinal / 1440.0;
+        return (minutoFinal - configuracion.minutoInicial()) / 1440.0;
     }
 }

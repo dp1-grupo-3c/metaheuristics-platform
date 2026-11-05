@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -34,6 +35,8 @@ import org.kindbox.core.metaheuristica.Algoritmo;
 import org.kindbox.core.metaheuristica.PresupuestoComputo;
 import org.kindbox.core.metaheuristica.ResultadoPlanificacion;
 import org.kindbox.core.metaheuristica.alns.BusquedaAdaptativaVecindadAmplia;
+import org.kindbox.core.modelo.Mantenimiento;
+import org.kindbox.core.modelo.EstadoUnidad;
 import org.kindbox.core.modelo.ParametrosOperacion;
 import org.kindbox.core.modelo.Pedido;
 import org.kindbox.core.modelo.TipoAveria;
@@ -404,6 +407,75 @@ class MotorSimulacionTest {
         assertEquals(EstadoCorrida.CULMINADA, resultado.estado(), resultado.mensaje());
         assertTrue(conEnvios[0] > 0, "ninguna fotografia tuvo envios");
         assertTrue(errores.isEmpty(), errores.size() + " incoherencias: " + errores.subList(0, Math.min(3, errores.size())));
+    }
+
+    @Test
+    @DisplayName("Una corrida que arranca a media jornada empieza en ese minuto y cubre un dia desde ahi")
+    void arrancaEnElMinutoElegido(@TempDir Path raiz) throws IOException {
+        long inicio = 630L;
+        RepositorioDatos.DatosEscenario cargados = escenario(raiz, PRIMER_DIA.plusDays(1));
+        assertTrue(cargados.pedidos().stream().anyMatch(p -> p.minutoRegistro() < inicio),
+                "el escenario debe traer pedidos antes del arranque");
+        // TA02 tiene mantenimiento todo el primer dia, asi que ya esta retirada al arrancar.
+        RepositorioDatos.DatosEscenario datos = new RepositorioDatos.DatosEscenario(cargados.calendario(),
+                cargados.primerDia(), cargados.ultimoDia(), cargados.flota(), cargados.pedidos(), cargados.bloqueos(),
+                List.of(new Mantenimiento(PRIMER_DIA, "TA02")), cargados.avisos());
+        MotorSimulacion motor = new MotorSimulacion(datos, configuracionSinAverias(PRIMER_DIA).conMinutoInicial(630),
+                new ParametrosOperacion(), new PlanificadorConstructivo(), List.of());
+        List<InstantaneaSimulacion> primeras = new ArrayList<>();
+        motor.agregarObservador(new ObservadorSimulacion() {
+            @Override
+            public void alTomarFotografia(InstantaneaSimulacion foto) {
+                if (primeras.isEmpty()) {
+                    primeras.add(foto);
+                }
+            }
+        });
+
+        ResultadoSimulacion resultado = motor.ejecutar();
+
+        assertEquals(EstadoCorrida.CULMINADA, resultado.estado(), resultado.mensaje());
+        InstantaneaSimulacion primera = primeras.get(0);
+        assertEquals(inicio, primera.minutoSimulado(), "la primera fotografia es la del arranque");
+        assertEquals(LocalDateTime.of(2026, 9, 1, 10, 30), primera.fechaHoraSimulada());
+        assertEquals(EstadoUnidad.EN_MANTENIMIENTO, primera.unidades().stream()
+                .filter(u -> u.codigo().equals("TA02")).findFirst().orElseThrow().estado());
+        assertEquals(inicio + MINUTOS_POR_DIA, resultado.minutoFinal(), "el horizonte se corre con el arranque");
+        assertEquals(1.0, resultado.diasSimulados(), 1e-9);
+        long esperados = datos.pedidos().stream()
+                .filter(p -> p.minutoRegistro() >= inicio && p.minutoRegistro() <= inicio + MINUTOS_POR_DIA).count();
+        assertEquals(esperados, resultado.metricas().pedidosRegistrados(), "solo cuentan los pedidos desde el arranque");
+        assertTrue(motor.pedidosConocidos().stream().allMatch(p -> p.minutoRegistro() >= inicio),
+                "los pedidos anteriores al arranque no entran en la corrida");
+    }
+
+    @Test
+    @DisplayName("El reloj acompasado cuenta desde el arranque y no desde las 00:00")
+    void elRelojAcompasadoCuentaDesdeElArranque(@TempDir Path raiz) throws Exception {
+        // 10 ms por minuto simulado: contar desde las 00:00 haria esperar 6,3 s antes de empezar.
+        ConfiguracionEscenario configuracion = new ConfiguracionEscenario(TipoEscenario.DIA_A_DIA, PRIMER_DIA,
+                PRIMER_DIA, SALTO_MINUTOS, 6000.0, ModoReloj.ACOMPASADO, BusquedaAdaptativaVecindadAmplia.NOMBRE,
+                SEMILLA, 1, false, 0.0, false, 630);
+        MotorSimulacion motor = new MotorSimulacion(escenario(raiz, PRIMER_DIA.plusDays(1)), configuracion,
+                new ParametrosOperacion(), new PlanificadorConstructivo(), List.of());
+        CountDownLatch avanzo = new CountDownLatch(1);
+        motor.agregarObservador(new ObservadorSimulacion() {
+            @Override
+            public void alTomarFotografia(InstantaneaSimulacion foto) {
+                if (foto.minutoSimulado() >= 640L) {
+                    avanzo.countDown();
+                }
+            }
+        });
+        Thread hilo = new Thread(motor::ejecutar, "simulacion-acompasada");
+        hilo.start();
+        try {
+            assertTrue(avanzo.await(3, TimeUnit.SECONDS), "el reloj no avanzo desde el arranque");
+        } finally {
+            motor.cancelar();
+            hilo.join(TimeUnit.SECONDS.toMillis(10));
+        }
+        assertFalse(hilo.isAlive());
     }
 
     // -------------------------------------------------------------- escenario

@@ -708,6 +708,16 @@ public final class RepositorioDatos {
             return LectorMantenimiento.agrupadoPorFecha(mantenimientos);
         }
 
+        // Los mismos datos sin los pedidos registrados antes del minuto dado.
+        public DatosEscenario sinPedidosAntesDe(long minuto) {
+            if (minuto <= 0) {
+                return this;
+            }
+            return new DatosEscenario(calendario, primerDia, ultimoDia, flota,
+                    pedidos.stream().filter(p -> p.minutoRegistro() >= minuto).toList(),
+                    bloqueos, mantenimientos, avisos);
+        }
+
         /** Indica si la carga dejo algo sin leer. */
         public boolean tieneAvisos() {
             return !avisos.isEmpty();

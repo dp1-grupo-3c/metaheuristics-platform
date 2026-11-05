@@ -71,6 +71,8 @@ public class MotorEjecucion {
     private final int[] distanciasAuxiliares = new int[Ciudad.TOTAL_NODOS];
     private final int[] predecesoresAuxiliares = new int[Ciudad.TOTAL_NODOS];
     private final long minutoFin;
+    // Minuto en que arranca el reloj de la simulacion; la operacion usa el de su arranque.
+    private final long minutoInicial;
     private final boolean operacion;
     /** Fuente de los meses siguientes en el escenario abierto; nula en los de horizonte fijo. */
     private final FuenteTramos fuenteTramos;
@@ -150,6 +152,9 @@ public class MotorEjecucion {
         if (datos == null || configuracion == null || parametros == null || algoritmo == null) {
             throw new IllegalArgumentException("El motor necesita datos, configuracion, parametros y algoritmo");
         }
+        this.minutoInicial = operacion ? 0L : configuracion.minutoInicial();
+        datos = datos.sinPedidosAntesDe(minutoInicial);
+        this.minutoActual = minutoInicial;
         this.datos = datos;
         this.configuracion = configuracion;
         this.parametros = parametros;
@@ -166,9 +171,10 @@ public class MotorEjecucion {
         if (operacion || fuente != null) {
             this.minutoFin = Long.MAX_VALUE;
         } else {
-            long cierreConfigurado = calendario.aMinutos(configuracion.ultimoDia().plusDays(1).atStartOfDay());
+            long cierreConfigurado = calendario.aMinutos(configuracion.ultimoDia().plusDays(1).atStartOfDay())
+                    + minutoInicial;
             this.minutoFin = Math.min(cierreConfigurado, datos.minutoFin());
-            if (minutoFin <= 0) {
+            if (minutoFin <= minutoInicial) {
                 throw new IllegalArgumentException("El horizonte del escenario es vacio: el ultimo dia configurado ("
                         + configuracion.ultimoDia() + ") no alcanza el primer dia de los datos (" + datos.primerDia() + ")");
             }
@@ -504,7 +510,8 @@ public class MotorEjecucion {
     /** Siembra el horizonte fijo entero, cerrado en {@code minutoFin}, y su cierre. */
     private void sembrar() {
         // Los minutos son enteros: "hasta minutoFin incluido" es lo mismo que "antes de minutoFin + 1".
-        sembrarVentana(0L, minutoFin + 1, minutoFin, 0, estado.cantidadPedidos(), datos.bloqueos());
+        sembrarVentana(minutoInicial, minutoFin + 1, minutoFin, 0, estado.cantidadPedidos(), datos.bloqueos());
+        programarPlanInicial();
         cola.programar(minutoFin, TipoEvento.FIN_ESCENARIO);
     }
 
@@ -516,8 +523,17 @@ public class MotorEjecucion {
         mesCargado = YearMonth.from(datos.ultimoDia());
         horizonteCargado = datos.minutoFin();
         bloqueosCargados.addAll(datos.bloqueos());
-        sembrarVentana(0L, horizonteCargado, horizonteCargado, 0, estado.cantidadPedidos(), datos.bloqueos());
-        cola.programar(0L, TipoEvento.CARGA_TRAMO);
+        sembrarVentana(minutoInicial, horizonteCargado, horizonteCargado, 0, estado.cantidadPedidos(), datos.bloqueos());
+        programarPlanInicial();
+        cola.programar(minutoInicial, TipoEvento.CARGA_TRAMO);
+    }
+
+    // Si el arranque no cae en un multiplo del salto, se planifica igual en el primer minuto.
+    private void programarPlanInicial() {
+        if (minutoInicial % configuracion.saltoMinutos() != 0) {
+            motivosReplanificacion.computeIfAbsent(minutoInicial, k -> new LinkedHashSet<>()).add("PERIODICA");
+            cola.programar(minutoInicial, TipoEvento.REPLANIFICACION);
+        }
     }
 
     /**
@@ -588,11 +604,12 @@ public class MotorEjecucion {
                 continue;
             }
             long inicio = calendario.aMinutos(m.fecha());
-            // La primera ventana tambien recoge el dia en curso si empezo antes del minuto cero.
-            if (inicio >= hasta || (desde > 0 && inicio < desde)) {
+            // La primera ventana tambien recoge el dia en curso si empezo antes del arranque.
+            if (inicio >= hasta || (desde > minutoInicial && inicio < desde)
+                    || inicio + CalendarioEscenario.MINUTOS_POR_DIA <= minutoInicial) {
                 continue;
             }
-            cola.programar(Math.max(0L, inicio), TipoEvento.INICIO_MANTENIMIENTO, unidad, 0);
+            cola.programar(Math.max(minutoInicial, inicio), TipoEvento.INICIO_MANTENIMIENTO, unidad, 0);
             cola.programar(Math.min(minutoFin, inicio + CalendarioEscenario.MINUTOS_POR_DIA),
                     TipoEvento.FIN_MANTENIMIENTO, unidad, 0);
         }
@@ -688,7 +705,7 @@ public class MotorEjecucion {
         }
         double milisegundosPorMinuto = configuracion.milisegundosPorMinutoSimulado();
         while (!cancelado) {
-            long objetivo = (long) (minutoObjetivo * milisegundosPorMinuto);
+            long objetivo = (long) ((minutoObjetivo - minutoInicial) * milisegundosPorMinuto);
             long restante = objetivo - milisegundosReales();
             if (restante <= 0) {
                 return true;

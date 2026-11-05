@@ -3,6 +3,7 @@ package org.kindbox.service.simulacion;
 import jakarta.annotation.PreDestroy;
 import java.io.IOException;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -186,12 +187,20 @@ public class ServicioSimulacion {
                     + "). Cancelela antes de arrancar otra.");
         }
         SolicitudSimulacion peticion = solicitud == null
-                ? new SolicitudSimulacion(null, null, null, null, null, null, null, null, null)
+                ? new SolicitudSimulacion(null, null, null, null, null, null, null, null, null, null)
                 : solicitud;
 
         TipoEscenario tipo = peticion.tipo() == null ? TipoEscenario.SIMULACION_5D : peticion.tipo();
-        LocalDate primerDia = peticion.primerDia() == null
-                ? propiedades.getPrimerDiaPorDefecto() : peticion.primerDia();
+        LocalDateTime inicio = peticion.inicio();
+        if (inicio != null && (inicio.getSecond() != 0 || inicio.getNano() != 0)) {
+            throw new SolicitudInvalida("El inicio se indica hasta el minuto, sin segundos: " + inicio);
+        }
+        if (inicio != null && peticion.primerDia() != null && !peticion.primerDia().equals(inicio.toLocalDate())) {
+            throw new SolicitudInvalida("El inicio " + inicio + " no cae en el primer dia " + peticion.primerDia());
+        }
+        LocalDate primerDia = inicio != null ? inicio.toLocalDate()
+                : peticion.primerDia() == null ? propiedades.getPrimerDiaPorDefecto() : peticion.primerDia();
+        int minutoInicial = inicio == null ? 0 : inicio.getHour() * 60 + inicio.getMinute();
         LocalDate ultimoDia = peticion.ultimoDia() == null
                 ? primerDia.plusDays(tipo == TipoEscenario.DIA_A_DIA ? 0 : propiedades.getDiasPorDefecto() - 1L)
                 : peticion.ultimoDia();
@@ -227,9 +236,10 @@ public class ServicioSimulacion {
         ConfiguracionEscenario configuracion = tipo == TipoEscenario.COLAPSO
                 ? ConfiguracionEscenario.colapso(primerDia, salto, algoritmo, semilla, cadencia, generarAverias,
                         propiedades.getAveriasPorUnidadPorTurno(), arranqueDesdePlanVigente)
+                        .conMinutoInicial(minutoInicial)
                 : new ConfiguracionEscenario(tipo, primerDia, ultimoDia,
                         salto, factor, reloj, algoritmo, semilla, cadencia, generarAverias,
-                        propiedades.getAveriasPorUnidadPorTurno(), arranqueDesdePlanVigente);
+                        propiedades.getAveriasPorUnidadPorTurno(), arranqueDesdePlanVigente, minutoInicial);
 
         // El colapso no tiene fecha de fin: arranca con el primer mes y el motor pide los
         // siguientes a medida que avanza. Los demas escenarios cargan su rango entero.
@@ -241,8 +251,10 @@ public class ServicioSimulacion {
                 datos = carga.inicio();
                 siguientes = carga.siguientes();
             } else {
-                datos = repositorio.cargar(primerDia, ultimoDia);
+                // Con arranque a media jornada el horizonte se corre y toca el dia siguiente.
+                datos = repositorio.cargar(primerDia, minutoInicial > 0 ? ultimoDia.plusDays(1) : ultimoDia);
             }
+            datos = datos.sinPedidosAntesDe(minutoInicial);
         } catch (IOException e) {
             throw new ErrorDeDatos("No se pudo leer el escenario desde " + repositorio.raiz()
                     + ": " + e.getMessage(), e);
@@ -252,7 +264,8 @@ public class ServicioSimulacion {
         if (datos.pedidos().isEmpty()) {
             throw new SolicitudInvalida((siguientes != null
                     ? "El mes de " + primerDia + " no tiene ningun pedido en "
-                    : "El rango " + primerDia + " a " + ultimoDia + " no tiene ningun pedido en ")
+                    : "El rango desde " + configuracion.fechaHoraInicio() + " a " + ultimoDia
+                            + " no tiene ningun pedido en ")
                     + repositorio.raiz() + ". Revise el directorio de datos o elija otras fechas.");
         }
 
@@ -269,8 +282,9 @@ public class ServicioSimulacion {
         orden.add(id);
         podar();
 
-        LOG.info("Arranca la corrida {}: {} del {} al {}, {} pedidos, algoritmo {}, K={}",
-                id, tipo, primerDia, ultimoDia, datos.pedidos().size(), algoritmo, String.format("%.1f", factor));
+        LOG.info("Arranca la corrida {}: {} desde {} al {}, {} pedidos, algoritmo {}, K={}",
+                id, tipo, configuracion.fechaHoraInicio(), ultimoDia, datos.pedidos().size(), algoritmo,
+                String.format("%.1f", factor));
         ejecutor.submit(() -> ejecutarCorrida(corrida, reserva));
 
         ResumenCorrida resumen = resumen(corrida);
@@ -642,7 +656,8 @@ public class ServicioSimulacion {
                 configuracion.factorAceleracion(), configuracion.minutosEntreFotografias(),
                 configuracion.semilla(), instantanea == null ? 0L : instantanea.minutoSimulado(),
                 motor == null ? corrida.datos().minutoFin() : motor.horizonteCargado(),
-                instantanea == null ? corrida.datos().calendario().inicio() : instantanea.fechaHoraSimulada(),
+                instantanea == null ? configuracion.fechaHoraInicio() : instantanea.fechaHoraSimulada(),
+                configuracion.fechaHoraInicio(), configuracion.minutoInicial(),
                 milisegundos, motor == null ? corrida.datos().pedidos().size() : motor.estado().cantidadPedidos(),
                 corrida.datos().unidades().size(),
                 activas, instantanea == null ? 0 : instantanea.metricas().unidadesEntregadas(),

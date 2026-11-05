@@ -56,6 +56,9 @@ public record ResumenCorrida(
         long minutoSimulado,
         long minutosHorizonte,
         LocalDateTime fechaHoraSimulada,
+        // Instante de arranque elegido y su minuto; el avance se mide desde ahi.
+        LocalDateTime fechaHoraInicio,
+        long minutoInicial,
         long milisegundosReales,
         int pedidosDelEscenario,
         int unidadesDeLaFlota,
@@ -78,9 +81,10 @@ public record ResumenCorrida(
 
     /** Fraccion del horizonte ya recorrida, acotada a {@code [0,1]}. */
     public double avance() {
-        if (minutosHorizonte <= 0) {
+        if (minutosHorizonte <= minutoInicial) {
             return 0.0;
         }
-        return Math.max(0.0, Math.min(1.0, (double) minutoSimulado / minutosHorizonte));
+        return Math.max(0.0, Math.min(1.0,
+                (double) (minutoSimulado - minutoInicial) / (minutosHorizonte - minutoInicial)));
     }
 }

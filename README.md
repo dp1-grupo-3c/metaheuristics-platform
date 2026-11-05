@@ -288,6 +288,14 @@ metodo no mapeado en esa ruta, 409 para una operacion que choca con el estado (a
 corrida ya en curso, o averiar una unidad ya averiada o en mantenimiento), 413 para un archivo
 de averias por encima del limite y 415 para un tipo de contenido que el extremo no sabe leer.
 
+`POST /api/simulaciones` admite `inicio`, la fecha y hora de arranque al minuto, por ejemplo
+`{"tipo":"SIMULACION_5D","inicio":"2026-09-02T10:30"}`. Su fecha es el primer dia, el reloj
+arranca en ese minuto y el horizonte se corre lo mismo: el 5D cubre cinco dias exactos desde
+`inicio` y el dia a dia, uno. Los pedidos registrados antes del arranque no forman parte de la
+corrida, y el mantenimiento o los bloqueos ya vigentes a esa hora rigen desde el primer minuto.
+Con segundos, o con un `primerDia` de otra fecha, responde 400. El resumen de la corrida trae
+`fechaHoraInicio` y `minutoInicial`, y su avance se mide desde el arranque.
+
 El semaforo se configura con `PUT /api/parametros/semaforo`: `{"ambar":250,"verde":500}` fija
 los umbrales de inventario de los almacenes intermedios, en paquetes, y
 `{"ocupacionAmbar":50,"ocupacionRojo":80}` los de ocupacion de las unidades, en porcentaje de su

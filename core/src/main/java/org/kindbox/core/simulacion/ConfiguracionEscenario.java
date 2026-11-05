@@ -1,6 +1,7 @@
 package org.kindbox.core.simulacion;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Locale;
 import java.util.Properties;
 import org.kindbox.core.metaheuristica.PresupuestoComputo;
@@ -48,7 +49,9 @@ public record ConfiguracionEscenario(
         int minutosEntreFotografias,
         boolean generarAverias,
         double averiasPorUnidadPorTurno,
-        boolean arranqueDesdePlanVigente) {
+        boolean arranqueDesdePlanVigente,
+        // Minuto del primer dia en que arranca el reloj; el horizonte se corre lo mismo.
+        int minutoInicial) {
 
     /** Horizonte de la simulacion de cinco dias, en minutos. */
     public static final int HORIZONTE_5D_MINUTOS = 5 * 24 * 60;
@@ -95,6 +98,29 @@ public record ConfiguracionEscenario(
         if (averiasPorUnidadPorTurno < 0.0 || averiasPorUnidadPorTurno > 1.0) {
             throw new IllegalArgumentException("Probabilidad de averia fuera de [0,1]");
         }
+        if (minutoInicial < 0 || minutoInicial >= 1440) {
+            throw new IllegalArgumentException("El minuto inicial debe estar entre 0 y 1439: " + minutoInicial);
+        }
+    }
+
+    // Arranque a las 00:00 del primer dia, como hasta ahora.
+    public ConfiguracionEscenario(TipoEscenario tipo, LocalDate primerDia, LocalDate ultimoDia, int saltoMinutos,
+                                  double factorAceleracion, ModoReloj modoReloj, String algoritmo, long semilla,
+                                  int minutosEntreFotografias, boolean generarAverias,
+                                  double averiasPorUnidadPorTurno, boolean arranqueDesdePlanVigente) {
+        this(tipo, primerDia, ultimoDia, saltoMinutos, factorAceleracion, modoReloj, algoritmo, semilla,
+                minutosEntreFotografias, generarAverias, averiasPorUnidadPorTurno, arranqueDesdePlanVigente, 0);
+    }
+
+    public ConfiguracionEscenario conMinutoInicial(int minuto) {
+        return minuto == minutoInicial ? this
+                : new ConfiguracionEscenario(tipo, primerDia, ultimoDia, saltoMinutos, factorAceleracion,
+                        modoReloj, algoritmo, semilla, minutosEntreFotografias, generarAverias,
+                        averiasPorUnidadPorTurno, arranqueDesdePlanVigente, minuto);
+    }
+
+    public LocalDateTime fechaHoraInicio() {
+        return primerDia.atStartOfDay().plusMinutes(minutoInicial);
     }
 
     /**
@@ -143,7 +169,7 @@ public record ConfiguracionEscenario(
         return activo == arranqueDesdePlanVigente ? this
                 : new ConfiguracionEscenario(tipo, primerDia, ultimoDia, saltoMinutos, factorAceleracion,
                         modoReloj, algoritmo, semilla, minutosEntreFotografias, generarAverias,
-                        averiasPorUnidadPorTurno, activo);
+                        averiasPorUnidadPorTurno, activo, minutoInicial);
     }
 
     /**

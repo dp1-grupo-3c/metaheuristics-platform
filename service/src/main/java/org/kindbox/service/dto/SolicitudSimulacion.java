@@ -1,6 +1,7 @@
 package org.kindbox.service.dto;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import org.kindbox.core.simulacion.TipoEscenario;
 
 /**
@@ -33,5 +34,7 @@ public record SolicitudSimulacion(
         Integer minutosEntreFotografias,
         String algoritmo,
         Long semilla,
-        Boolean generarAverias) {
+        Boolean generarAverias,
+        // Fecha y hora de arranque, al minuto; si llega, su fecha es el primer dia.
+        LocalDateTime inicio) {
 }
