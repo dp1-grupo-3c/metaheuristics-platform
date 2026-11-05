@@ -1,0 +1,99 @@
+{
+  "mapa" : {
+    "largoKm" : 70,
+    "anchoKm" : 50
+  },
+  "almacenes" : [ {
+    "id" : 0,
+    "nombre" : "Almacen Central",
+    "x" : 27,
+    "y" : 14,
+    "central" : true,
+    "capacidad" : null
+  }, {
+    "id" : 1,
+    "nombre" : "Almacen Intermedio Nor-Oeste",
+    "x" : 12,
+    "y" : 38,
+    "central" : false,
+    "capacidad" : 1000
+  }, {
+    "id" : 2,
+    "nombre" : "Almacen Intermedio Este",
+    "x" : 57,
+    "y" : 27,
+    "central" : false,
+    "capacidad" : 1000
+  } ],
+  "flota" : [ {
+    "prefijo" : "TA",
+    "etiqueta" : "Auto",
+    "cantidad" : 10,
+    "capacidad" : 24,
+    "velocidadKmH" : 40.0,
+    "costoPorKm" : 8.0,
+    "factorAveria" : 0.6
+  }, {
+    "prefijo" : "TM",
+    "etiqueta" : "Moto",
+    "cantidad" : 15,
+    "capacidad" : 8,
+    "velocidadKmH" : 25.0,
+    "costoPorKm" : 6.0,
+    "factorAveria" : 1.0
+  }, {
+    "prefijo" : "TB",
+    "etiqueta" : "Bicicleta",
+    "cantidad" : 12,
+    "capacidad" : 4,
+    "velocidadKmH" : 12.0,
+    "costoPorKm" : 3.0,
+    "factorAveria" : 1.8
+  } ],
+  "averias" : [ {
+    "tipo" : 1,
+    "porcentaje" : 70,
+    "minutosEnElLugar" : 120,
+    "trasladaAlmacenCentral" : false,
+    "reincorporacion" : "TRAS_MINUTOS",
+    "minutosIndisponible" : 120,
+    "diasMantenimiento" : null,
+    "turnoReingreso" : null
+  }, {
+    "tipo" : 2,
+    "porcentaje" : 25,
+    "minutosEnElLugar" : 240,
+    "trasladaAlmacenCentral" : true,
+    "reincorporacion" : "FIN_TURNO_SIGUIENTE",
+    "minutosIndisponible" : null,
+    "diasMantenimiento" : null,
+    "turnoReingreso" : null
+  }, {
+    "tipo" : 3,
+    "porcentaje" : 5,
+    "minutosEnElLugar" : 240,
+    "trasladaAlmacenCentral" : true,
+    "reincorporacion" : "DIAS_Y_TURNO",
+    "minutosIndisponible" : null,
+    "diasMantenimiento" : 2,
+    "turnoReingreso" : "TARDE"
+  } ],
+  "semaforo" : {
+    "verdeDesdePorcentaje" : 50,
+    "ambarDesdePorcentaje" : 25
+  },
+  "turnos" : {
+    "cambiosMinutoDia" : [ 420, 900, 1380 ]
+  },
+  "plazos" : {
+    "estandarHoras" : 36,
+    "priorizadosHoras" : [ 4, 8, 12, 18 ]
+  },
+  "tiempos" : {
+    "acondicionamiento" : 60,
+    "alimentacion" : 60,
+    "separacionCambioTurno" : 60,
+    "trasvase" : 30,
+    "recargaIntermediosMinutoDia" : 1439
+  }
+}

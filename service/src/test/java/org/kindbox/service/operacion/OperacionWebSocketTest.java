@@ -35,10 +35,12 @@ class OperacionWebSocketTest {
 
     @DynamicPropertySource static void propiedades(DynamicPropertyRegistry registro) {
         registro.add("kindbox.directorio-datos", datos::toString);
+        registro.add("kindbox.archivo-parametros-mundo", () -> datos.resolve("parametros-mundo.json").toString());
     }
 
     @AfterAll static void limpiar() throws Exception {
         Files.deleteIfExists(datos.resolve("flota.txt"));
+        Files.deleteIfExists(datos.resolve("parametros-mundo.json"));
         Files.deleteIfExists(datos);
     }
 
