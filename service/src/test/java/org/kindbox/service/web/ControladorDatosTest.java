@@ -74,6 +74,22 @@ class ControladorDatosTest {
     }
 
     @Test
+    void ningunDatoSeCargaConUnaEjecucionActiva() throws Exception {
+        try (var reserva = coordinador.reservar("simulacion")) {
+            mvc.perform(multipart("/api/datos/bloqueos").file(archivo("202601.bloqueadas", BLOQUEO)))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.codigoError").value("CONFLICTO_ESTADO"));
+            mvc.perform(post("/api/datos/bloqueos/manual").contentType(MediaType.APPLICATION_JSON)
+                            .content(bloqueo("[{\"x\":12,\"y\":20},{\"x\":13,\"y\":20}]", "2026-09-02T10:30", "2026-09-02T18:00")))
+                    .andExpect(status().isConflict());
+            mvc.perform(multipart("/api/datos/mantenimiento").file(archivo("mant.preventivo.09.10", "20260901:TA05\n")))
+                    .andExpect(status().isConflict());
+        }
+        assertFalse(Files.exists(raiz.resolve("bloqueos")));
+        assertFalse(Files.exists(raiz.resolve("mantenimiento")));
+    }
+
+    @Test
     void cargaDeBloqueosConYSinMes() throws Exception {
         mvc.perform(multipart("/api/datos/bloqueos").file(archivo("202601.bloqueadas", BLOQUEO)))
                 .andExpect(status().isOk())

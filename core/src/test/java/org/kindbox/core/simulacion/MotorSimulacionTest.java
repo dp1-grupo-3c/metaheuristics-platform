@@ -140,6 +140,33 @@ class MotorSimulacionTest {
     }
 
     @Test
+    @DisplayName("Con umbral de un incumplimiento, la simulacion de varios dias colapsa con el primer pedido vencido")
+    void conUmbralUnoColapsaConElPrimerVencido(@TempDir Path raiz) throws IOException {
+        LocalDate ultimoDia = PRIMER_DIA.plusDays(1);
+        // Demanda muy por encima de lo que cinco unidades pueden entregar a tiempo.
+        RepositorioDatos.DatosEscenario datos = escenario(raiz, ultimoDia, 400.0);
+        ConfiguracionEscenario configuracion = new ConfiguracionEscenario(TipoEscenario.SIMULACION_5D, PRIMER_DIA,
+                ultimoDia, SALTO_MINUTOS, FACTOR_LIBRE, ModoReloj.LIBRE, BusquedaAdaptativaVecindadAmplia.NOMBRE,
+                SEMILLA, 60, false, 0.0, false);
+
+        MotorSimulacion sinUmbral = new MotorSimulacion(datos, configuracion, new ParametrosOperacion(),
+                new PlanificadorConstructivo(), List.of());
+        ResultadoSimulacion completa = sinUmbral.ejecutar();
+        assertTrue(completa.metricas().pedidosIncumplidos() > 0, "el escenario tiene que vencer pedidos");
+        assertFalse(completa.colapso(), "sin umbral la corrida recorre el horizonte: " + completa.mensaje());
+
+        MotorSimulacion conUmbral = new MotorSimulacion(datos, configuracion, new ParametrosOperacion(),
+                new PlanificadorConstructivo(), List.of());
+        conUmbral.umbralIncumplimientos(1);
+        ResultadoSimulacion colapsada = conUmbral.ejecutar();
+        assertEquals(EstadoCorrida.COLAPSADA, colapsada.estado(), colapsada.mensaje());
+        assertTrue(colapsada.pedidoDelColapso() >= 0, "falta el pedido que provoco el colapso");
+        assertEquals(completa.minutoPrimerIncumplimiento(), colapsada.minutoColapso(), "colapsa en el primer vencimiento");
+        assertTrue(colapsada.minutoFinal() < 2L * MINUTOS_POR_DIA, "la corrida se detiene antes del horizonte");
+        assertTrue(colapsada.mensaje().contains("no pudo entregarse dentro de su plazo"), colapsada.mensaje());
+    }
+
+    @Test
     @DisplayName("La corrida de dos dias culmina el horizonte con el reparto de pedidos coherente")
     void laCorridaCulminaConLaParticionCoherente(@TempDir Path raiz) throws IOException {
         LocalDate ultimoDia = PRIMER_DIA.plusDays(1);

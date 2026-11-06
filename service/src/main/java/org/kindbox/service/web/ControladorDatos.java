@@ -49,26 +49,33 @@ public class ControladorDatos {
         }
     }
 
-    @PostMapping("/flota")
-    public RepositorioDatos.ArchivoGuardado flota(@RequestParam("archivo") MultipartFile archivo) {
+    /** Los datos solo se cargan antes de los escenarios: con una ejecucion en curso se rechaza. */
+    private void exigirSinEjecucion(String que) {
         String activa = coordinador.ejecucionActiva();
         if (activa != null) {
             throw new ConflictoDeEstado("Hay una ejecucion activa de " + activa
-                    + "; la flota solo se puede reemplazar sin ejecuciones en curso");
+                    + "; " + que + " solo se puede cargar sin ejecuciones en curso");
         }
+    }
+
+    @PostMapping("/flota")
+    public RepositorioDatos.ArchivoGuardado flota(@RequestParam("archivo") MultipartFile archivo) {
+        exigirSinEjecucion("la flota");
         return guardar(archivo, "flota.txt", repositorio::guardarFlota);
     }
 
     @PostMapping("/bloqueos")
     public RepositorioDatos.ArchivoGuardado bloqueos(@RequestParam("archivo") MultipartFile archivo,
                                                      @RequestParam(name = "mes", required = false) String mes) {
+        exigirSinEjecucion("un archivo de bloqueos");
         YearMonth periodo = mes == null || mes.isBlank() ? null : mes(mes);
         return guardar(archivo, "bloqueos.txt", origen -> repositorio.guardarBloqueos(periodo, origen));
     }
 
-    // Se agrega al archivo del mes: rige desde la siguiente carga, no en una corrida en curso.
+    // Se agrega al archivo del mes y rige desde la siguiente corrida.
     @PostMapping("/bloqueos/manual")
     public List<RepositorioDatos.ArchivoGuardado> bloqueoManual(@RequestBody SolicitudBloqueo solicitud) {
+        exigirSinEjecucion("un bloqueo");
         if (solicitud == null || solicitud.nodos() == null || solicitud.nodos().size() < 2) {
             throw new SolicitudInvalida("Un bloqueo necesita al menos dos nodos");
         }
@@ -104,6 +111,7 @@ public class ControladorDatos {
 
     @PostMapping("/mantenimiento")
     public RepositorioDatos.ArchivoGuardado mantenimiento(@RequestParam("archivo") MultipartFile archivo) {
+        exigirSinEjecucion("el mantenimiento");
         return guardar(archivo, "mantenimiento.txt",
                 origen -> repositorio.guardarMantenimiento(origen.getFileName().toString(), origen));
     }

@@ -280,6 +280,12 @@ public class ServicioSimulacion {
         MotorSimulacion motor = siguientes != null
                 ? fabrica.crearAbierto(datos, configuracion, parametros, planificador, observadores, siguientes)
                 : fabrica.crear(datos, configuracion, parametros, planificador, observadores);
+        // En la web, la simulacion de 5 dias tambien colapsa con el primer pedido vencido.
+        // El motor conserva su umbral infinito por defecto porque los experimentos cuentan
+        // los incumplimientos de los 5 dias sin detener la corrida.
+        if (tipo == TipoEscenario.SIMULACION_5D) {
+            motor.umbralIncumplimientos(1);
+        }
         corrida.motor(motor);
 
         corridas.put(id, corrida);

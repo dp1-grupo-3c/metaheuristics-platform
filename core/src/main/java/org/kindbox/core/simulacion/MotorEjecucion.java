@@ -828,7 +828,7 @@ public class MotorEjecucion {
             minutoPrimerIncumplimiento = estado.pedido(vencidos.get(0)).minutoLimite();
             pedidoDelPrimerIncumplimiento = estado.pedido(vencidos.get(0)).id();
         }
-        if (configuracion.tipo() == TipoEscenario.COLAPSO) {
+        if (configuracion.tipo() == TipoEscenario.COLAPSO || umbralIncumplimientos == 1) {
             estadoCorrida = EstadoCorrida.COLAPSADA;
             return "Colapso logistico en " + calendario.textoCorto(minutoPrimerIncumplimiento)
                     + ": el pedido " + pedidoDelPrimerIncumplimiento + " no pudo entregarse dentro de su plazo";
