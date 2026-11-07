@@ -411,8 +411,11 @@ public class ServicioSimulacion {
      * @param pagina      numero de pagina, empezando en cero
      * @param tamano      filas por pagina
      * @param soloActivos si se excluyen los pedidos ya entregados
+     * @param entregadosUltimosMinutos si se indica, solo los entregados en esos ultimos minutos simulados (ignora
+     *                                 soloActivos), del mas reciente al mas antiguo; admite nulo
      */
-    public PaginaPedidos pedidos(String id, String busqueda, Integer pagina, Integer tamano, boolean soloActivos) {
+    public PaginaPedidos pedidos(String id, String busqueda, Integer pagina, Integer tamano, boolean soloActivos,
+                                 Integer entregadosUltimosMinutos) {
         Corrida corrida = requerir(id);
         int numeroPagina = pagina == null ? 0 : pagina;
         if (numeroPagina < 0) {
@@ -440,7 +443,12 @@ public class ServicioSimulacion {
                 continue;
             }
             boolean entregado = entregados.contains(pedido.id());
-            if (soloActivos && entregado) {
+            Long minutoEntrega = entregado ? corrida.minutoEntrega(pedido.id()) : null;
+            if (entregadosUltimosMinutos != null) {
+                if (minutoEntrega == null || minutoEntrega < minuto - entregadosUltimosMinutos) {
+                    continue;
+                }
+            } else if (soloActivos && entregado) {
                 continue;
             }
             if (!filtro.isEmpty() && !coincide(pedido, filtro)) {
@@ -452,11 +460,15 @@ public class ServicioSimulacion {
                     corrida.datos().calendario().aFecha(pedido.minutoRegistro()),
                     corrida.datos().calendario().aFecha(pedido.minutoLimite()),
                     holgura, entregado,
+                    minutoEntrega == null ? null : corrida.datos().calendario().aFecha(minutoEntrega),
+                    corrida.unidadesEntrega(pedido.id()),
                     entregado ? ColorSemaforo.VERDE
                             : ColorSemaforo.deHolgura(holgura, pedido.plazoHoras() * 60L, vigentes),
                     envios.getOrDefault(pedido.id(), List.of())));
         }
-        filtradas.sort(Comparator.comparingLong(FilaPedido::holguraMinutos).thenComparingInt(FilaPedido::id));
+        filtradas.sort(entregadosUltimosMinutos != null
+                ? Comparator.comparing(FilaPedido::entrega).reversed().thenComparingInt(FilaPedido::id)
+                : Comparator.comparingLong(FilaPedido::holguraMinutos).thenComparingInt(FilaPedido::id));
 
         int total = filtradas.size();
         int totalPaginas = total == 0 ? 0 : (total + filasPorPagina - 1) / filasPorPagina;

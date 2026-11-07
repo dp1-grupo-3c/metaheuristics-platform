@@ -2,7 +2,9 @@ package org.kindbox.core.operacion;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import org.kindbox.core.io.CalendarioEscenario;
 import org.kindbox.core.modelo.Ciudad;
 import org.kindbox.core.modelo.Pedido;
@@ -12,6 +14,7 @@ public final class PedidoOperativo {
     private final SolicitudPedidoOperacion solicitud;
     private final CalendarioEscenario calendario;
     private final List<VistaPedidoOperacion.Transicion> transiciones = new ArrayList<>();
+    private final Set<String> unidadesEntrega = new LinkedHashSet<>();
     private EstadoPedido estado;
     private int pendiente;
     private boolean incumplido;
@@ -49,12 +52,18 @@ public final class PedidoOperativo {
     }
 
     public void descargar(int remanente, long minuto) {
+        descargar(remanente, minuto, null);
+    }
+
+    /** Descarga hecha por la unidad indicada (admite nulo); la unidad queda anotada en el pedido. */
+    public void descargar(int remanente, long minuto, String unidad) {
         if (remanente < 0 || remanente > pendiente) throw new IllegalArgumentException("La descarga es invalida");
         if (!activo() || estado == EstadoPedido.REGISTRADO) {
             throw new IllegalStateException("El pedido no admite una descarga");
         }
         if (estado == EstadoPedido.PLANIFICADO) cambiar(EstadoPedido.EN_TRANSITO, minuto);
         pendiente = remanente;
+        if (unidad != null) unidadesEntrega.add(unidad);
         cambiar(remanente == 0 ? EstadoPedido.ENTREGADO : EstadoPedido.ENTREGADO_PARCIALMENTE, minuto);
     }
 
@@ -68,6 +77,6 @@ public final class PedidoOperativo {
         return new VistaPedidoOperacion(pedido.id(), solicitud.codigoCliente(), solicitud.nombreCliente(),
                 solicitud.telefonoCliente(), solicitud.direccion(), pedido.x(), pedido.y(), pedido.cantidad(),
                 pendiente, solicitud.prioridad(), estado, incumplido, calendario.aFecha(pedido.minutoRegistro()),
-                calendario.aFecha(pedido.minutoLimite()), transiciones, List.of());
+                calendario.aFecha(pedido.minutoLimite()), transiciones, List.copyOf(unidadesEntrega), List.of());
     }
 }

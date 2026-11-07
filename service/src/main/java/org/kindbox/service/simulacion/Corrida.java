@@ -2,7 +2,9 @@ package org.kindbox.service.simulacion;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -36,7 +38,10 @@ public final class Corrida implements ObservadorSimulacion {
     private final RepositorioDatos.DatosEscenario datos;
     private final int duracionMinutosReales;
 
-    private final Set<Integer> entregados = ConcurrentHashMap.newKeySet();
+    // Pedido completado y minuto simulado en que se completo.
+    private final Map<Integer, Long> entregados = new ConcurrentHashMap<>();
+    // Unidades que descargaron cada pedido, en orden de descarga.
+    private final Map<Integer, Set<String>> unidadesEntrega = new ConcurrentHashMap<>();
     private final Deque<String> averiasAplicadas = new ArrayDeque<>();
     private final Queue<LectorAverias.AveriaProgramada> averiasProgramadas = new PriorityBlockingQueue<>();
 
@@ -113,7 +118,23 @@ public final class Corrida implements ObservadorSimulacion {
 
     /** Identificadores de los pedidos ya entregados por completo. */
     public Set<Integer> entregados() {
-        return entregados;
+        return entregados.keySet();
+    }
+
+    /** Minuto simulado en que se completo el pedido, o {@code null} si aun no se entrega. */
+    public Long minutoEntrega(int idPedido) {
+        return entregados.get(idPedido);
+    }
+
+    /** Codigos de las unidades que descargaron el pedido, en orden de descarga. */
+    public List<String> unidadesEntrega(int idPedido) {
+        Set<String> unidades = unidadesEntrega.get(idPedido);
+        if (unidades == null) {
+            return List.of();
+        }
+        synchronized (unidades) {
+            return List.copyOf(unidades);
+        }
     }
 
     /** Averias que esperan a que el reloj simulado alcance su instante. */
@@ -154,9 +175,18 @@ public final class Corrida implements ObservadorSimulacion {
     }
 
     @Override
+    public void alDescargarPedido(long minutoSimulado, int idPedido, String codigoUnidad,
+                                  int cantidad, int pendiente) {
+        Set<String> unidades = unidadesEntrega.computeIfAbsent(idPedido, k -> new LinkedHashSet<>());
+        synchronized (unidades) {
+            unidades.add(codigoUnidad);
+        }
+    }
+
+    @Override
     public void alEntregarPedido(long minutoSimulado, int idPedido, String codigoUnidad,
                                  int cantidad, long minutosDesdeRegistro, int plazoHoras) {
-        entregados.add(idPedido);
+        entregados.putIfAbsent(idPedido, minutoSimulado);
     }
 
     @Override

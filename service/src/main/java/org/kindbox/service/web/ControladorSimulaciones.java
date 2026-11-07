@@ -95,14 +95,16 @@ public class ControladorSimulaciones {
      * @param pagina      numero de pagina, empezando en cero
      * @param tamano      filas por pagina
      * @param soloActivos si se excluyen los pedidos ya entregados; cierto por defecto
+     * @param entregadosUltimosMinutos si se indica, solo los pedidos entregados en esos ultimos minutos simulados
      */
     @GetMapping("/{id}/pedidos")
     public PaginaPedidos pedidos(@PathVariable("id") String id,
                                  @RequestParam(name = "busqueda", required = false) String busqueda,
                                  @RequestParam(name = "pagina", required = false) Integer pagina,
                                  @RequestParam(name = "tamano", required = false) Integer tamano,
-                                 @RequestParam(name = "soloActivos", defaultValue = "true") boolean soloActivos) {
-        return servicio.pedidos(id, busqueda, pagina, tamano, soloActivos);
+                                 @RequestParam(name = "soloActivos", defaultValue = "true") boolean soloActivos,
+                                 @RequestParam(name = "entregadosUltimosMinutos", required = false) Integer entregadosUltimosMinutos) {
+        return servicio.pedidos(id, busqueda, pagina, tamano, soloActivos, entregadosUltimosMinutos);
     }
 
     // Ultimo plan comprometido; terminada la corrida es el reporte de su ultima planificacion estable.

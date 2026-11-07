@@ -24,6 +24,8 @@ import org.kindbox.core.simulacion.EnvioPedido;
  * @param limite         instante limite de llegada de la unidad
  * @param holguraMinutos minutos que faltan hasta el limite; negativo si ya vencio
  * @param entregado      indica si el pedido se completo
+ * @param entrega        instante en que se completo; nulo si aun no se entrega
+ * @param unidadesEntrega codigos de las unidades que lo descargaron, en orden de descarga
  * @param semaforo       color de la holgura segun los umbrales vigentes
  */
 public record FilaPedido(
@@ -38,11 +40,14 @@ public record FilaPedido(
         LocalDateTime limite,
         long holguraMinutos,
         boolean entregado,
+        LocalDateTime entrega,
+        List<String> unidadesEntrega,
         ColorSemaforo semaforo,
         // Unidades que llevan el pedido, con sus horarios, segun la ultima fotografia.
         List<EnvioPedido> envios) {
 
     public FilaPedido {
+        unidadesEntrega = unidadesEntrega == null ? List.of() : List.copyOf(unidadesEntrega);
         envios = envios == null ? List.of() : List.copyOf(envios);
     }
 

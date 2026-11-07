@@ -283,7 +283,7 @@ public final class MotorOperacion implements AutoCloseable, ObservadorSimulacion
     @Override
     public void alDescargarPedido(long minuto, int idPedido, String unidad, int cantidad, int pendiente) {
         PedidoOperativo pedido = contexto.pedidos().buscar(idPedido);
-        if (pedido != null) pedido.descargar(pendiente, minuto);
+        if (pedido != null) pedido.descargar(pendiente, minuto, unidad);
     }
 
     @Override
