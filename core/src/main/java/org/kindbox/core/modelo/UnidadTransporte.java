@@ -32,6 +32,16 @@ public final class UnidadTransporte {
         inicioTurnoAlimentacion = minutoInicioTurno;
     }
 
+    // Copia independiente: dos corridas sobre los mismos datos no comparten la flota.
+    public UnidadTransporte copia() {
+        UnidadTransporte copia = new UnidadTransporte(codigo, tipo, nodo);
+        copia.estado = estado;
+        copia.cargaABordo = cargaABordo;
+        copia.minutoDisponibleDesde = minutoDisponibleDesde;
+        copia.inicioTurnoAlimentacion = inicioTurnoAlimentacion;
+        return copia;
+    }
+
     /** Crea la unidad deduciendo el tipo del prefijo de su codigo. */
     public static UnidadTransporte de(String codigo, int nodoInicial) {
         return new UnidadTransporte(codigo, TipoUnidad.porCodigo(codigo), nodoInicial);

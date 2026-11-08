@@ -13,6 +13,7 @@ import org.kindbox.core.grafo.RegistroBloqueos;
 import org.kindbox.core.io.CalendarioEscenario;
 import org.kindbox.core.modelo.Almacen;
 import org.kindbox.core.modelo.Ciudad;
+import org.kindbox.core.modelo.EstadoUnidad;
 import org.kindbox.core.modelo.Pedido;
 import org.kindbox.core.modelo.TipoUnidad;
 import org.kindbox.core.modelo.ParametrosOperacion;
@@ -48,6 +49,25 @@ class EstadoSimulacionTest {
 
     private static Pedido pedido(int id, int cantidad, long minutoRegistro, int plazoHoras) {
         return new Pedido(id, "c" + (1000 + id), Ciudad.nodo(20, 30), cantidad, minutoRegistro, plazoHoras);
+    }
+
+    @Test
+    @DisplayName("El estado copia la flota: mover sus unidades no cambia las de los datos")
+    void elEstadoNoTocaLaFlotaDeLosDatos() {
+        int central = Almacen.crearCentral().nodo();
+        UnidadTransporte original = UnidadTransporte.de("TA01", central);
+        EstadoSimulacion estado = new EstadoSimulacion(CalendarioEscenario.desde(DIA), new RegistroBloqueos(List.of()),
+                Almacen.todos(), List.of(), List.of(original));
+
+        UnidadTransporte enCurso = estado.unidades()[0].unidad();
+        enCurso.nodo(Ciudad.nodo(5, 5));
+        enCurso.cargaABordo(7);
+        enCurso.estado(EstadoUnidad.EN_RUTA);
+
+        assertEquals("TA01", enCurso.codigo());
+        assertEquals(central, original.nodo());
+        assertEquals(0, original.cargaABordo());
+        assertEquals(EstadoUnidad.DISPONIBLE, original.estado());
     }
 
     @Test

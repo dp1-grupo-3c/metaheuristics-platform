@@ -134,7 +134,8 @@ public final class EstadoSimulacion {
         this.unidades = new UnidadEnCurso[flota.size()];
         this.indicePorCodigoUnidad = new HashMap<>(flota.size() * 2);
         for (int i = 0; i < flota.size(); i++) {
-            unidades[i] = new UnidadEnCurso(i, flota.get(i));
+            // Copia: el estado de una corrida no debe quedar en la flota de los datos.
+            unidades[i] = new UnidadEnCurso(i, flota.get(i).copia());
             indicePorCodigoUnidad.put(flota.get(i).codigo(), i);
         }
     }
