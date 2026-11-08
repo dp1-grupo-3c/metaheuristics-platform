@@ -14,6 +14,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -162,6 +164,91 @@ public final class RepositorioDatos {
         DatosEscenario inicio = new DatosEscenario(calendario, primerDia, mes.atEndOfMonth(), flota,
                 primero.pedidos(), primero.bloqueos(), mantenimientos, avisos);
         return new CargaAbierta(inicio, fuente);
+    }
+
+    // Horizonte fijo con los pedidos del primer dia; la fuente entrega los demas de a uno.
+    public CargaPorDias abrirPorDias(LocalDate primerDia, LocalDate ultimoDia) throws IOException {
+        if (primerDia == null || ultimoDia == null || ultimoDia.isBefore(primerDia)) {
+            throw new IllegalArgumentException("El escenario necesita un rango de dias valido");
+        }
+        CalendarioEscenario calendario = CalendarioEscenario.desde(primerDia);
+        long minutoFin = calendario.aMinutos(ultimoDia.plusDays(1).atStartOfDay());
+        List<String> avisos = new ArrayList<>();
+        LectorFlota.FlotaLeida flota = cargarFlota(avisos);
+        List<Bloqueo> bloqueos = cargarBloqueos(calendario, primerDia, ultimoDia, minutoFin, avisos);
+        List<Mantenimiento> mantenimientos = cargarMantenimientos(primerDia, ultimoDia, avisos);
+        FuenteDiaria fuente = new FuenteDiaria(calendario, primerDia, ultimoDia);
+        TramoDiario primero = fuente.cargar(primerDia);
+        avisos.addAll(primero.avisos());
+        DatosEscenario inicio = new DatosEscenario(calendario, primerDia, ultimoDia, flota,
+                primero.pedidos(), bloqueos, mantenimientos, avisos);
+        return new CargaPorDias(inicio, fuente);
+    }
+
+    // Lee del archivo del mes solo los pedidos del dia pedido; de cada mes guarda su cantidad de registros.
+    private final class FuenteDiaria implements FuenteDias {
+
+        private final CalendarioEscenario calendario;
+        private final LocalDate primerDia;
+        private final LocalDate ultimoDia;
+        private final LectorVentas lector;
+        private final Map<YearMonth, Integer> registrosPorMes = new HashMap<>();
+        private final Set<YearMonth> mesesAvisados = new HashSet<>();
+
+        FuenteDiaria(CalendarioEscenario calendario, LocalDate primerDia, LocalDate ultimoDia) {
+            this.calendario = calendario;
+            this.primerDia = primerDia;
+            this.ultimoDia = ultimoDia;
+            this.lector = new LectorVentas(calendario);
+        }
+
+        @Override
+        public synchronized TramoDiario cargar(LocalDate dia) throws IOException {
+            if (dia == null || dia.isBefore(primerDia) || dia.isAfter(ultimoDia)) {
+                throw new IllegalArgumentException("El dia " + dia + " esta fuera del escenario "
+                        + primerDia + ".." + ultimoDia);
+            }
+            YearMonth mes = YearMonth.from(dia);
+            // Los ids siguen la numeracion de la carga completa: los meses previos reservan todos sus registros.
+            int primerId = 0;
+            for (YearMonth previo = YearMonth.from(primerDia); previo.isBefore(mes); previo = previo.plusMonths(1)) {
+                primerId += registrosDe(previo);
+            }
+            long desde = calendario.aMinutos(dia.atStartOfDay());
+            long hasta = desde + CalendarioEscenario.MINUTOS_POR_DIA;
+            List<String> avisos = new ArrayList<>();
+            Path archivo = archivoVentas(mes);
+            if (archivo == null) {
+                if (mesesAvisados.add(mes)) {
+                    avisos.add("No se encontro el archivo de ventas de " + mes + " en "
+                            + raiz.resolve(DIRECTORIO_VENTAS) + "; sus dias quedan sin pedidos");
+                }
+                registrosPorMes.put(mes, 0);
+                return new TramoDiario(dia, List.of(), avisos);
+            }
+            LectorVentas.Lectura lectura = lector.leer(archivo, mes, primerId, desde, hasta);
+            registrosPorMes.put(mes, lectura.registros());
+            List<Pedido> pedidos = new ArrayList<>(lectura.pedidos());
+            pedidos.sort(Comparator.comparingLong(Pedido::minutoRegistro).thenComparingInt(Pedido::id));
+            return new TramoDiario(dia, pedidos, avisos);
+        }
+
+        private int registrosDe(YearMonth mes) throws IOException {
+            Integer conocidos = registrosPorMes.get(mes);
+            if (conocidos != null) {
+                return conocidos;
+            }
+            Path archivo = archivoVentas(mes);
+            int registros = archivo == null ? 0 : lector.leer(archivo, mes, 0, 0, 0).registros();
+            registrosPorMes.put(mes, registros);
+            return registros;
+        }
+    }
+
+    private Path archivoVentas(YearMonth mes) throws IOException {
+        String base = LectorVentas.nombreDeArchivo(mes);
+        return localizarMensual(raiz.resolve(DIRECTORIO_VENTAS), List.of(base, base + ".txt",
+                "ventas." + String.format("%04d%02d", mes.getYear(), mes.getMonthValue()) + ".txt"));
     }
 
     /**
@@ -326,9 +413,7 @@ public final class RepositorioDatos {
                                         List<String> avisos) throws IOException {
         Path directorio = raiz.resolve(DIRECTORIO_VENTAS);
         String base = LectorVentas.nombreDeArchivo(mes);
-        Path archivo = localizarMensual(directorio, List.of(
-                base, base + ".txt",
-                "ventas." + String.format("%04d%02d", mes.getYear(), mes.getMonthValue()) + ".txt"));
+        Path archivo = archivoVentas(mes);
         if (archivo == null) {
             avisos.add("No se encontro el archivo de ventas de " + mes + " (" + directorio.resolve(base)
                     + "); el mes se omite");
@@ -733,6 +818,18 @@ public final class RepositorioDatos {
      * @param siguientes fuente de los meses posteriores al primero
      */
     public record CargaAbierta(DatosEscenario inicio, FuenteTramos siguientes) {}
+
+    // Pedidos de un dia de un horizonte fijo, ordenados por instante de registro.
+    public record TramoDiario(LocalDate dia, List<Pedido> pedidos, List<String> avisos) {
+
+        public TramoDiario {
+            pedidos = List.copyOf(pedidos);
+            avisos = List.copyOf(avisos);
+        }
+    }
+
+    // Horizonte fijo con el primer dia ya cargado y la fuente de los siguientes.
+    public record CargaPorDias(DatosEscenario inicio, FuenteDias siguientes) {}
 
     /**
      * Escenario completo listo para el motor de simulacion.

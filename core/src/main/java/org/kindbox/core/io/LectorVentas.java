@@ -71,6 +71,14 @@ public final class LectorVentas {
      * @return pedidos en el orden en que aparecen en el archivo
      */
     public List<Pedido> leer(Path archivo, YearMonth mes, int primerId) throws IOException {
+        return leer(archivo, mes, primerId, Long.MIN_VALUE, Long.MAX_VALUE).pedidos();
+    }
+
+    // Pedidos del archivo y cuantos registros trae en total, contando tambien los descartados.
+    public record Lectura(List<Pedido> pedidos, int registros) {}
+
+    // Solo guarda los registrados en [desde, hasta); los ids siguen el orden de todo el archivo.
+    public Lectura leer(Path archivo, YearMonth mes, int primerId, long desde, long hasta) throws IOException {
         String nombre = archivo.getFileName().toString();
         List<Pedido> pedidos = new ArrayList<>();
         // Se decodifica como ISO-8859-1 y no como UTF-8 porque los registros son ASCII puro
@@ -85,11 +93,14 @@ public final class LectorVentas {
                 if (registro.isEmpty() || registro.charAt(0) == '#') {
                     continue;
                 }
-                pedidos.add(interpretar(registro, nombre, numeroLinea, mes, id));
+                Pedido pedido = interpretar(registro, nombre, numeroLinea, mes, id);
+                if (pedido.minutoRegistro() >= desde && pedido.minutoRegistro() < hasta) {
+                    pedidos.add(pedido);
+                }
                 id++;
             }
+            return new Lectura(pedidos, id - primerId);
         }
-        return pedidos;
     }
 
     /** Interpreta un unico registro ya limpio de espacios. */

@@ -1,6 +1,7 @@
 package org.kindbox.service.simulacion;
 
 import java.util.List;
+import org.kindbox.core.io.FuenteDias;
 import org.kindbox.core.io.FuenteTramos;
 import org.kindbox.core.io.RepositorioDatos;
 import org.kindbox.core.metaheuristica.Algoritmo;
@@ -54,5 +55,12 @@ public class FabricaMotor {
                                         ParametrosOperacion parametros, Algoritmo algoritmo,
                                         List<ObservadorSimulacion> observadores, FuenteTramos siguientes) {
         return new MotorSimulacion(datos, configuracion, parametros, algoritmo, observadores, siguientes);
+    }
+
+    // Horizonte fijo que recibe los pedidos de a un dia desde dias.
+    public MotorSimulacion crearPorDias(RepositorioDatos.DatosEscenario datos, ConfiguracionEscenario configuracion,
+                                        ParametrosOperacion parametros, Algoritmo algoritmo,
+                                        List<ObservadorSimulacion> observadores, FuenteDias dias) {
+        return new MotorSimulacion(datos, configuracion, parametros, algoritmo, observadores, dias);
     }
 }

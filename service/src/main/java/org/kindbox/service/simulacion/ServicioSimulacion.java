@@ -20,6 +20,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.kindbox.core.io.FuenteDias;
 import org.kindbox.core.io.FuenteTramos;
 import org.kindbox.core.io.LectorAverias;
 import org.kindbox.core.io.RepositorioDatos;
@@ -246,9 +247,10 @@ public class ServicioSimulacion {
                         propiedades.getAveriasPorUnidadPorTurno(), arranqueDesdePlanVigente, minutoInicial);
 
         // El colapso no tiene fecha de fin: arranca con el primer mes y el motor pide los
-        // siguientes a medida que avanza. Los demas escenarios cargan su rango entero.
+        // siguientes a medida que avanza. Los demas escenarios reciben los pedidos de a un dia.
         RepositorioDatos.DatosEscenario datos;
         FuenteTramos siguientes = null;
+        FuenteDias porDias = null;
         try {
             if (tipo == TipoEscenario.COLAPSO) {
                 RepositorioDatos.CargaAbierta carga = repositorio.abrir(primerDia);
@@ -256,16 +258,24 @@ public class ServicioSimulacion {
                 siguientes = carga.siguientes();
             } else {
                 // Con arranque a media jornada el horizonte se corre y toca el dia siguiente.
-                datos = repositorio.cargar(primerDia, minutoInicial > 0 ? ultimoDia.plusDays(1) : ultimoDia);
+                RepositorioDatos.CargaPorDias carga = repositorio.abrirPorDias(primerDia,
+                        minutoInicial > 0 ? ultimoDia.plusDays(1) : ultimoDia);
+                datos = carga.inicio();
+                porDias = carga.siguientes();
             }
             datos = datos.sinPedidosAntesDe(minutoInicial);
+            if (porDias != null && datos.pedidos().isEmpty() && !hayPedidosDespues(datos, porDias)) {
+                throw new SolicitudInvalida("El rango desde " + configuracion.fechaHoraInicio() + " a " + ultimoDia
+                        + " no tiene ningun pedido en " + repositorio.raiz()
+                        + ". Revise el directorio de datos o elija otras fechas.");
+            }
         } catch (IOException e) {
             throw new ErrorDeDatos("No se pudo leer el escenario desde " + repositorio.raiz()
                     + ": " + e.getMessage(), e);
         } catch (IllegalArgumentException e) {
             throw new SolicitudInvalida("Escenario invalido: " + e.getMessage(), e);
         }
-        if (datos.pedidos().isEmpty()) {
+        if (porDias == null && datos.pedidos().isEmpty()) {
             throw new SolicitudInvalida((siguientes != null
                     ? "El mes de " + primerDia + " no tiene ningun pedido en "
                     : "El rango desde " + configuracion.fechaHoraInicio() + " a " + ultimoDia
@@ -279,7 +289,7 @@ public class ServicioSimulacion {
         List<ObservadorSimulacion> observadores = List.of(corrida, publicador.observadorDe(id));
         MotorSimulacion motor = siguientes != null
                 ? fabrica.crearAbierto(datos, configuracion, parametros, planificador, observadores, siguientes)
-                : fabrica.crear(datos, configuracion, parametros, planificador, observadores);
+                : fabrica.crearPorDias(datos, configuracion, parametros, planificador, observadores, porDias);
         // En la web, la simulacion de 5 dias tambien colapsa con el primer pedido vencido.
         // El motor conserva su umbral infinito por defecto porque los experimentos cuentan
         // los incumplimientos de los 5 dias sin detener la corrida.
@@ -292,7 +302,7 @@ public class ServicioSimulacion {
         orden.add(id);
         podar();
 
-        LOG.info("Arranca la corrida {}: {} desde {} al {}, {} pedidos, algoritmo {}, K={}",
+        LOG.info("Arranca la corrida {}: {} desde {} al {}, {} pedidos del primer bloque, algoritmo {}, K={}",
                 id, tipo, configuracion.fechaHoraInicio(), ultimoDia, datos.pedidos().size(), algoritmo,
                 String.format("%.1f", factor));
         ejecutor.submit(() -> ejecutarCorrida(corrida, reserva));
@@ -300,6 +310,17 @@ public class ServicioSimulacion {
         ResumenCorrida resumen = resumen(corrida);
         publicador.publicar(MensajeVisualizador.TIPO_CORRIDA, id, resumen);
         return resumen;
+    }
+
+    // Solo si el primer dia viene vacio: busca un pedido en los dias siguientes del rango.
+    private static boolean hayPedidosDespues(RepositorioDatos.DatosEscenario datos, FuenteDias dias)
+            throws IOException {
+        for (LocalDate dia = datos.primerDia().plusDays(1); !dia.isAfter(datos.ultimoDia()); dia = dia.plusDays(1)) {
+            if (!dias.cargar(dia).pedidos().isEmpty()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void ejecutarCorrida(Corrida corrida,
@@ -716,7 +737,7 @@ public class ServicioSimulacion {
         ResultadoSimulacion resultado = corrida.resultado();
         MotorSimulacion motor = corrida.motor();
         List<String> avisos = corrida.datos().avisos();
-        if (motor != null && motor.abierto()) {
+        if (motor != null && (motor.abierto() || motor.cargaPorDias())) {
             avisos = new ArrayList<>(avisos);
             avisos.addAll(motor.avisosDeCarga());
         }

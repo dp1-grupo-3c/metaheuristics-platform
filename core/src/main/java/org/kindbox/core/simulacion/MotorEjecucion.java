@@ -2,6 +2,7 @@ package org.kindbox.core.simulacion;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.concurrent.ExecutorService;
@@ -24,6 +25,7 @@ import org.kindbox.core.grafo.MatrizDistanciasReticula;
 import org.kindbox.core.grafo.OraculoDistancias;
 import org.kindbox.core.grafo.RegistroBloqueos;
 import org.kindbox.core.io.CalendarioEscenario;
+import org.kindbox.core.io.FuenteDias;
 import org.kindbox.core.io.FuenteTramos;
 import org.kindbox.core.io.RepositorioDatos;
 import org.kindbox.core.metaheuristica.Algoritmo;
@@ -80,6 +82,9 @@ public class MotorEjecucion {
     private final FuenteTramos fuenteTramos;
     /** Ultimo mes cargado del escenario abierto. */
     private YearMonth mesCargado;
+    // Pedidos de a un dia en un horizonte fijo; nula si el rango llega cargado entero.
+    private final FuenteDias fuenteDias;
+    private LocalDate diaCargado;
     /** Bloqueos cargados que aun no terminaron, de los que se rehace el registro de cada tramo. */
     private final List<Bloqueo> bloqueosCargados = new ArrayList<>();
     private final List<String> avisosDeCarga = new CopyOnWriteArrayList<>();
@@ -128,7 +133,7 @@ public class MotorEjecucion {
     public MotorEjecucion(RepositorioDatos.DatosEscenario datos, ConfiguracionEscenario configuracion,
                           ParametrosOperacion parametros, Algoritmo algoritmo,
                           List<ObservadorSimulacion> observadores, boolean operacion) {
-        this(datos, configuracion, parametros, algoritmo, observadores, operacion, null);
+        this(datos, configuracion, parametros, algoritmo, observadores, operacion, null, null);
     }
 
     /**
@@ -143,14 +148,24 @@ public class MotorEjecucion {
                           ParametrosOperacion parametros, Algoritmo algoritmo,
                           List<ObservadorSimulacion> observadores, FuenteTramos fuente) {
         this(datos, configuracion, parametros, algoritmo, observadores, false,
-                java.util.Objects.requireNonNull(fuente, "El escenario abierto necesita una fuente de meses"));
+                java.util.Objects.requireNonNull(fuente, "El escenario abierto necesita una fuente de meses"), null);
+    }
+
+    // Horizonte fijo que recibe los pedidos de a un dia, siempre uno por delante del reloj.
+    public MotorEjecucion(RepositorioDatos.DatosEscenario datos, ConfiguracionEscenario configuracion,
+                          ParametrosOperacion parametros, Algoritmo algoritmo,
+                          List<ObservadorSimulacion> observadores, FuenteDias dias) {
+        this(datos, configuracion, parametros, algoritmo, observadores, false, null,
+                java.util.Objects.requireNonNull(dias, "La carga por dias necesita una fuente de dias"));
     }
 
     private MotorEjecucion(RepositorioDatos.DatosEscenario datos, ConfiguracionEscenario configuracion,
                            ParametrosOperacion parametros, Algoritmo algoritmo,
-                           List<ObservadorSimulacion> observadores, boolean operacion, FuenteTramos fuente) {
+                           List<ObservadorSimulacion> observadores, boolean operacion, FuenteTramos fuente,
+                           FuenteDias dias) {
         this.operacion = operacion;
         this.fuenteTramos = fuente;
+        this.fuenteDias = dias;
         if (datos == null || configuracion == null || parametros == null || algoritmo == null) {
             throw new IllegalArgumentException("El motor necesita datos, configuracion, parametros y algoritmo");
         }
@@ -529,6 +544,39 @@ public class MotorEjecucion {
         sembrarVentana(minutoInicial, minutoFin + 1, minutoFin, 0, estado.cantidadPedidos(), datos.bloqueos());
         programarPlanInicial();
         cola.programar(minutoFin, TipoEvento.FIN_ESCENARIO);
+        if (fuenteDias != null) {
+            diaCargado = datos.primerDia();
+            cola.programar(minutoInicial, TipoEvento.CARGA_TRAMO);
+        }
+    }
+
+    // Carga el dia siguiente al ultimo cargado y programa la carga del otro al empezar este.
+    private void cargarDiaSiguiente() {
+        LocalDate dia = diaCargado.plusDays(1);
+        long desde = calendario.aMinutos(dia.atStartOfDay());
+        if (dia.isAfter(datos.ultimoDia()) || desde > minutoFin) {
+            return;
+        }
+        RepositorioDatos.TramoDiario tramo;
+        try {
+            tramo = fuenteDias.cargar(dia);
+        } catch (IOException e) {
+            throw new UncheckedIOException("No se pudieron leer los pedidos de " + dia + ": " + e.getMessage(), e);
+        }
+        avisosDeCarga.addAll(tramo.avisos());
+        int primerPedido = estado.cantidadPedidos();
+        for (Pedido pedido : tramo.pedidos()) {
+            estado.anexarPedido(pedido);
+        }
+        sembrarPedidos(desde, Math.min(desde + CalendarioEscenario.MINUTOS_POR_DIA, minutoFin + 1),
+                primerPedido, estado.cantidadPedidos());
+        diaCargado = dia;
+        cola.programar(desde, TipoEvento.CARGA_TRAMO);
+    }
+
+    // Si los pedidos llegan de a un dia en lugar del rango entero.
+    public boolean cargaPorDias() {
+        return fuenteDias != null;
     }
 
     /**
@@ -597,12 +645,7 @@ public class MotorEjecucion {
      */
     private void sembrarVentana(long desde, long hasta, long finReplanificacion,
                                 int primerPedido, int finPedidos, List<Bloqueo> bloqueos) {
-        for (int i = primerPedido; i < finPedidos; i++) {
-            long registro = estado.pedido(i).minutoRegistro();
-            if (registro >= desde && registro < hasta) {
-                cola.programar(registro, TipoEvento.LLEGADA_PEDIDO, i, 0);
-            }
-        }
+        sembrarPedidos(desde, hasta, primerPedido, finPedidos);
 
         for (int i = 0; i < bloqueos.size(); i++) {
             Bloqueo b = bloqueos.get(i);
@@ -651,6 +694,16 @@ public class MotorEjecucion {
         for (long minuto = primerMultiplo(desde, configuracion.minutosEntreFotografias()); minuto < hasta;
                 minuto += configuracion.minutosEntreFotografias()) {
             cola.programar(minuto, TipoEvento.FOTOGRAFIA);
+        }
+    }
+
+    // Llegadas de los pedidos [primerPedido, finPedidos) registrados en [desde, hasta).
+    private void sembrarPedidos(long desde, long hasta, int primerPedido, int finPedidos) {
+        for (int i = primerPedido; i < finPedidos; i++) {
+            long registro = estado.pedido(i).minutoRegistro();
+            if (registro >= desde && registro < hasta) {
+                cola.programar(registro, TipoEvento.LLEGADA_PEDIDO, i, 0);
+            }
         }
     }
 
@@ -791,7 +844,13 @@ public class MotorEjecucion {
                 case CAMBIO_TURNO -> sortearAveriasDelTurno();
                 case INICIO_MANTENIMIENTO -> iniciarMantenimiento(evento.referencia());
                 case FIN_MANTENIMIENTO -> terminarMantenimiento(evento.referencia());
-                case CARGA_TRAMO -> cargarTramoSiguiente();
+                case CARGA_TRAMO -> {
+                    if (fuenteDias != null) {
+                        cargarDiaSiguiente();
+                    } else {
+                        cargarTramoSiguiente();
+                    }
+                }
                 case LLEGADA_PEDIDO -> estado.registrarPedido(evento.referencia());
                 case AVERIA -> averiar(evento.referencia(), evento.dato());
                 case TRASLADO_A_CENTRAL -> trasladarAlCentral(evento.referencia());

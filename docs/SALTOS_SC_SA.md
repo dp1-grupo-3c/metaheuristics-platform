@@ -15,9 +15,10 @@ Un minuto sin pedidos no cuesta nada: el motor salta directo al siguiente evento
 
 ## Cómo se consumen los pedidos
 
-1. **Carga.** Los pedidos se leen del archivo y quedan en memoria, pero todavía no existen para la simulación.
-   - Simulación de 5 días: se carga el rango entero al arrancar.
-   - Colapso: se carga mes a mes con el evento `CARGA_TRAMO`.
+1. **Carga por bloques.** Nunca se carga el rango entero: los pedidos entran a memoria un bloque por delante del reloj y todavía no existen para la simulación.
+   - Simulación de 5 días y día a día: bloques de un día. Arranca con el primer día; en el arranque `CARGA_TRAMO` pide el segundo, y al empezar cada día pide el siguiente (`RepositorioDatos.abrirPorDias`, `MotorEjecucion.cargarDiaSiguiente`). En memoria hay, como mucho, el día en curso y el siguiente.
+   - Colapso: bloques de un mes, con el mismo evento `CARGA_TRAMO`.
+   - Del archivo mensual, `LectorVentas` solo guarda los pedidos del bloque pedido; los ids siguen siendo los de la carga completa.
    - Con un inicio a media jornada, `sinPedidosAntesDe` descarta lo anterior al arranque.
 2. **Siembra.** `sembrarVentana` programa un `LLEGADA_PEDIDO` por pedido, y los eventos `REPLANIFICACION` en los múltiplos de Sa.
 3. **Consumo (Sc).** Al llegar a `minutoRegistro`, `EstadoSimulacion.registrarPedido` lo marca como registrado y pendiente, y empieza a contar su plazo. Desde ahí puede vencer.
@@ -37,7 +38,7 @@ Un bloque Sa de 30 minutos, con sus 30 bloques Sc de 1 minuto:
 
 ```mermaid
 flowchart TB
-    A[("Archivo ventas.AAAAMM<br/>registro ##d##h##m")] -->|"carga: rango entero en 5D,<br/>mes a mes en colapso"| B["Cola de eventos<br/>un LLEGADA_PEDIDO por pedido"]
+    A[("Archivo ventas.AAAAMM<br/>registro ##d##h##m")] -->|"carga por bloques: un dia por delante en 5D,<br/>un mes por delante en colapso"| B["Cola de eventos<br/>un LLEGADA_PEDIDO por pedido"]
 
     subgraph SA["Bloque Sa = 30 min simulados: intervalo (t - 30, t]"]
         direction LR
