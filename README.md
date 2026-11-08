@@ -397,6 +397,14 @@ El registro se suma al archivo del mes y se valida con el mismo lector. Si cruza
 un registro por mes, y ese ultimo minuto del mes queda libre porque el formato no puede expresarlo.
 Rige desde la siguiente carga: una corrida en curso no lo ve.
 
+`GET /api/datos/bloqueos/registros?mes=2026-09` lista los bloqueos guardados del mes, cada uno con su
+`linea`, su `registro` tal como esta en el archivo, `inicio`, `fin` y `nodos`.
+`PUT /api/datos/bloqueos/registros/{mes}/{linea}` lo reemplaza con un cuerpo igual al del bloqueo manual,
+y `DELETE` sobre la misma ruta lo borra. Si se manda `?registro=` con el texto listado y la linea ya no
+coincide, responden 409 para no pisar un cambio ajeno; una linea que no es bloqueo da 404. El bloqueo
+nuevo puede caer en otro mes, y todo se valida antes de escribir. Un bloqueo que cruzo de mes quedo
+partido en un registro por mes, y cada parte se edita por separado.
+
 `POST /api/datos/mantenimiento` exige el nombre `mant.preventivo.m1.m2` y guarda el plan en
 `mantenimiento/<ano de su primera fecha>/`, reemplazando el del mismo nombre.
 

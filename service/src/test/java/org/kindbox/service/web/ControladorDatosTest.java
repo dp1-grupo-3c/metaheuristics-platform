@@ -2,9 +2,11 @@ package org.kindbox.service.web;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -140,6 +142,54 @@ class ControladorDatosTest {
                 .andExpect(jsonPath("$[0].ruta").value("bloqueos/202609.bloqueadas"))
                 .andExpect(jsonPath("$[0].registros").value(1));
         assertEquals("02d10h30m-02d18h00m:12,20,13,20\n", Files.readString(raiz.resolve("bloqueos/202609.bloqueadas")));
+    }
+
+    @Test
+    void registrosDeBloqueoSeListanEditanYBorran() throws Exception {
+        Path archivo = raiz.resolve("bloqueos/202609.bloqueadas");
+        Files.createDirectories(archivo.getParent());
+        Files.writeString(archivo, "02d10h30m-02d18h00m:12,20,13,20\n03d00h00m-04d00h00m:1,1,1,5,4,5\n");
+
+        mvc.perform(get("/api/datos/bloqueos/registros").param("mes", "2026-09"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].mes").value("2026-09"))
+                .andExpect(jsonPath("$[0].linea").value(1))
+                .andExpect(jsonPath("$[0].registro").value("02d10h30m-02d18h00m:12,20,13,20"))
+                .andExpect(jsonPath("$[0].inicio").exists())
+                .andExpect(jsonPath("$[0].nodos[1].x").value(13))
+                .andExpect(jsonPath("$[1].linea").value(2));
+        mvc.perform(get("/api/datos/bloqueos/registros").param("mes", "2026-10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
+
+        mvc.perform(put("/api/datos/bloqueos/registros/2026-09/1").param("registro", "02d10h30m-02d18h00m:12,20,13,20")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bloqueo("[{\"x\":5,\"y\":5},{\"x\":5,\"y\":8}]", "2026-09-05T07:00", "2026-09-05T09:15")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].registros").value(2));
+        assertEquals("03d00h00m-04d00h00m:1,1,1,5,4,5\n05d07h00m-05d09h15m:5,5,5,8\n", Files.readString(archivo));
+
+        // El texto ya no coincide con la linea 1: alguien la cambio.
+        mvc.perform(delete("/api/datos/bloqueos/registros/2026-09/1").param("registro", "02d10h30m-02d18h00m:12,20,13,20"))
+                .andExpect(status().isConflict());
+        mvc.perform(delete("/api/datos/bloqueos/registros/2026-09/7"))
+                .andExpect(status().isNotFound());
+        mvc.perform(delete("/api/datos/bloqueos/registros/2026-13/1"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(put("/api/datos/bloqueos/registros/2026-09/1").contentType(MediaType.APPLICATION_JSON)
+                        .content(bloqueo("[{\"x\":1,\"y\":1},{\"x\":2,\"y\":2}]", "2026-09-05T07:00", "2026-09-05T08:00")))
+                .andExpect(status().isBadRequest());
+
+        mvc.perform(delete("/api/datos/bloqueos/registros/2026-09/1").param("registro", "03d00h00m-04d00h00m:1,1,1,5,4,5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.registros").value(1));
+        assertEquals("05d07h00m-05d09h15m:5,5,5,8\n", Files.readString(archivo));
+
+        try (var reserva = coordinador.reservar("simulacion")) {
+            mvc.perform(delete("/api/datos/bloqueos/registros/2026-09/1")).andExpect(status().isConflict());
+        }
+        assertEquals("05d07h00m-05d09h15m:5,5,5,8\n", Files.readString(archivo));
     }
 
     @Test

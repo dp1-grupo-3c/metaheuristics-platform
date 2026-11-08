@@ -8,17 +8,23 @@ import java.time.YearMonth;
 import java.time.format.DateTimeParseException;
 import java.util.Comparator;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.stream.Stream;
 import org.kindbox.core.io.RepositorioDatos;
 import org.kindbox.service.dto.SolicitudBloqueo;
+import org.kindbox.service.dto.VistaRegistroBloqueo;
 import org.kindbox.service.error.ConflictoDeEstado;
 import org.kindbox.service.error.ErrorDeDatos;
+import org.kindbox.service.error.RecursoNoEncontrado;
 import org.kindbox.service.error.SolicitudInvalida;
 import org.kindbox.service.operacion.CoordinadorEjecucion;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -76,6 +82,67 @@ public class ControladorDatos {
     @PostMapping("/bloqueos/manual")
     public List<RepositorioDatos.ArchivoGuardado> bloqueoManual(@RequestBody SolicitudBloqueo solicitud) {
         exigirSinEjecucion("un bloqueo");
+        int[] coordenadas = coordenadas(solicitud);
+        List<RepositorioDatos.ArchivoGuardado> guardados = editarBloqueos(
+                () -> repositorio.agregarBloqueo(coordenadas, solicitud.inicio(), solicitud.fin()));
+        LOG.info("Bloqueo manual de {} a {} agregado a {}", solicitud.inicio(), solicitud.fin(), guardados);
+        return guardados;
+    }
+
+    // Bloqueos guardados del mes, con la linea que usan PUT y DELETE.
+    @GetMapping("/bloqueos/registros")
+    public List<VistaRegistroBloqueo> registrosBloqueo(@RequestParam("mes") String mes) {
+        YearMonth periodo = mes(mes);
+        return editarBloqueos(() -> repositorio.registrosBloqueo(periodo)).stream()
+                .map(VistaRegistroBloqueo::de).toList();
+    }
+
+    // Cambia el bloqueo de esa linea; registro, si llega, debe coincidir con el listado.
+    @PutMapping("/bloqueos/registros/{mes}/{linea}")
+    public List<RepositorioDatos.ArchivoGuardado> reemplazarBloqueo(@PathVariable("mes") String mes,
+                                                                    @PathVariable("linea") int linea,
+                                                                    @RequestParam(name = "registro", required = false) String registro,
+                                                                    @RequestBody SolicitudBloqueo solicitud) {
+        exigirSinEjecucion("un bloqueo");
+        YearMonth periodo = mes(mes);
+        int[] coordenadas = coordenadas(solicitud);
+        List<RepositorioDatos.ArchivoGuardado> guardados = editarBloqueos(() -> repositorio.reemplazarBloqueo(
+                periodo, linea, registro, coordenadas, solicitud.inicio(), solicitud.fin()));
+        LOG.info("Bloqueo de la linea {} de {} reemplazado; archivos {}", linea, periodo, guardados);
+        return guardados;
+    }
+
+    @DeleteMapping("/bloqueos/registros/{mes}/{linea}")
+    public RepositorioDatos.ArchivoGuardado quitarBloqueo(@PathVariable("mes") String mes,
+                                                          @PathVariable("linea") int linea,
+                                                          @RequestParam(name = "registro", required = false) String registro) {
+        exigirSinEjecucion("un bloqueo");
+        YearMonth periodo = mes(mes);
+        RepositorioDatos.ArchivoGuardado guardado = editarBloqueos(() -> repositorio.quitarBloqueo(periodo, linea, registro));
+        LOG.info("Bloqueo de la linea {} de {} borrado; quedan {}", linea, periodo, guardado.registros());
+        return guardado;
+    }
+
+    private interface EdicionBloqueos<T> {
+        T aplicar() throws IOException;
+    }
+
+    // Traduce los errores del repositorio a respuestas HTTP.
+    private <T> T editarBloqueos(EdicionBloqueos<T> edicion) {
+        try {
+            return edicion.aplicar();
+        } catch (NoSuchElementException e) {
+            throw new RecursoNoEncontrado(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            throw new SolicitudInvalida(e.getMessage(), e);
+        } catch (IllegalStateException e) {
+            throw new ConflictoDeEstado(e.getMessage());
+        } catch (IOException e) {
+            throw new ErrorDeDatos("No se pudo editar los bloqueos del directorio de datos " + repositorio.raiz(), e);
+        }
+    }
+
+    private static int[] coordenadas(SolicitudBloqueo solicitud) {
         if (solicitud == null || solicitud.nodos() == null || solicitud.nodos().size() < 2) {
             throw new SolicitudInvalida("Un bloqueo necesita al menos dos nodos");
         }
@@ -95,18 +162,7 @@ public class ControladorDatos {
             coordenadas[2 * i] = nodo.x();
             coordenadas[2 * i + 1] = nodo.y();
         }
-        try {
-            List<RepositorioDatos.ArchivoGuardado> guardados =
-                    repositorio.agregarBloqueo(coordenadas, solicitud.inicio(), solicitud.fin());
-            LOG.info("Bloqueo manual de {} a {} agregado a {}", solicitud.inicio(), solicitud.fin(), guardados);
-            return guardados;
-        } catch (IllegalArgumentException e) {
-            throw new SolicitudInvalida(e.getMessage(), e);
-        } catch (IllegalStateException e) {
-            throw new ConflictoDeEstado(e.getMessage());
-        } catch (IOException e) {
-            throw new ErrorDeDatos("No se pudo guardar el bloqueo en el directorio de datos " + repositorio.raiz(), e);
-        }
+        return coordenadas;
     }
 
     @PostMapping("/mantenimiento")

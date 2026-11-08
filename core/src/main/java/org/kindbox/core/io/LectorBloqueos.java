@@ -67,8 +67,16 @@ public final class LectorBloqueos {
      * @return bloqueos en el orden en que aparecen en el archivo
      */
     public List<Bloqueo> leer(Path archivo, YearMonth mes) throws IOException {
+        return leerRegistros(archivo, mes).stream().map(RegistroLeido::bloqueo).toList();
+    }
+
+    // Registro del archivo con su numero de linea, su texto limpio y el bloqueo que describe.
+    public record RegistroLeido(int linea, String registro, Bloqueo bloqueo) {}
+
+    // Como leer, pero conserva la linea y el texto de cada registro para editarlo.
+    public List<RegistroLeido> leerRegistros(Path archivo, YearMonth mes) throws IOException {
         String nombre = archivo.getFileName().toString();
-        List<Bloqueo> bloqueos = new ArrayList<>();
+        List<RegistroLeido> registros = new ArrayList<>();
         // ISO-8859-1 y no UTF-8: los registros son ASCII puro y asi ningun comentario con
         // tildes puede hacer fallar la decodificacion.
         try (BufferedReader lector = Files.newBufferedReader(archivo, StandardCharsets.ISO_8859_1)) {
@@ -80,10 +88,10 @@ public final class LectorBloqueos {
                 if (registro.isEmpty() || registro.charAt(0) == '#') {
                     continue;
                 }
-                bloqueos.add(interpretar(registro, nombre, numeroLinea, mes));
+                registros.add(new RegistroLeido(numeroLinea, registro, interpretar(registro, nombre, numeroLinea, mes)));
             }
         }
-        return bloqueos;
+        return registros;
     }
 
     /** Interpreta un unico registro ya limpio de espacios. */

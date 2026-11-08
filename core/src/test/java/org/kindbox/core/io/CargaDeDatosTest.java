@@ -152,6 +152,78 @@ class CargaDeDatosTest {
     }
 
     @Test
+    @DisplayName("Los registros de bloqueo se listan con su linea, su vigencia y su poligonal")
+    void listarRegistrosDeBloqueo() throws Exception {
+        assertTrue(repositorio.registrosBloqueo(YearMonth.of(2026, 9)).isEmpty());
+        enRaiz("bloqueos/202609.bloqueadas", "# comentario\n02d10h30m-02d18h00m:12,20,13,20\n\n03d00h00m-04d00h00m:1,1,1,5,4,5\n");
+
+        List<RepositorioDatos.RegistroBloqueo> registros = repositorio.registrosBloqueo(YearMonth.of(2026, 9));
+
+        assertEquals(2, registros.size());
+        RepositorioDatos.RegistroBloqueo primero = registros.get(0);
+        assertEquals(2, primero.linea());
+        assertEquals("bloqueos/202609.bloqueadas", primero.archivo());
+        assertEquals("02d10h30m-02d18h00m:12,20,13,20", primero.registro());
+        assertEquals(LocalDateTime.of(2026, 9, 2, 10, 30), primero.inicio());
+        assertEquals(LocalDateTime.of(2026, 9, 2, 18, 0), primero.fin());
+        assertEquals(List.of(12, 20, 13, 20), primero.coordenadas());
+        assertEquals(4, registros.get(1).linea());
+        assertEquals(List.of(1, 1, 1, 5, 4, 5), registros.get(1).coordenadas());
+    }
+
+    @Test
+    @DisplayName("Quitar un bloqueo borra solo su linea y exige que no haya cambiado")
+    void quitarBloqueo() throws Exception {
+        Path archivo = enRaiz("bloqueos/202609.bloqueadas",
+                "# comentario\n02d10h30m-02d18h00m:12,20,13,20\n03d00h00m-04d00h00m:1,1,1,5,4,5\n");
+        YearMonth septiembre = YearMonth.of(2026, 9);
+
+        assertThrows(IllegalStateException.class, () -> repositorio.quitarBloqueo(septiembre, 2, "otro registro"));
+        assertThrows(java.util.NoSuchElementException.class, () -> repositorio.quitarBloqueo(septiembre, 1, null));
+        assertThrows(java.util.NoSuchElementException.class, () -> repositorio.quitarBloqueo(septiembre, 9, null));
+        assertThrows(java.util.NoSuchElementException.class,
+                () -> repositorio.quitarBloqueo(YearMonth.of(2026, 10), 1, null));
+        assertEquals(3, Files.readAllLines(archivo).size());
+
+        RepositorioDatos.ArchivoGuardado guardado =
+                repositorio.quitarBloqueo(septiembre, 2, "02d10h30m-02d18h00m:12,20,13,20");
+
+        assertEquals(1, guardado.registros());
+        assertEquals(List.of("# comentario", "03d00h00m-04d00h00m:1,1,1,5,4,5"), Files.readAllLines(archivo));
+        repositorio.quitarBloqueo(septiembre, 2, null);
+        assertEquals(List.of("# comentario"), Files.readAllLines(archivo));
+        sinTemporales();
+    }
+
+    @Test
+    @DisplayName("Reemplazar un bloqueo cambia su linea, aunque el nuevo caiga en otro mes")
+    void reemplazarBloqueo() throws Exception {
+        Path septiembre = enRaiz("bloqueos/202609.bloqueadas",
+                "02d10h30m-02d18h00m:12,20,13,20\n03d00h00m-04d00h00m:1,1,1,5,4,5\n");
+        YearMonth mes = YearMonth.of(2026, 9);
+
+        List<RepositorioDatos.ArchivoGuardado> mismoMes = repositorio.reemplazarBloqueo(mes, 1,
+                "02d10h30m-02d18h00m:12,20,13,20", new int[] {5, 5, 5, 8}, LocalDateTime.of(2026, 9, 5, 7, 0),
+                LocalDateTime.of(2026, 9, 5, 9, 15));
+        assertEquals(1, mismoMes.size());
+        assertEquals(List.of("03d00h00m-04d00h00m:1,1,1,5,4,5", "05d07h00m-05d09h15m:5,5,5,8"),
+                Files.readAllLines(septiembre));
+
+        List<RepositorioDatos.ArchivoGuardado> otroMes = repositorio.reemplazarBloqueo(mes, 1, null,
+                new int[] {1, 1, 2, 1}, LocalDateTime.of(2026, 10, 3, 0, 0), LocalDateTime.of(2026, 10, 3, 6, 0));
+        assertEquals(2, otroMes.size());
+        assertEquals(List.of("05d07h00m-05d09h15m:5,5,5,8"), Files.readAllLines(septiembre));
+        assertEquals(List.of("03d00h00m-03d06h00m:1,1,2,1"),
+                Files.readAllLines(raiz.resolve("bloqueos/202610.bloqueadas")));
+
+        // Un bloqueo nuevo invalido no toca el archivo.
+        assertThrows(IllegalArgumentException.class, () -> repositorio.reemplazarBloqueo(mes, 1, null,
+                new int[] {1, 1, 2, 2}, LocalDateTime.of(2026, 9, 5, 7, 0), LocalDateTime.of(2026, 9, 5, 8, 0)));
+        assertEquals(List.of("05d07h00m-05d09h15m:5,5,5,8"), Files.readAllLines(septiembre));
+        sinTemporales();
+    }
+
+    @Test
     void agregarBloqueoInvalidoNoEscribeNada() {
         LocalDateTime inicio = LocalDateTime.of(2026, 9, 30, 22, 0);
         LocalDateTime fin = LocalDateTime.of(2026, 10, 1, 2, 0);

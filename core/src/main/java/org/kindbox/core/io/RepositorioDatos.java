@@ -21,6 +21,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.StringJoiner;
 import java.util.regex.Matcher;
@@ -595,6 +596,92 @@ public final class RepositorioDatos {
      */
     public synchronized List<ArchivoGuardado> agregarBloqueo(int[] coordenadas, LocalDateTime inicio,
                                                              LocalDateTime fin) throws IOException {
+        return escribirBloqueo(coordenadas, inicio, fin, null, null);
+    }
+
+    // Registros del archivo de bloqueos del mes, en orden; vacio si el mes no tiene archivo.
+    public synchronized List<RegistroBloqueo> registrosBloqueo(YearMonth mes) throws IOException {
+        Path archivo = localizarMensual(raiz.resolve(DIRECTORIO_BLOQUEOS), nombresBloqueos(mes));
+        if (archivo == null) {
+            return List.of();
+        }
+        CalendarioEscenario calendario = CalendarioEscenario.desde(mes);
+        List<RegistroBloqueo> registros = new ArrayList<>();
+        for (LectorBloqueos.RegistroLeido leido : new LectorBloqueos(calendario).leerRegistros(archivo, mes)) {
+            List<Integer> coordenadas = new ArrayList<>();
+            for (String campo : leido.registro().substring(leido.registro().indexOf(':') + 1).split(",")) {
+                coordenadas.add(Integer.parseInt(campo.trim()));
+            }
+            registros.add(new RegistroBloqueo(mes, relativa(archivo), leido.linea(), leido.registro(),
+                    calendario.aFecha(leido.bloqueo().minutoInicio()), calendario.aFecha(leido.bloqueo().minutoFin()),
+                    coordenadas));
+        }
+        return registros;
+    }
+
+    // Borra el registro de la linea; si llega el texto del registro, exige que no haya cambiado.
+    public synchronized ArchivoGuardado quitarBloqueo(YearMonth mes, int linea, String registro) throws IOException {
+        byte[] restante = sinLinea(archivoBloqueosExistente(mes), linea, registro);
+        Path temporal = Files.createTempDirectory("kindbox-bloqueo-");
+        try {
+            return guardarBloqueos(mes, prepararContenido(temporal, mes, restante));
+        } finally {
+            borrarTemporal(temporal);
+        }
+    }
+
+    // Cambia el registro de la linea por el bloqueo nuevo, que puede caer en otro mes.
+    public synchronized List<ArchivoGuardado> reemplazarBloqueo(YearMonth mes, int linea, String registro,
+                                                                int[] coordenadas, LocalDateTime inicio,
+                                                                LocalDateTime fin) throws IOException {
+        byte[] restante = sinLinea(archivoBloqueosExistente(mes), linea, registro);
+        return escribirBloqueo(coordenadas, inicio, fin, mes, restante);
+    }
+
+    private Path archivoBloqueosExistente(YearMonth mes) throws IOException {
+        Path archivo = localizarMensual(raiz.resolve(DIRECTORIO_BLOQUEOS), nombresBloqueos(mes));
+        if (archivo == null) {
+            throw new NoSuchElementException("No hay archivo de bloqueos de " + mes);
+        }
+        return archivo;
+    }
+
+    // Contenido del archivo sin la linea indicada, que tiene que ser un registro.
+    private byte[] sinLinea(Path archivo, int linea, String registro) throws IOException {
+        List<String> lineas = new ArrayList<>(Files.readAllLines(archivo, StandardCharsets.ISO_8859_1));
+        if (linea < 1 || linea > lineas.size()) {
+            throw new NoSuchElementException("El archivo " + relativa(archivo) + " no tiene la linea " + linea);
+        }
+        String actual = sinMarcaDeOrden(lineas.get(linea - 1));
+        if (actual.isEmpty() || actual.charAt(0) == '#') {
+            throw new NoSuchElementException("La linea " + linea + " de " + relativa(archivo) + " no es un bloqueo");
+        }
+        if (registro != null && !registro.isBlank() && !actual.equals(registro.trim())) {
+            throw new IllegalStateException("La linea " + linea + " de " + relativa(archivo)
+                    + " cambio desde que se listo; vuelva a listar los bloqueos");
+        }
+        lineas.remove(linea - 1);
+        String texto = lineas.isEmpty() ? "" : String.join("\n", lineas) + "\n";
+        return texto.getBytes(StandardCharsets.ISO_8859_1);
+    }
+
+    private static String sinMarcaDeOrden(String linea) {
+        String limpia = linea.trim();
+        if (limpia.startsWith("\uFEFF")) {
+            return limpia.substring(1).trim();
+        }
+        if (limpia.startsWith("\u00EF\u00BB\u00BF")) {
+            return limpia.substring(3).trim();
+        }
+        return limpia;
+    }
+
+    // Escribe el bloqueo; si mesEditado no es nulo, ese mes parte de baseEditada y se guarda siempre.
+    private List<ArchivoGuardado> escribirBloqueo(int[] coordenadas, LocalDateTime inicio, LocalDateTime fin,
+                                                  YearMonth mesEditado, byte[] baseEditada) throws IOException {
+        if (inicio == null || fin == null) {
+            throw new IllegalArgumentException("Faltan el inicio y el fin del bloqueo");
+        }
         if (!fin.isAfter(inicio)) {
             throw new IllegalArgumentException("El fin del bloqueo debe ser posterior a su inicio");
         }
@@ -610,11 +697,16 @@ public final class RepositorioDatos {
                 LocalDateTime hastaDelMes = mes.atEndOfMonth().atTime(23, 59);
                 LocalDateTime hasta = fin.isBefore(hastaDelMes) ? fin : hastaDelMes;
                 if (hasta.isAfter(desde)) {
-                    preparados.put(mes, prepararBloqueo(temporal, mes, registroBloqueo(desde, hasta, poligonal.toString())));
+                    byte[] base = mes.equals(mesEditado) ? baseEditada : null;
+                    preparados.put(mes, prepararBloqueo(temporal, mes, registroBloqueo(desde, hasta, poligonal.toString()),
+                            base));
                 }
             }
             if (preparados.isEmpty()) {
                 throw new IllegalArgumentException("El bloqueo debe durar al menos un minuto dentro de un mes");
+            }
+            if (mesEditado != null && !preparados.containsKey(mesEditado)) {
+                preparados.put(mesEditado, prepararContenido(temporal, mesEditado, baseEditada));
             }
             List<ArchivoGuardado> guardados = new ArrayList<>();
             for (Map.Entry<YearMonth, Path> preparado : preparados.entrySet()) {
@@ -622,10 +714,22 @@ public final class RepositorioDatos {
             }
             return guardados;
         } finally {
-            try (Stream<Path> flujo = Files.walk(temporal)) {
-                flujo.sorted(Comparator.reverseOrder()).forEach(p -> p.toFile().delete());
-            }
+            borrarTemporal(temporal);
         }
+    }
+
+    private static void borrarTemporal(Path temporal) throws IOException {
+        try (Stream<Path> flujo = Files.walk(temporal)) {
+            flujo.sorted(Comparator.reverseOrder()).forEach(p -> p.toFile().delete());
+        }
+    }
+
+    // Copia validada de un contenido completo para el archivo del mes.
+    private Path prepararContenido(Path temporal, YearMonth mes, byte[] contenido) throws IOException {
+        Path copia = Files.createDirectories(temporal.resolve(mes.toString())).resolve("bloqueo-manual.txt");
+        Files.write(copia, contenido);
+        new LectorBloqueos(CalendarioEscenario.desde(mes)).leer(copia, mes);
+        return copia;
     }
 
     private static String registroBloqueo(LocalDateTime desde, LocalDateTime hasta, String poligonal) {
@@ -633,15 +737,16 @@ public final class RepositorioDatos {
                 desde.getMinute(), hasta.getDayOfMonth(), hasta.getHour(), hasta.getMinute(), poligonal);
     }
 
-    // Copia del archivo del mes con el registro al final, ya validada entera.
-    private Path prepararBloqueo(Path temporal, YearMonth mes, String registro) throws IOException {
+    // Copia del archivo del mes, o de base si llega, con el registro al final, ya validada entera.
+    private Path prepararBloqueo(Path temporal, YearMonth mes, String registro, byte[] base) throws IOException {
         List<Path> existentes = coincidencias(raiz.resolve(DIRECTORIO_BLOQUEOS), nombresBloqueos(mes));
         if (existentes.size() > 1) {
             throw new IllegalStateException("Hay mas de un archivo de bloqueos de " + mes + ": "
                     + relativas(existentes) + ". Conserve uno solo antes de agregar otro");
         }
         Path copia = Files.createDirectory(temporal.resolve(mes.toString())).resolve("bloqueo-manual.txt");
-        byte[] actuales = existentes.isEmpty() ? new byte[0] : Files.readAllBytes(existentes.get(0));
+        byte[] actuales = base != null ? base
+                : existentes.isEmpty() ? new byte[0] : Files.readAllBytes(existentes.get(0));
         boolean cerrado = actuales.length == 0 || actuales[actuales.length - 1] == '\n';
         Files.write(copia, actuales);
         Files.writeString(copia, (cerrado ? "" : "\n") + registro + "\n", StandardCharsets.ISO_8859_1,
@@ -790,6 +895,15 @@ public final class RepositorioDatos {
 
     // Ruta relativa a la raiz del archivo guardado, registros validados y si piso uno anterior.
     public record ArchivoGuardado(String ruta, int registros, boolean reemplazado) {}
+
+    // Registro de un archivo mensual de bloqueos; mes y linea lo identifican para editarlo o borrarlo.
+    public record RegistroBloqueo(YearMonth mes, String archivo, int linea, String registro,
+                                  LocalDateTime inicio, LocalDateTime fin, List<Integer> coordenadas) {
+
+        public RegistroBloqueo {
+            coordenadas = List.copyOf(coordenadas);
+        }
+    }
 
     /**
      * Un mes de un escenario abierto.
