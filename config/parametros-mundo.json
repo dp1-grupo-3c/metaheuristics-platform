@@ -1,6 +1,6 @@
 {
   "mapa" : {
-    "largoKm" : 70,
+    "largoKm" : 87,
     "anchoKm" : 50
   },
   "almacenes" : [ {
@@ -20,7 +20,7 @@
   }, {
     "id" : 2,
     "nombre" : "Almacen Intermedio Este",
-    "x" : 57,
+    "x" : 66,
     "y" : 27,
     "central" : false,
     "capacidad" : 1000
