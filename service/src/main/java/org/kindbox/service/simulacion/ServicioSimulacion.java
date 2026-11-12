@@ -381,7 +381,7 @@ public class ServicioSimulacion {
     public DetalleCorrida detalle(String id) {
         Corrida corrida = requerir(id);
         return new DetalleCorrida(resumen(corrida), corrida.instantanea(), corrida.resultado(),
-                corrida.averiasAplicadas());
+                corrida.averiasAplicadas(), corrida.eventos());
     }
 
     /** Indicadores acumulados de la corrida. */
