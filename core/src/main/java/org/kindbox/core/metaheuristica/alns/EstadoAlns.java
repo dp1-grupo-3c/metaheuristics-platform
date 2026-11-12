@@ -66,7 +66,7 @@ import org.kindbox.core.problema.ValorObjetivo;
  */
 public final class EstadoAlns {
 
-    /** Holgura, en minutos, por debajo de la cual un pedido del plan vigente no puede soltarse. */
+    /** Parte fija, en minutos, de la ventana de compromiso de {@link #ventanaCompromiso}. */
     static final long HOLGURA_COMPROMISO = 120L;
 
     /** Holgura minima de filas de ruta, para instancias con turnos muy cortos. */
@@ -446,10 +446,14 @@ public final class EstadoAlns {
 
     /**
      * Ventana, en minutos antes de su limite, desde la que un pedido que el plan de referencia
-     * atiende ya no puede soltarse.
+     * atiende ya no puede soltarse: {@link #HOLGURA_COMPROMISO} para cargar, viajar y entregar,
+     * mas el margen que exige el objetivo (10 % del plazo por defecto). Un Prioritario 1 de 4 h
+     * queda protegido desde que le quedan 2:24 h (60 % de su plazo) y un pedido normal de 36 h
+     * desde las 5:36 h (16 %), de modo que se protege mas a los urgentes sin volver rigido al
+     * planificador con los normales.
      */
     long ventanaCompromiso(int pedido) {
-        return HOLGURA_COMPROMISO;
+        return HOLGURA_COMPROMISO + margenExigido[pedido];
     }
 
     /** El pedido ha entrado en su ventana de compromiso. */

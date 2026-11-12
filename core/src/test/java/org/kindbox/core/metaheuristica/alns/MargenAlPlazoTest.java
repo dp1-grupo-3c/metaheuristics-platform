@@ -105,6 +105,25 @@ class MargenAlPlazoTest {
     }
 
     @Test
+    void laVentanaDeCompromisoEsDosHorasMasElMargenExigido() {
+        InstanciaPlanificacion instancia = InstanciasDePrueba.fotografia(AHORA,
+                List.of(InstanciasDePrueba.pedido(0, 30, 14, 1, AHORA, 4),
+                        InstanciasDePrueba.pedido(1, 30, 14, 1, AHORA, 8),
+                        InstanciasDePrueba.pedido(2, 30, 14, 1, AHORA, 12),
+                        InstanciasDePrueba.pedido(3, 30, 14, 1, AHORA, 18),
+                        InstanciasDePrueba.pedido(4, 30, 14, 1, AHORA, 36)),
+                List.of(InstanciasDePrueba.unidadEn("TA01", 27, 14, AHORA)), 1440, InstanciasDePrueba.parametros());
+        EstadoAlns estado = new EstadoAlns(instancia, new ProgramadorRuta(instancia));
+        long[] esperada = {144, 168, 192, 228, 336};
+        for (int id = 0; id < esperada.length; id++) {
+            assertEquals(esperada[id], estado.ventanaCompromiso(instancia.indiceDePedido(id)), "pedido " + id);
+        }
+        // Con el nivel de margen anulado queda la ventana fija de antes, 2 h para todos.
+        EstadoAlns sinMargen = new EstadoAlns(instancia, new TareasAlns(instancia), new ProgramadorRuta(instancia), 30, 0.0);
+        assertEquals(120, sinMargen.ventanaCompromiso(instancia.indiceDePedido(4)));
+    }
+
+    @Test
     void alnsYHgsEntreganAlUrgenteConMargen() {
         InstanciaPlanificacion instancia = instancia();
         for (String nombre : List.of("ALNS", "HGS")) {

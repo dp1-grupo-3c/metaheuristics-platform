@@ -76,7 +76,8 @@ public final class FuncionObjetivoJerarquica implements FuncionObjetivo {
      * de dos horas es holgado para un pedido de 36 h e imposible para uno de 4 h.
      */
     public static long margenExigido(InstanciaPlanificacion instancia, int pedido, double fraccion) {
-        return (long) Math.ceil(fraccion * instancia.pedidoPlazoHoras(pedido) * 60.0);
+        // La tolerancia evita que el error de coma flotante sume un minuto: 0.1 * 720 no da 72 exacto.
+        return (long) Math.ceil(fraccion * instancia.pedidoPlazoHoras(pedido) * 60.0 - 1e-9);
     }
 
     /** Fraccion del plazo que este objetivo exige como margen. */
