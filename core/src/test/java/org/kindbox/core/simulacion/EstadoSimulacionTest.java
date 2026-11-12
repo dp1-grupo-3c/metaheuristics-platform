@@ -241,6 +241,31 @@ class EstadoSimulacionTest {
     }
 
     @Test
+    @DisplayName("Los kilometros recorridos de la unidad se acumulan y no se reinician al replanificar")
+    void losKilometrosRecorridosNoSeReinician() {
+        EstadoSimulacion estado = estadoCon(List.of(pedido(1, 2, 0L, 36), pedido(2, 2, 0L, 36)));
+        ParametrosOperacion.Instantanea p = new ParametrosOperacion().instantanea();
+        UnidadEnCurso bici = estado.unidad(estado.indiceDeUnidad("TB01"));
+        assertEquals(0, estado.vistaDe(bici, 0L, p).kilometrosRecorridos(), "sin itinerario no ha recorrido nada");
+
+        int[] primero = {Ciudad.nodo(5, 5), Ciudad.nodo(6, 5), Ciudad.nodo(7, 5), Ciudad.nodo(8, 5)};
+        bici.asignarItinerario(new Ruta("TB01", TipoUnidad.BICICLETA, primero[0], 0L,
+                        List.of(Parada.entrega(primero[3], 1, 2, 15, 75, 3))), primero,
+                new int[] {3}, new long[] {15L}, new long[] {75L}, 0L, p);
+        assertEquals(2, bici.cobrarHasta(2));
+        assertEquals(2, estado.vistaDe(bici, 10L, p).kilometrosRecorridos());
+
+        // La replanificacion cobra lo recorrido y asigna un camino nuevo: el acumulado sigue.
+        int[] segundo = {Ciudad.nodo(7, 5), Ciudad.nodo(7, 6), Ciudad.nodo(7, 7)};
+        bici.asignarItinerario(new Ruta("TB01", TipoUnidad.BICICLETA, segundo[0], 100L,
+                        List.of(Parada.entrega(segundo[2], 2, 2, 110, 170, 2))), segundo,
+                new int[] {2}, new long[] {110L}, new long[] {170L}, 100L, p);
+        assertEquals(2, estado.vistaDe(bici, 90L, p).kilometrosRecorridos(), "antes de salir no suma");
+        assertEquals(2, bici.cobrarHasta(2));
+        assertEquals(4, estado.vistaDe(bici, 120L, p).kilometrosRecorridos());
+    }
+
+    @Test
     @DisplayName("El registro de entregas guarda solo las ultimas 24 horas")
     void elRegistroDeEntregasSeRecorta() {
         EstadoSimulacion estado = estadoCon(List.of());

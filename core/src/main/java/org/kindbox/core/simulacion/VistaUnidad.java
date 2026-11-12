@@ -55,7 +55,22 @@ public record VistaUnidad(
         long minutoLlegadaTramo,
         // Ultimo almacen donde cargo y minuto en que sale o salio de el, o -1.
         int idAlmacenOrigen,
-        long minutoSalidaAlmacen) {
+        long minutoSalidaAlmacen,
+        // Kilometros recorridos desde el inicio de la corrida hasta el minuto de la fotografia.
+        int kilometrosRecorridos) {
+
+    /** Vista sin kilometraje acumulado, para quien no lo conoce. */
+    public VistaUnidad(String codigo, TipoUnidad tipo, EstadoUnidad estado, int x, int y, int cargaABordo,
+                       int capacidad, ColorSemaforo color, int[] caminoRecorrido, int[] caminoPendiente,
+                       int destinoX, int destinoY, long minutosHastaDestino, List<PedidoABordo> pedidosABordo,
+                       int tipoAveria, long minutoInicioAveria, long minutoFinAveriaEnElLugar,
+                       long minutoReincorporacion, Fase fase, long minutoSalidaTramo, long minutoLlegadaTramo,
+                       int idAlmacenOrigen, long minutoSalidaAlmacen) {
+        this(codigo, tipo, estado, x, y, cargaABordo, capacidad, color, caminoRecorrido, caminoPendiente,
+                destinoX, destinoY, minutosHastaDestino, pedidosABordo, tipoAveria, minutoInicioAveria,
+                minutoFinAveriaEnElLugar, minutoReincorporacion, fase, minutoSalidaTramo, minutoLlegadaTramo,
+                idAlmacenOrigen, minutoSalidaAlmacen, 0);
+    }
 
     // LLEGANDO va hacia una parada, SALIENDO espera salir de una, SIN_RUTA no tiene itinerario.
     public enum Fase { LLEGANDO, SALIENDO, SIN_RUTA }

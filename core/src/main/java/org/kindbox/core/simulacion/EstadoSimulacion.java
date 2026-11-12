@@ -622,6 +622,7 @@ public final class EstadoSimulacion {
                 destinoX, destinoY, minutosHastaDestino, aBordo,
                 u.averia() == null ? 0 : u.averia().codigo(),
                 u.minutoInicioAveria(), u.minutoFinAveriaEnElLugar(), u.minutoReincorporacion(),
-                fase, salidaTramo, llegadaTramo, u.idAlmacenOrigen(), u.minutoSalidaAlmacen());
+                fase, salidaTramo, llegadaTramo, u.idAlmacenOrigen(), u.minutoSalidaAlmacen(),
+                u.kilometrosRecorridos(minuto));
     }
 }

@@ -72,6 +72,8 @@ public final class UnidadEnCurso {
     private ParametrosOperacion.Instantanea parametrosMovimiento = new ParametrosOperacion().instantanea();
     private long minutoFinServicioHeredado = Long.MIN_VALUE;
     private int indiceCobrado;
+    // Kilometros cobrados desde el inicio de la corrida; no se reinicia al cambiar de itinerario.
+    private int kilometrosCobrados;
     private long secuenciaMovimiento = -1L;
 
     private boolean misionTrasvase;
@@ -396,7 +398,17 @@ public final class UnidadEnCurso {
         int destino = Math.max(indiceCobrado, Math.min(indiceEnCamino, camino.length - 1));
         int kilometros = destino - indiceCobrado;
         indiceCobrado = destino;
+        kilometrosCobrados += kilometros;
         return kilometros;
+    }
+
+    /**
+     * Kilometros recorridos por la unidad desde el inicio de la corrida hasta el minuto dado:
+     * los ya cobrados mas los del tramo en curso que aun no se cobran.
+     */
+    public int kilometrosRecorridos(long minuto) {
+        int actual = Math.min(indiceNodoActual(minuto), camino.length - 1);
+        return kilometrosCobrados + Math.max(0, actual - indiceCobrado);
     }
 
     // -------------------------------------------------------------- eventos
