@@ -27,12 +27,13 @@ import org.kindbox.core.problema.Solucion;
  * modo que cada corrida da un plan distinto y el colapso no se repite. Aqui ALNS recibe un
  * numero fijo de iteraciones y el resto de la configuracion es la de la web: semilla 20262,
  * salto de 30 minutos, averias por reglas con probabilidad 0,02, arranque desde el plan
- * vigente y colapso con el primer pedido vencido. El colapso que se obtiene no es el del
- * pedido 2816 del reporte, pero tiene el mismo origen: el pedido nunca queda sin asignar
- * mientras tiene margen y las replanificaciones lo postergan hasta que ya no cabe.</p>
+ * vigente y colapso con el primer pedido vencido.</p>
  *
- * <p>La prueba fija el comportamiento actual. Cuando se corrija la postergacion en ALNS, la
- * corrida debe culminar sin colapso y esta afirmacion tiene que cambiar.</p>
+ * <p>Antes del nivel de margen de la funcion objetivo esta corrida colapsaba siempre en el
+ * pedido 3180 (15/11 13:33, 701 entregados), con el mismo origen que los pedidos 2816 y 3323
+ * de los reportes: la busqueda lo mantenia asignado con 1 a 8 minutos de margen durante
+ * horas, porque era lo mas barato, y en cuanto un contratiempo se comia ese margen ya ninguna
+ * unidad podia atenderlo. Con el nivel de margen debe culminar sin incumplir ningun plazo.</p>
  */
 class ReproduccionColapso5DTest {
 
@@ -43,8 +44,8 @@ class ReproduccionColapso5DTest {
     private static final long ITERACIONES = 200L;
 
     @Test
-    @DisplayName("La 5D del 12/11/2026 11:25 con ALNS por iteraciones colapsa siempre en el mismo pedido")
-    void colapsoRepetible() throws IOException {
+    @DisplayName("La 5D del 12/11/2026 11:25 con ALNS por iteraciones culmina sin colapso")
+    void culminaSinColapso() throws IOException {
         assumeTrue(Files.isDirectory(DATOS), "sin " + DATOS.toAbsolutePath());
         ConfiguracionEscenario configuracion = new ConfiguracionEscenario(TipoEscenario.SIMULACION_5D,
                 PRIMER_DIA, PRIMER_DIA.plusDays(4), 30, 240.0, ModoReloj.LIBRE, "ALNS", SEMILLA_WEB, 5,
@@ -60,10 +61,8 @@ class ReproduccionColapso5DTest {
 
         ResultadoSimulacion resultado = motor.ejecutar();
 
-        assertEquals(EstadoCorrida.COLAPSADA, resultado.estado(), resultado.mensaje());
-        assertEquals(3180, resultado.pedidoDelPrimerIncumplimiento());
-        assertEquals(5133L, resultado.minutoPrimerIncumplimiento());
-        assertEquals(701, resultado.metricas().pedidosEntregados());
+        assertEquals(EstadoCorrida.CULMINADA, resultado.estado(), resultado.mensaje());
+        assertEquals(0, resultado.metricas().pedidosIncumplidos());
     }
 
     /** ALNS con un presupuesto fijo de iteraciones en lugar del de reloj que fija el motor. */
