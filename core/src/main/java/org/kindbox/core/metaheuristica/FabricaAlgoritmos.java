@@ -166,7 +166,8 @@ public final class FabricaAlgoritmos {
                 .real("esfuerzoElite", ParametrosHgs::esfuerzoElite)
                 .largo("maximoGeneraciones", ParametrosHgs::maximoGeneraciones)
                 .largo("maximoGeneracionesSinMejora", ParametrosHgs::maximoGeneracionesSinMejora)
-                .booleano("filtroCotaInferior", ParametrosHgs::filtroCotaInferior);
+                .booleano("filtroCotaInferior", ParametrosHgs::filtroCotaInferior)
+                .real("fraccionMargenPlazo", ParametrosHgs::fraccionMargenPlazo);
     }
 
     private static Tabla<ParametrosAlns> tablaAlns() {
@@ -210,7 +211,9 @@ public final class FabricaAlgoritmos {
                 .largo("maximoIteracionesSinMejora", ParametrosAlns::maximoIteracionesSinMejora)
                 .largo("iteracionesParaReinicio", ParametrosAlns::iteracionesParaReinicio)
                 .entero("holguraObjetivoMinutos", ParametrosAlns::holguraObjetivoMinutos)
-                .booleano("filtroCotaInferior", ParametrosAlns::filtroCotaInferior);
+                .booleano("filtroCotaInferior", ParametrosAlns::filtroCotaInferior)
+                .real("fraccionMargenPlazo", ParametrosAlns::fraccionMargenPlazo)
+                .real("factorPenalizacionMargen", ParametrosAlns::factorPenalizacionMargen);
     }
 
     // ------------------------------------------------------------- lectura

@@ -14,7 +14,9 @@ import org.kindbox.core.problema.ValorObjetivo;
  * Funcion objetivo jerarquica H/U/S, con urgencia efectiva antes del costo.
  *
  * <p>El nivel 1, dominante, minimiza {@code H}, el numero de pedidos que quedan con
- * remanente sin asignar. A igual H se minimiza la urgencia de los no atendidos; despues se minimiza {@code S}, la suma sobre las
+ * remanente sin asignar. A igual H se minimiza la urgencia de los no atendidos; despues, el
+ * numero de pedidos asignados que llegan con menos margen que una fraccion de su plazo
+ * ({@link #FRACCION_MARGEN_PLAZO} por defecto); y despues se minimiza {@code S}, la suma sobre las
  * unidades de los kilometros recorridos por el costo por kilometro de su tipo. La
  * comparacion lexicografica vive en {@link ValorObjetivo}: una solucion con {@code H} mayor
  * que cero nunca se prefiere a una con {@code H} igual a cero, sea cual sea su costo.</p>
@@ -34,18 +36,60 @@ import org.kindbox.core.problema.ValorObjetivo;
  * las entregas de las rutas y de las cantidades pendientes de la instancia, sin confiar en el
  * banco que cada algoritmo lleve por su cuenta.</p>
  *
- * <p>La clase no guarda estado, de modo que una sola instancia puede compartirse entre los
+ * <p>La clase no guarda estado mutable, de modo que una sola instancia puede compartirse entre los
  * dos algoritmos y entre hilos.</p>
  */
 public final class FuncionObjetivoJerarquica implements FuncionObjetivo {
 
+    /** Fraccion del plazo que un pedido debe conservar como margen si no se configura otra. */
+    public static final double FRACCION_MARGEN_PLAZO = 0.10;
+
     /** Tipos de unidad en orden fijo, para que la suma de {@code S} sea reproducible. */
     private static final TipoUnidad[] TIPOS = TipoUnidad.values();
+
+    private final double fraccionMargenPlazo;
+
+    /** Objetivo con el margen por defecto del {@value #FRACCION_MARGEN_PLAZO} del plazo. */
+    public FuncionObjetivoJerarquica() {
+        this(FRACCION_MARGEN_PLAZO);
+    }
+
+    /**
+     * @param fraccionMargenPlazo fraccion del plazo total de cada pedido que su ultima llegada
+     *                            debe dejar libre antes del limite; cero anula el nivel
+     */
+    public FuncionObjetivoJerarquica(double fraccionMargenPlazo) {
+        this.fraccionMargenPlazo = exigirFraccionMargen(fraccionMargenPlazo);
+    }
+
+    /** Valida una fraccion de margen del plazo, en {@code [0, 0.5]}. */
+    public static double exigirFraccionMargen(double fraccion) {
+        if (!(fraccion >= 0.0 && fraccion <= 0.5)) {
+            throw new IllegalArgumentException("La fraccion de margen del plazo debe estar entre 0 y 0.5: " + fraccion);
+        }
+        return fraccion;
+    }
+
+    /**
+     * Margen minimo, en minutos, que la ultima llegada del pedido debe dejar antes de su
+     * limite. Es proporcional a su plazo total y no un numero fijo de minutos, porque un margen
+     * de dos horas es holgado para un pedido de 36 h e imposible para uno de 4 h.
+     */
+    public static long margenExigido(InstanciaPlanificacion instancia, int pedido, double fraccion) {
+        return (long) Math.ceil(fraccion * instancia.pedidoPlazoHoras(pedido) * 60.0);
+    }
+
+    /** Fraccion del plazo que este objetivo exige como margen. */
+    public double fraccionMargenPlazo() {
+        return fraccionMargenPlazo;
+    }
 
     @Override
     public ValorObjetivo evaluar(InstanciaPlanificacion instancia, Solucion solucion) {
         final int cantidadPedidos = instancia.cantidadPedidos();
         int[] entregado = new int[cantidadPedidos];
+        long[] ultimaLlegada = new long[cantidadPedidos];
+        Arrays.fill(ultimaLlegada, Long.MIN_VALUE);
         int[] kilometrosPorTipo = new int[TIPOS.length];
 
         for (Ruta ruta : solucion.rutas()) {
@@ -57,6 +101,7 @@ public final class FuncionObjetivoJerarquica implements FuncionObjetivo {
                     // Un pedido ajeno a esta fotografia no aporta a H: ya fue atendido antes.
                     if (indice >= 0) {
                         entregado[indice] += parada.cantidad();
+                        ultimaLlegada[indice] = Math.max(ultimaLlegada[indice], parada.minutoLlegada());
                     }
                 }
             }
@@ -64,11 +109,15 @@ public final class FuncionObjetivoJerarquica implements FuncionObjetivo {
         }
 
         int pedidosNoAtendidos = 0;
+        int pedidosSinMargen = 0;
         double urgencia = 0.0;
         for (int i = 0; i < cantidadPedidos; i++) {
             if (entregado[i] < instancia.pedidoCantidad(i)) {
                 pedidosNoAtendidos++;
                 urgencia += ValorObjetivo.urgenciaDe(instancia.pedidoMinutoLimiteEfectivo(i) - instancia.minutoActual());
+            } else if (instancia.pedidoMinutoLimite(i) - ultimaLlegada[i]
+                    < margenExigido(instancia, i, fraccionMargenPlazo)) {
+                pedidosSinMargen++;
             }
         }
 
@@ -78,7 +127,7 @@ public final class FuncionObjetivoJerarquica implements FuncionObjetivo {
         }
 
         double penalizacion = PESO_ESTABILIDAD * desviacionDelPlanVigente(instancia, solucion);
-        return new ValorObjetivo(pedidosNoAtendidos, urgencia, costo, penalizacion);
+        return new ValorObjetivo(pedidosNoAtendidos, urgencia, costo, penalizacion, pedidosSinMargen);
     }
 
     @Override

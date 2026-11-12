@@ -124,11 +124,21 @@ public final class VerificarCorrecciones {
         var distintoCosto = instancia(List.of(pedidos().get(0)), List.of(
                 InstanciasDePrueba.unidad("TA01", 530),
                 InstanciasDePrueba.unidadEn("TA02", 20, 14, 510)));
-        var barato = new EstadoAlns(distintoCosto, new ProgramadorRuta(distintoCosto));
-        var holgado = new EstadoAlns(distintoCosto, new ProgramadorRuta(distintoCosto));
+        // El riesgo de holgura (margen deseado de 30 min) solo desempata: sin el nivel de margen
+        // del objetivo, el costo manda.
+        var tareasDistintoCosto = new TareasAlns(distintoCosto);
+        var barato = new EstadoAlns(distintoCosto, tareasDistintoCosto, new ProgramadorRuta(distintoCosto), 30, 0.0);
+        var holgado = new EstadoAlns(distintoCosto, tareasDistintoCosto, new ProgramadorRuta(distintoCosto), 30, 0.0);
         exigir(barato.insertar(0, 0, 0) && holgado.insertar(1, 0, 0), "Dos rutas factibles");
         exigir(barato.riesgoTemporal() > holgado.riesgoTemporal(), "Caso con sobrecosto mas robusto");
         exigir(barato.compararConHolgura(holgado) < 0, "El costo original domina a la holgura");
+        // Con el nivel de margen (10 % de 2 h = 12 min), llegar al filo pesa mas que el costo.
+        var baratoAlFilo = new EstadoAlns(distintoCosto, new ProgramadorRuta(distintoCosto));
+        var holgadoConMargen = new EstadoAlns(distintoCosto, new ProgramadorRuta(distintoCosto));
+        exigir(baratoAlFilo.insertar(0, 0, 0) && holgadoConMargen.insertar(1, 0, 0), "Dos rutas factibles");
+        exigir(baratoAlFilo.pedidosSinMargen() == 1 && holgadoConMargen.pedidosSinMargen() == 0,
+                "El barato llega con menos de 12 min de margen");
+        exigir(baratoAlFilo.compararConHolgura(holgadoConMargen) > 0, "El margen al plazo domina al costo");
     }
 
     private static void probarPartesYCopia() {

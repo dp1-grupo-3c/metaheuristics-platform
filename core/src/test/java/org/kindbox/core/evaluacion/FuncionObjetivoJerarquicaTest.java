@@ -122,6 +122,39 @@ class FuncionObjetivoJerarquicaTest {
     }
 
     @Test
+    @DisplayName("Un pedido que llega con menos del 10 % de su plazo de margen pesa mas que el costo")
+    void losPedidosSinMargenPrecedenAlCosto() {
+        // Prioritario de 4 h registrado a las 05:00: vence a las 09:00 y exige 24 min de margen.
+        List<Pedido> pedidos = List.of(
+                InstanciasDePrueba.pedido(0, 30, 20, 4, 300, 4),
+                InstanciasDePrueba.pedido(1, 40, 30, 6, 0, 36));
+        InstanciaPlanificacion instancia = InstanciasDePrueba.fotografia(
+                InstanciasDePrueba.INICIO_MANANA, pedidos,
+                List.of(InstanciasDePrueba.unidad("TA01", InstanciasDePrueba.INICIO_MANANA)),
+                InstanciasDePrueba.FIN_MANANA, InstanciasDePrueba.parametros());
+        int nodo = Ciudad.nodo(30, 20);
+        Solucion barataAlFilo = solucion(instancia, List.of(new Ruta("TA01", TipoUnidad.AUTO, Ciudad.nodo(27, 14), 420,
+                List.of(Parada.entrega(nodo, 0, 4, 530, 590, 10), Parada.entrega(nodo, 1, 6, 600, 660, 0)))),
+                Map.of(), ValorObjetivo.cero());
+        Solucion caraConMargen = solucion(instancia, List.of(new Ruta("TA01", TipoUnidad.AUTO, Ciudad.nodo(27, 14), 420,
+                List.of(Parada.entrega(nodo, 0, 4, 500, 560, 30), Parada.entrega(nodo, 1, 6, 600, 660, 0)))),
+                Map.of(), ValorObjetivo.cero());
+
+        ValorObjetivo alFilo = objetivo.evaluar(instancia, barataAlFilo);
+        ValorObjetivo conMargen = objetivo.evaluar(instancia, caraConMargen);
+
+        assertEquals(1, alFilo.pedidosSinMargen(), "llega a las 08:50, con 10 min de los 24 exigidos");
+        assertEquals(0, conMargen.pedidosSinMargen(), "llega a las 08:20, con 40 min");
+        assertTrue(conMargen.mejorQue(alFilo), "el nivel de margen decide antes que el costo");
+        assertTrue(new ValorObjetivo(0, 0.0, 0.0, 0.0, 5).mejorQue(new ValorObjetivo(1, 0.0, 0.0, 0.0, 0)),
+                "el margen nunca pesa mas que dejar un pedido sin atender");
+        assertEquals(0, new FuncionObjetivoJerarquica(0.0).evaluar(instancia, barataAlFilo).pedidosSinMargen(),
+                "con fraccion cero el nivel queda anulado");
+        assertEquals(24, FuncionObjetivoJerarquica.margenExigido(instancia, 0, 0.10));
+        assertEquals(216, FuncionObjetivoJerarquica.margenExigido(instancia, 1, 0.10));
+    }
+
+    @Test
     @DisplayName("H cuenta los pedidos con cualquier remanente, no las unidades sin entregar")
     void hCuentaPedidosConRemanente() {
         List<Pedido> pedidos = List.of(

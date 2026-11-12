@@ -105,6 +105,7 @@ public final class Split {
     private final ProgramadorRuta programador;
     private final ParametrosHgs parametros;
     private final EstabilidadPlan estabilidad;
+    private final ContadorMargen contadorMargen;
 
     private final int cantidadUnidades;
     private final int cantidadAlmacenes;
@@ -165,6 +166,7 @@ public final class Split {
         this.programador = programador;
         this.parametros = parametros;
         this.estabilidad = estabilidad;
+        this.contadorMargen = new ContadorMargen(instancia, tareas, programador, parametros.fraccionMargenPlazo());
         this.cantidadUnidades = instancia.cantidadUnidades();
         this.cantidadAlmacenes = instancia.cantidadAlmacenes();
 
@@ -286,6 +288,7 @@ public final class Split {
         valorarArcos(individuo.permutacion(), individuo.tipo());
         resolverConCuotas(pesoDesfase);
         asignarUnidades(individuo, pesoDesfase);
+        contadorMargen.contar(individuo);
     }
 
     /** Decodificacion degenerada: sin tareas o sin unidades no hay ruta posible. */
@@ -300,6 +303,7 @@ public final class Split {
         individuo.cantidadBanco(m);
         individuo.pedidosNoAtendidos(contarPedidos(banco, m));
         individuo.urgencia(ultimaUrgencia);
+        individuo.pedidosSinMargen(0);
         individuo.costo(0.0);
         individuo.desfase(0);
         individuo.desviacionPlan(0);

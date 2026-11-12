@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.kindbox.core.evaluacion.FuncionObjetivoJerarquica;
 import org.kindbox.core.evaluacion.Programacion;
 import org.kindbox.core.evaluacion.HolguraTemporal;
 import org.kindbox.core.evaluacion.ProgramadorRuta;
@@ -137,6 +138,14 @@ public final class EstadoAlns {
     private boolean riesgoValido;
     private long riesgoTotal;
 
+    // Nivel de pedidos sin margen de la funcion objetivo, sobre las mismas llegadas.
+    private final long[] margenExigido;
+    private final boolean[] sinMargen;
+    private int pedidosSinMargen;
+    private int ultimoDeltaSinMargen;
+    /** Peso de cada pedido sin margen dentro del escalar interno y de la insercion. */
+    private double pesoSinMargen;
+
     private double costoTotal;
     private int kilometrosTotales;
 
@@ -166,6 +175,15 @@ public final class EstadoAlns {
     /** Margen capturado de los parametros del algoritmo, sin depender de propiedades globales. */
     public EstadoAlns(InstanciaPlanificacion instancia, TareasAlns tareas,
                       ProgramadorRuta programador, int margenHolgura) {
+        this(instancia, tareas, programador, margenHolgura, FuncionObjetivoJerarquica.FRACCION_MARGEN_PLAZO);
+    }
+
+    /**
+     * @param fraccionMargenPlazo fraccion del plazo de cada pedido que su llegada debe dejar
+     *                            libre, la misma de la funcion objetivo del algoritmo
+     */
+    public EstadoAlns(InstanciaPlanificacion instancia, TareasAlns tareas,
+                      ProgramadorRuta programador, int margenHolgura, double fraccionMargenPlazo) {
         if (margenHolgura < 0 || margenHolgura > 1440) {
             throw new IllegalArgumentException("Margen de holgura fuera de [0,1440]");
         }
@@ -197,6 +215,12 @@ public final class EstadoAlns {
         this.urgenciaDe = new double[Math.max(1, cantidadPedidos)];
         for (int p = 0; p < cantidadPedidos; p++) {
             urgenciaDe[p] = ValorObjetivo.urgenciaDe(instancia.pedidoMinutoLimiteEfectivo(p) - instancia.minutoActual());
+        }
+        FuncionObjetivoJerarquica.exigirFraccionMargen(fraccionMargenPlazo);
+        this.margenExigido = new long[Math.max(1, cantidadPedidos)];
+        this.sinMargen = new boolean[Math.max(1, cantidadPedidos)];
+        for (int p = 0; p < cantidadPedidos; p++) {
+            margenExigido[p] = FuncionObjetivoJerarquica.margenExigido(instancia, p, fraccionMargenPlazo);
         }
         this.tareasEnUnidadVigenteDe = new int[Math.max(1, cantidadPedidos)];
         this.unidadVigenteDe = PlanVigenteAlns.ninguno(cantidadPedidos).unidades();
@@ -404,20 +428,57 @@ public final class EstadoAlns {
      * mismo criterio con que se aceptan los movimientos y no solo por costo.
      */
     public ValorObjetivo valor() {
-        return new ValorObjetivo(pedidosPendientes, urgenciaBanco, costoTotal, pesoEstabilidad * desviacionVigente);
+        return new ValorObjetivo(pedidosPendientes, urgenciaBanco, costoTotal, pesoEstabilidad * desviacionVigente,
+                pedidosSinMargen());
+    }
+
+    /** Pedidos asignados que llegan con menos margen que el exigido. Es el nivel M del objetivo. */
+    public int pedidosSinMargen() {
+        riesgoTemporal();
+        return pedidosSinMargen;
+    }
+
+    /** El pedido esta asignado por completo y llega con menos margen que el exigido. */
+    boolean pedidoSinMargen(int pedido) {
+        riesgoTemporal();
+        return sinMargen[pedido];
     }
 
     /**
-     * Detecta por identidad si se pierde un pedido urgente del mejor plan de referencia.
-     * Solo se protegen asignaciones vigentes a unidades disponibles y con holgura efectiva
-     * de hasta {@link #HOLGURA_COMPROMISO} minutos. No basta comparar cuantos hay en banco:
-     * dos bancos de igual tamano pueden dejar fuera pedidos diferentes.
+     * Ventana, en minutos antes de su limite, desde la que un pedido que el plan de referencia
+     * atiende ya no puede soltarse.
+     */
+    long ventanaCompromiso(int pedido) {
+        return HOLGURA_COMPROMISO;
+    }
+
+    /** El pedido ha entrado en su ventana de compromiso. */
+    boolean pedidoComprometido(int pedido) {
+        return instancia.pedidoMinutoLimiteEfectivo(pedido) - instancia.minutoActual() <= ventanaCompromiso(pedido);
+    }
+
+    /**
+     * Detecta por identidad si el candidato rompe un compromiso del mejor plan de referencia.
+     * No basta comparar cuantos hay en banco ni cuantos van sin margen: dos planes con los
+     * mismos conteos pueden sacrificar pedidos diferentes. Hay dos compromisos:
+     * <ul>
+     *   <li>no soltar un pedido que la referencia atiende y que ya entro en su ventana de
+     *       compromiso ({@link #ventanaCompromiso}); y</li>
+     *   <li>no retrasar por debajo del margen exigido un pedido que en la referencia lo
+     *       conservaba, salvo que el candidato deje en conjunto menos pedidos sin margen.</li>
+     * </ul>
      */
     public boolean pierdeCompromisosDe(EstadoAlns referencia) {
         for (int p = 0; p < cantidadPedidos; p++) {
-            if (unidadVigenteDe[p] >= 0 && tareasEnBancoDe[p] > 0
-                    && referencia.tareasEnBancoDe[p] == 0
-                    && instancia.pedidoMinutoLimiteEfectivo(p) - instancia.minutoActual() <= HOLGURA_COMPROMISO) {
+            if (tareasEnBancoDe[p] > 0 && referencia.tareasEnBancoDe[p] == 0 && pedidoComprometido(p)) {
+                return true;
+            }
+        }
+        if (pedidosSinMargen() < referencia.pedidosSinMargen()) {
+            return false;
+        }
+        for (int p = 0; p < cantidadPedidos; p++) {
+            if (sinMargen[p] && referencia.tareasEnBancoDe[p] == 0 && !referencia.sinMargen[p]) {
                 return true;
             }
         }
@@ -435,7 +496,16 @@ public final class EstadoAlns {
      */
     public double escalar(double penalizacionPorPedidoDelBanco) {
         return costoTotal + penalizacionPorPedidoDelBanco * (pedidosPendientes + urgenciaBanco)
-                + pesoEstabilidad * desviacionVigente;
+                + pesoSinMargen * pedidosSinMargen() + pesoEstabilidad * desviacionVigente;
+    }
+
+    /** Peso de cada pedido sin margen dentro del escalar interno y de la insercion. */
+    public double pesoSinMargen() {
+        return pesoSinMargen;
+    }
+
+    public void pesoSinMargen(double peso) {
+        this.pesoSinMargen = Math.max(0.0, peso);
     }
 
     /** Acceso directo a la fila de tareas de una unidad. No debe modificarse desde fuera. */
@@ -683,6 +753,8 @@ public final class EstadoAlns {
         System.arraycopy(otro.riesgoPedido, 0, riesgoPedido, 0, cantidadPedidos);
         riesgoValido = otro.riesgoValido;
         riesgoTotal = otro.riesgoTotal;
+        System.arraycopy(otro.sinMargen, 0, sinMargen, 0, cantidadPedidos);
+        pedidosSinMargen = otro.pedidosSinMargen;
     }
 
     /**
@@ -856,15 +928,19 @@ public final class EstadoAlns {
             llegadaSucia[u] = false;
         }
         riesgoTotal = 0;
+        pedidosSinMargen = 0;
         for (int p = 0; p < cantidadPedidos; p++) {
             long ultima = Long.MIN_VALUE;
             int fin = tareas.primeraDePedido(p) + tareas.tareasDePedido(p);
             for (int t = tareas.primeraDePedido(p); t < fin; t++) {
                 if (unidadDe[t] >= 0) ultima = Math.max(ultima, llegadaTarea[t]);
             }
-            riesgoPedido[p] = tareasEnBancoDe[p] == 0 && ultima != Long.MIN_VALUE
+            boolean asignado = tareasEnBancoDe[p] == 0 && ultima != Long.MIN_VALUE;
+            riesgoPedido[p] = asignado
                     ? HolguraTemporal.penalizacion(instancia.pedidoMinutoLimite(p) - ultima, margenHolgura) : 0;
             riesgoTotal += riesgoPedido[p];
+            sinMargen[p] = asignado && instancia.pedidoMinutoLimite(p) - ultima < margenExigido[p];
+            if (sinMargen[p]) pedidosSinMargen++;
         }
         riesgoValido = true;
         return riesgoTotal;
@@ -898,6 +974,7 @@ public final class EstadoAlns {
             maximoInsercion[p] = Math.max(maximoInsercion[p], llegadasTrabajo[i]);
         }
         long delta = 0;
+        int deltaSinMargen = 0;
         int pedidoInsertado = tareas.pedido(tareaInsertada);
         for (int i = 0; i < cuantos; i++) {
             int p = afectadosInsercion[i];
@@ -910,9 +987,20 @@ public final class EstadoAlns {
             long nuevo = bancoDespues == 0
                     ? HolguraTemporal.penalizacion(instancia.pedidoMinutoLimite(p) - ultima, margenHolgura) : 0;
             delta += nuevo - riesgoPedido[p];
+            boolean quedaSinMargen = bancoDespues == 0 && instancia.pedidoMinutoLimite(p) - ultima < margenExigido[p];
+            deltaSinMargen += (quedaSinMargen ? 1 : 0) - (sinMargen[p] ? 1 : 0);
             afectadoInsercion[p] = false;
         }
+        ultimoDeltaSinMargen = deltaSinMargen;
         return delta;
+    }
+
+    /**
+     * Variacion del numero de pedidos sin margen de la ultima insercion valorada con
+     * {@link #deltaRiesgoInsercionValorada}, calculada en la misma pasada.
+     */
+    int ultimoDeltaSinMargen() {
+        return ultimoDeltaSinMargen;
     }
 
     private void prepararLlegadas(int n) {
