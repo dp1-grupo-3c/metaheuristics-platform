@@ -135,7 +135,7 @@ public final class BusquedaGeneticaHibrida implements Algoritmo {
         }
         this.heuristica = heuristica;
         this.parametros = parametros;
-        this.funcionObjetivo = new FuncionObjetivoJerarquica();
+        this.funcionObjetivo = new FuncionObjetivoJerarquica(parametros.fraccionMargenPlazo());
         this.semilla = semilla;
     }
 
@@ -635,11 +635,16 @@ public final class BusquedaGeneticaHibrida implements Algoritmo {
             calcularCotaEntregable(individuo);
             if (mejorSolucion != null && !sondeo) {
                 double diferenciaUrgencia = cotaUrgencia - mejorValor.urgencia();
+                // Los pedidos sin margen no tienen cota propia: se toma el conteo del individuo,
+                // que es el que tendra la solucion salvo que se recorten rutas con desfase.
+                int sinMargen = individuo.pedidosSinMargen();
                 boolean mejora = cotaPedidos < mejorValor.pedidosNoAtendidos()
                         || (cotaPedidos == mejorValor.pedidosNoAtendidos()
                             && (diferenciaUrgencia < -ValorObjetivo.TOLERANCIA_URGENCIA
                                 || (Math.abs(diferenciaUrgencia) <= ValorObjetivo.TOLERANCIA_URGENCIA
-                                    && cotaCosto < mejorValor.costo() - 1e-9)));
+                                    && (sinMargen < mejorValor.pedidosSinMargen()
+                                        || (sinMargen == mejorValor.pedidosSinMargen()
+                                            && cotaCosto < mejorValor.costo() - 1e-9)))));
                 if (!mejora) {
                     return false;
                 }

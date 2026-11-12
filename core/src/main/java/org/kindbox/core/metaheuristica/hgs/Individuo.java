@@ -44,6 +44,7 @@ public final class Individuo {
     private int pedidosNoAtendidos;
     /** Suma de la urgencia de los pedidos con remanente sin asignar; desempata a igual H. */
     private double urgencia;
+    private int pedidosSinMargen;
     private double costo;
     private int desfase;
     private int desviacionPlan;
@@ -174,6 +175,15 @@ public final class Individuo {
         this.urgencia = valor;
     }
 
+    /** Pedidos asignados que llegan con menos margen que el exigido, como en {@link ValorObjetivo}. */
+    public int pedidosSinMargen() {
+        return pedidosSinMargen;
+    }
+
+    public void pedidosSinMargen(int valor) {
+        this.pedidosSinMargen = valor;
+    }
+
     /** Costo de operacion de las rutas, en soles. */
     public double costo() {
         return costo;
@@ -217,7 +227,7 @@ public final class Individuo {
 
     /** Valor de la funcion objetivo jerarquica que corresponde a la decodificacion. */
     public ValorObjetivo valor() {
-        return new ValorObjetivo(pedidosNoAtendidos, urgencia, costo, 0.0);
+        return new ValorObjetivo(pedidosNoAtendidos, urgencia, costo, 0.0, pedidosSinMargen);
     }
 
     /**
@@ -231,17 +241,19 @@ public final class Individuo {
 
     /**
      * Valor con el que la busqueda interna compara individuos: costo de operacion mas la
-     * penalizacion de las tareas sin atender, mas la penalizacion dinamica del desfase, mas la
-     * penalizacion blanda de la desviacion respecto del plan vigente.
+     * penalizacion de las tareas sin atender, mas la de los pedidos sin margen, mas la
+     * penalizacion dinamica del desfase, mas la penalizacion blanda de la desviacion respecto
+     * del plan vigente.
      */
     public double costoInterno(double pesoDesfase, double pesoEstabilidad) {
         return costo + ParametrosHgs.PENALIZACION_TAREA_NO_ATENDIDA * (cantidadBanco + urgencia)
+                + ParametrosHgs.PENALIZACION_PEDIDO_SIN_MARGEN * pedidosSinMargen
                 + pesoDesfase * desfase + pesoEstabilidad * desviacionPlan;
     }
 
     /**
      * Indica si este individuo es mejor que el otro segun el objetivo jerarquico (H, luego la
-     * urgencia de lo no atendido, luego el costo), con la
+     * urgencia de lo no atendido, luego los pedidos sin margen, luego el costo), con la
      * estabilidad desempatando dentro del nivel 2. Es la comparacion que fija el rango por
      * valor objetivo de la aptitud combinada del apartado 6.3.3, y por tanto la que lleva el
      * termino de estabilidad hasta la seleccion de progenitores y la supervivencia.
@@ -255,6 +267,9 @@ public final class Individuo {
         }
         if (Math.abs(urgencia - otro.urgencia) > ValorObjetivo.TOLERANCIA_URGENCIA) {
             return urgencia < otro.urgencia;
+        }
+        if (pedidosSinMargen != otro.pedidosSinMargen) {
+            return pedidosSinMargen < otro.pedidosSinMargen;
         }
         return costoPenalizado(pesoEstabilidad) < otro.costoPenalizado(pesoEstabilidad);
     }
@@ -297,6 +312,7 @@ public final class Individuo {
         this.cantidadBanco = otro.cantidadBanco;
         this.pedidosNoAtendidos = otro.pedidosNoAtendidos;
         this.urgencia = otro.urgencia;
+        this.pedidosSinMargen = otro.pedidosSinMargen;
         this.costo = otro.costo;
         this.desfase = otro.desfase;
         this.desviacionPlan = otro.desviacionPlan;

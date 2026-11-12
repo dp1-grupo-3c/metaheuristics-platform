@@ -17,14 +17,17 @@ import org.kindbox.core.simulacion.ResultadoSimulacion;
  * @param resultado   resumen final, o {@code null} si la corrida sigue en curso
  * @param averias     registro de las averias ya aplicadas, de la mas reciente a la mas
  *                    antigua, que es lo que lista el panel de averias del prototipo
+ * @param eventos     bitacora de la corrida en orden cronologico, que el resumen final lista
  */
 public record DetalleCorrida(
         ResumenCorrida corrida,
         InstantaneaSimulacion instantanea,
         ResultadoSimulacion resultado,
-        List<String> averias) {
+        List<String> averias,
+        List<EventoCorrida> eventos) {
 
     public DetalleCorrida {
         averias = List.copyOf(averias);
+        eventos = eventos == null ? List.of() : List.copyOf(eventos);
     }
 }

@@ -21,13 +21,26 @@ package org.kindbox.core.problema;
  * @param pedidosNoAtendidos numero de pedidos sin asignacion factible dentro de plazo
  * @param urgencia           suma de 1/(holgura+1) de los pedidos no atendidos
  * @param costo              costo de operacion en soles
+ * <p>{@code pedidosSinMargen} es el nivel entre la urgencia y el costo: cuantos pedidos quedan
+ * asignados con un margen al plazo menor que una fraccion de su plazo total (ver
+ * {@code FuncionObjetivoJerarquica}). A igual H y urgencia se prefiere el plan que no deja
+ * pedidos al filo de su plazo aunque cueste mas: sin este nivel la busqueda posterga un pedido
+ * hasta el ultimo minuto que lo hace factible y cualquier contratiempo lo vuelve inatendible.</p>
+ *
  * @param penalizacion       suma de terminos blandos, en unidades de costo
+ * @param pedidosSinMargen   pedidos asignados que llegan con menos margen que el exigido
  */
-public record ValorObjetivo(int pedidosNoAtendidos, double urgencia, double costo, double penalizacion)
+public record ValorObjetivo(int pedidosNoAtendidos, double urgencia, double costo, double penalizacion,
+                            int pedidosSinMargen)
         implements Comparable<ValorObjetivo> {
 
     /** Resolucion de urgencia; la comparacion por celdas mantiene un orden transitivo. */
     public static final double TOLERANCIA_URGENCIA = 1e-9;
+
+    /** Valor sin nivel de margen, el de las soluciones que no lo calculan. */
+    public ValorObjetivo(int pedidosNoAtendidos, double urgencia, double costo, double penalizacion) {
+        this(pedidosNoAtendidos, urgencia, costo, penalizacion, 0);
+    }
 
     /** Valor sin nivel de urgencia, el de las soluciones que no lo calculan. */
     public ValorObjetivo(int pedidosNoAtendidos, double costo, double penalizacion) {
@@ -42,7 +55,7 @@ public record ValorObjetivo(int pedidosNoAtendidos, double urgencia, double cost
     /** Valor peor posible, util como elemento neutro de una minimizacion. */
     public static final ValorObjetivo PEOR =
             new ValorObjetivo(Integer.MAX_VALUE, Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY,
-                    Double.POSITIVE_INFINITY);
+                    Double.POSITIVE_INFINITY, Integer.MAX_VALUE);
 
     /** Valor sin pedidos pendientes ni costo. */
     public static ValorObjetivo cero() {
@@ -70,8 +83,8 @@ public record ValorObjetivo(int pedidosNoAtendidos, double urgencia, double cost
     }
 
     /**
-     * Comparacion lexicografica: primero H, luego la urgencia de lo no atendido y por ultimo
-     * el costo penalizado.
+     * Comparacion lexicografica: primero H, luego la urgencia de lo no atendido, luego los
+     * pedidos sin margen y por ultimo el costo penalizado.
      * Devuelve un valor negativo si este objetivo es mejor.
      */
     @Override
@@ -83,6 +96,8 @@ public record ValorObjetivo(int pedidosNoAtendidos, double urgencia, double cost
         int porUrgencia = Long.compare(Math.round(urgencia / TOLERANCIA_URGENCIA),
                 Math.round(otro.urgencia / TOLERANCIA_URGENCIA));
         if (porUrgencia != 0) return porUrgencia;
+        int porMargen = Integer.compare(pedidosSinMargen, otro.pedidosSinMargen);
+        if (porMargen != 0) return porMargen;
         return Double.compare(costoPenalizado(), otro.costoPenalizado());
     }
 
@@ -93,6 +108,7 @@ public record ValorObjetivo(int pedidosNoAtendidos, double urgencia, double cost
 
     @Override
     public String toString() {
-        return String.format("H=%d U=%.4f S=%.2f pen=%.2f", pedidosNoAtendidos, urgencia, costo, penalizacion);
+        return String.format("H=%d U=%.4f M=%d S=%.2f pen=%.2f", pedidosNoAtendidos, urgencia, pedidosSinMargen,
+                costo, penalizacion);
     }
 }

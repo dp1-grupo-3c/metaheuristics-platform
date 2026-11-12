@@ -1,5 +1,7 @@
 package org.kindbox.core.metaheuristica.alns;
 
+import org.kindbox.core.evaluacion.FuncionObjetivoJerarquica;
+
 /**
  * Parametros calibrables de la busqueda adaptativa de vecindad amplia, conforme al
  * apartado 7.4 del ISA.
@@ -51,6 +53,38 @@ public final class ParametrosAlns {
 
     private boolean filtroCotaInferior = true;
     private int holguraObjetivoMinutos = 30;
+    private double fraccionMargenPlazo = FuncionObjetivoJerarquica.FRACCION_MARGEN_PLAZO;
+    private double factorPenalizacionMargen = 0.5;
+
+    /**
+     * Fraccion del plazo de cada pedido que su llegada debe dejar libre: es el nivel de pedidos
+     * sin margen de la funcion objetivo compartida y el umbral de la regla de compromiso.
+     */
+    public double fraccionMargenPlazo() {
+        return fraccionMargenPlazo;
+    }
+
+    public ParametrosAlns fraccionMargenPlazo(double valor) {
+        this.fraccionMargenPlazo = FuncionObjetivoJerarquica.exigirFraccionMargen(valor);
+        return this;
+    }
+
+    /**
+     * Peso de cada pedido sin margen en el escalar de aceptacion y en la insercion, como
+     * fraccion de la penalizacion de un pedido del banco: queda por debajo de dejar un pedido
+     * sin atender y muy por encima de las diferencias de costo habituales entre posiciones.
+     */
+    public double factorPenalizacionMargen() {
+        return factorPenalizacionMargen;
+    }
+
+    public ParametrosAlns factorPenalizacionMargen(double valor) {
+        if (!(valor >= 0.0 && valor <= 1.0)) {
+            throw new IllegalArgumentException("factorPenalizacionMargen debe estar entre 0 y 1: " + valor);
+        }
+        this.factorPenalizacionMargen = valor;
+        return this;
+    }
 
     /** Margen deseado para desempates temporales; cero anula la preferencia. */
     public int holguraObjetivoMinutos() {
@@ -483,6 +517,8 @@ public final class ParametrosAlns {
                 + " maximoIteracionesSinMejora=" + maximoIteracionesSinMejora
                 + " iteracionesParaReinicio=" + iteracionesParaReinicio
                 + " holguraObjetivoMinutos=" + holguraObjetivoMinutos
-                + " filtroCotaInferior=" + filtroCotaInferior + "]";
+                + " filtroCotaInferior=" + filtroCotaInferior
+                + " fraccionMargenPlazo=" + fraccionMargenPlazo
+                + " factorPenalizacionMargen=" + factorPenalizacionMargen + "]";
     }
 }

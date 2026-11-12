@@ -87,6 +87,7 @@ public final class Educacion {
     private final ParametrosHgs parametros;
     private final PresupuestoComputo presupuesto;
     private final EstabilidadPlan estabilidad;
+    private final ContadorMargen contadorMargen;
 
     private final int cantidadTareas;
     private final int cantidadUnidades;
@@ -99,6 +100,8 @@ public final class Educacion {
     private final int[] desfaseRuta;
     /** Pedidos de cada ruta que cambian de unidad respecto del plan vigente. */
     private final int[] desviacionRuta;
+    /** Pedidos de cada ruta que llegan con menos margen que el exigido. */
+    private final int[] sinMargenRuta;
     private int cantidadRutas;
 
     private final int[] rutaDeTarea;
@@ -127,6 +130,7 @@ public final class Educacion {
 
     private double ultimoCosto;
     private int ultimoDesfase;
+    private int ultimoSinMargen;
 
     /** Si la cota de los movimientos incluye el desfase minimo de {@link ResumenesRuta}. */
     private final boolean filtroCotaInferior;
@@ -149,6 +153,7 @@ public final class Educacion {
         this.parametros = parametros;
         this.presupuesto = presupuesto;
         this.estabilidad = estabilidad;
+        this.contadorMargen = new ContadorMargen(instancia, tareas, programador, parametros.fraccionMargenPlazo());
         this.cantidadTareas = tareas.cantidad();
         this.cantidadUnidades = instancia.cantidadUnidades();
 
@@ -160,6 +165,7 @@ public final class Educacion {
         this.costoRuta = new double[rutas];
         this.desfaseRuta = new int[rutas];
         this.desviacionRuta = new int[rutas];
+        this.sinMargenRuta = new int[rutas];
 
         this.rutaDeTarea = new int[Math.max(1, cantidadTareas)];
         this.posicionDeTarea = new int[Math.max(1, cantidadTareas)];
@@ -231,6 +237,7 @@ public final class Educacion {
             reinsertarBanco(pesoDesfase);
         }
         volcar(individuo);
+        contadorMargen.contar(individuo);
     }
 
     // --------------------------------------------------------- carga y volcado
@@ -262,6 +269,7 @@ public final class Educacion {
             evaluarSecuencia(unidad[r], ruta[r], largo[r], pesoDesfase);
             costoRuta[r] = ultimoCosto;
             desfaseRuta[r] = ultimoDesfase;
+            sinMargenRuta[r] = ultimoSinMargen;
             desviacionRuta[r] = estabilidad.desviacion(unidad[r], ruta[r], largo[r]);
         }
         for (int u = 0; u < cantidadUnidades && cantidadRutas < largo.length; u++) {
@@ -272,6 +280,7 @@ public final class Educacion {
             unidad[cantidadRutas] = u;
             costoRuta[cantidadRutas] = 0.0;
             desfaseRuta[cantidadRutas] = 0;
+            sinMargenRuta[cantidadRutas] = 0;
             desviacionRuta[cantidadRutas] = 0;
             cantidadRutas++;
         }
@@ -817,6 +826,7 @@ public final class Educacion {
             double mejorValor = valor(r, peso);
             double mejorCosto = 0.0;
             int mejorDesfase = 0;
+            int mejorSinMargen = 0;
             for (int c = 0; c < cantidad; c++) {
                 if (cotaDeSecuencia(candidatos[c], ruta[r], largo[r], peso, mejorValor - EPSILON)
                         >= mejorValor - EPSILON) {
@@ -831,6 +841,7 @@ public final class Educacion {
                     elegida = candidatos[c];
                     mejorCosto = ultimoCosto;
                     mejorDesfase = ultimoDesfase;
+                    mejorSinMargen = ultimoSinMargen;
                 }
             }
             if (elegida >= 0) {
@@ -848,6 +859,7 @@ public final class Educacion {
                 rutaDeUnidad[elegida] = r;
                 costoRuta[r] = mejorCosto;
                 desfaseRuta[r] = mejorDesfase;
+                sinMargenRuta[r] = mejorSinMargen;
                 desviacionRuta[r] = estabilidad.desviacion(elegida, ruta[r], largo[r]);
                 mejoro = true;
             }
@@ -918,11 +930,14 @@ public final class Educacion {
 
     /**
      * Valor penalizado de la ruta: costo de operacion, mas la penalizacion dinamica de sus
-     * minutos de desfase, mas el termino blando de estabilidad del apartado 11.4 del ISA por
-     * cada pedido que cambia de unidad respecto del plan vigente.
+     * minutos de desfase, mas la de sus pedidos sin margen, mas el termino blando de
+     * estabilidad del apartado 11.4 del ISA por cada pedido que cambia de unidad respecto del
+     * plan vigente.
      */
     private double valor(int r, double peso) {
-        return costoRuta[r] + peso * desfaseRuta[r] + estabilidad.peso() * desviacionRuta[r];
+        return costoRuta[r] + peso * desfaseRuta[r]
+                + ParametrosHgs.PENALIZACION_PEDIDO_SIN_MARGEN * sinMargenRuta[r]
+                + estabilidad.peso() * desviacionRuta[r];
     }
 
     /**
@@ -1167,6 +1182,7 @@ public final class Educacion {
         if (longitud == 0) {
             ultimoCosto = 0.0;
             ultimoDesfase = 0;
+            ultimoSinMargen = 0;
             return 0.0;
         }
         for (int i = 0; i < longitud; i++) {
@@ -1177,12 +1193,34 @@ public final class Educacion {
         if (!programador.evaluar(unidadRuta, pedidosBuffer, cantidadesBuffer, longitud)) {
             ultimoCosto = 0.0;
             ultimoDesfase = 0;
+            ultimoSinMargen = 0;
             return INFINITO;
         }
         ultimoCosto = programador.ultimoCosto();
         ultimoDesfase = programador.ultimoDesfase();
+        ultimoSinMargen = contadorMargen.sinMargenDeUltima(pedidosBuffer, longitud);
         return ultimoCosto + peso * ultimoDesfase
+                + ParametrosHgs.PENALIZACION_PEDIDO_SIN_MARGEN * ultimoSinMargen
                 + estabilidad.penalizacion(unidadRuta, secuencia, longitud);
+    }
+
+    /**
+     * Pedidos sin margen de una secuencia, sin tocar los resultados de la ultima valoracion:
+     * los movimientos pasan esos resultados como argumentos de {@link #aplicarUna}.
+     */
+    private int sinMargenDe(int unidadRuta, int[] secuencia, int longitud) {
+        if (longitud == 0) {
+            return 0;
+        }
+        for (int i = 0; i < longitud; i++) {
+            final int tarea = secuencia[i];
+            pedidosBuffer[i] = tareas.pedido(tarea);
+            cantidadesBuffer[i] = tareas.cantidadUnidades(tarea);
+        }
+        if (!programador.evaluar(unidadRuta, pedidosBuffer, cantidadesBuffer, longitud)) {
+            return longitud;
+        }
+        return contadorMargen.sinMargenDeUltima(pedidosBuffer, longitud);
     }
 
     /**
@@ -1198,6 +1236,7 @@ public final class Educacion {
         largo[r] = largoNuevo;
         costoRuta[r] = costo;
         desfaseRuta[r] = desfase;
+        sinMargenRuta[r] = sinMargenDe(unidad[r], ruta[r], largoNuevo);
         desviacionRuta[r] = estabilidad.desviacion(unidad[r], ruta[r], largoNuevo);
         for (int i = 0; i < largoNuevo; i++) {
             rutaDeTarea[ruta[r][i]] = r;

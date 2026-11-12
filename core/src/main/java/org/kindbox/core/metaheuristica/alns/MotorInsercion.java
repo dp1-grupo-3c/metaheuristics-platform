@@ -70,6 +70,11 @@ public final class MotorInsercion {
     /** Delta de riesgo global, separado de los soles para no mezclar prioridades. */
     private final long[] deltaRiesgoNuevo;
     private final long[] mejorDeltaRiesgo;
+    /** Pedidos que la insercion deja sin margen, indexado por par; precede al costo. */
+    private final int[] deltaSinMargenNuevo;
+    private final int[] mejorDeltaSinMargen;
+    /** La tarea pertenece a un pedido en su ventana de compromiso: se coloca antes que el resto. */
+    private final boolean[] urgente;
     private final boolean contieneParciales;
     /** Kilometros de esa ruta resultante. */
     private final int[] kilometrosNuevos;
@@ -123,6 +128,9 @@ public final class MotorInsercion {
         this.costoNuevo = new double[pares];
         this.deltaRiesgoNuevo = new long[pares];
         this.mejorDeltaRiesgo = new long[Math.max(1, cantidadTareas)];
+        this.deltaSinMargenNuevo = new int[pares];
+        this.mejorDeltaSinMargen = new int[Math.max(1, cantidadTareas)];
+        this.urgente = new boolean[Math.max(1, cantidadTareas)];
         boolean parciales = false;
         for (int p = 0; p < cantidadPedidos; p++) parciales |= tareas.tareasDePedido(p) > 1;
         this.contieneParciales = parciales;
@@ -172,6 +180,7 @@ public final class MotorInsercion {
         asegurarCapacidad(estado.capacidadRuta() + 1);
         for (int i = 0; i < n; i++) {
             pendientes[i] = estado.bancoEn(i);
+            urgente[pendientes[i]] = estado.pedidoComprometido(tareas.pedido(pendientes[i]));
         }
         for (int i = 0; i < n; i++) {
             if (presupuesto.agotado()) {
@@ -249,8 +258,33 @@ public final class MotorInsercion {
 
     // ----------------------------------------------------------------- internos
 
-    /** Elige la tarea que se coloca a continuacion segun el criterio del operador. */
+    /**
+     * Elige la tarea que se coloca a continuacion segun el criterio del operador. Las tareas de
+     * pedidos en su ventana de compromiso van antes que cualquier otra, por limite creciente:
+     * si se dejasen para el final, cuando las rutas cercanas ya estan llenas, el criterio de
+     * menor costo o de mayor arrepentimiento las podria dejar sin sitio.
+     */
     private int seleccionar(int n, int ordenArrepentimiento) {
+        int urgenteElegido = -1;
+        for (int i = 0; i < n; i++) {
+            int tarea = pendientes[i];
+            if (!urgente[tarea]) {
+                continue;
+            }
+            if (urgenteElegido < 0) {
+                urgenteElegido = i;
+                continue;
+            }
+            int otra = pendientes[urgenteElegido];
+            long limite = tareas.limite(tarea);
+            long limiteOtra = tareas.limite(otra);
+            if (limite < limiteOtra || (limite == limiteOtra && mejorDelta[tarea] < mejorDelta[otra])) {
+                urgenteElegido = i;
+            }
+        }
+        if (urgenteElegido >= 0) {
+            return urgenteElegido;
+        }
         int elegido = 0;
         if (ordenArrepentimiento < 2) {
             double mejor = INFINITO;
@@ -296,7 +330,11 @@ public final class MotorInsercion {
             valorarUnidad(estado, tarea, candidatasDe[base + j], aleatorio, parpadeo);
         }
         derivarMejor(estado, tarea, ordenArrepentimiento);
-        if (mejorUnidad[tarea] < 0 && cantidadCandidatas[tarea] < cantidadUnidades) {
+        // Un pedido urgente que la vecindad solo puede colocar sin margen merece el recorrido
+        // completo de la flota, igual que el que no cabe en ninguna candidata.
+        boolean sinSitio = mejorUnidad[tarea] < 0
+                || (urgente[tarea] && mejorDeltaSinMargen[tarea] > 0);
+        if (sinSitio && cantidadCandidatas[tarea] < cantidadUnidades) {
             ampliarATodaLaFlota(estado, tarea, aleatorio, parpadeo);
             derivarMejor(estado, tarea, ordenArrepentimiento);
         }
@@ -363,6 +401,7 @@ public final class MotorInsercion {
         int par = tarea * cantidadUnidades + unidad;
         costoNuevo[par] = INFINITO;
         deltaRiesgoNuevo[par] = Long.MAX_VALUE;
+        deltaSinMargenNuevo[par] = Integer.MAX_VALUE;
         posicionNueva[par] = -1;
         kilometrosNuevos[par] = 0;
 
@@ -388,6 +427,7 @@ public final class MotorInsercion {
 
         double mejorCosto = INFINITO;
         long mejorRiesgo = Long.MAX_VALUE;
+        int mejorSinMargen = Integer.MAX_VALUE;
         int mejorPosicion = -1;
         int mejorKilometros = 0;
         for (int i = longitud; i >= 0; i--) {
@@ -395,8 +435,10 @@ public final class MotorInsercion {
             // Poda por el incremento directo de kilometros: si el rodeo que introduce la
             // visita ya cuesta mas que la mejor posicion hallada, programar la ruta entera
             // no puede mejorarla. Es una poda de costo, no de factibilidad: mientras no haya
-            // ninguna posicion factible no descarta nada, de modo que nunca aumenta la H.
-            if (!saltar && mejorPosicion >= 0
+            // ninguna posicion factible no descarta nada, de modo que nunca aumenta la H. Y
+            // como una insercion nunca rebaja los pedidos sin margen, solo se aplica cuando la
+            // mejor posicion ya no deja ninguno: antes, una mas cara aun puede preferirse.
+            if (!saltar && mejorPosicion >= 0 && mejorSinMargen == 0
                     && costoPorKm * incrementoDirecto(unidad, fila, longitud, i, puntoTarea)
                         > mejorCosto - costoActual) {
                 saltar = true;
@@ -412,11 +454,14 @@ public final class MotorInsercion {
                     && programador.evaluar(unidad, secuencia, cantidades, longitud + 1)
                     && programador.ultimaFactible()) {
                 double costo = programador.ultimoCosto();
-                if (costo <= mejorCosto) {
+                if (costo <= mejorCosto || mejorSinMargen > 0) {
                     long riesgo = estado.deltaRiesgoInsercionValorada(unidad, secuencia, longitud + 1, tarea);
-                    if (costo < mejorCosto || (costo == mejorCosto && riesgo < mejorRiesgo)) {
+                    int sinMargen = estado.ultimoDeltaSinMargen();
+                    if (sinMargen < mejorSinMargen || (sinMargen == mejorSinMargen
+                            && (costo < mejorCosto || (costo == mejorCosto && riesgo < mejorRiesgo)))) {
                         mejorCosto = costo;
                         mejorRiesgo = riesgo;
+                        mejorSinMargen = sinMargen;
                         mejorPosicion = i;
                         mejorKilometros = programador.ultimosKilometros();
                     }
@@ -433,6 +478,7 @@ public final class MotorInsercion {
         }
         costoNuevo[par] = mejorCosto;
         deltaRiesgoNuevo[par] = mejorRiesgo;
+        deltaSinMargenNuevo[par] = mejorSinMargen;
         posicionNueva[par] = mejorPosicion;
         kilometrosNuevos[par] = mejorKilometros;
     }
@@ -475,12 +521,15 @@ public final class MotorInsercion {
         int total = cantidadCandidatas[tarea];
 
         final double pesoEstabilidad = estado.pesoEstabilidad();
+        final double pesoSinMargen = estado.pesoSinMargen();
         final int unidadVigente =
                 pesoEstabilidad > 0.0 ? estado.unidadVigentePorRecuperar(tarea) : -1;
 
         double mejorVacia = INFINITO;
         long riesgoVacia = Long.MAX_VALUE;
         long riesgoPrimera = Long.MAX_VALUE;
+        int sinMargenVacia = 0;
+        int sinMargenPrimera = 0;
         int unidadVacia = -1;
         double primero = INFINITO;
         double segundo = INFINITO;
@@ -494,7 +543,8 @@ public final class MotorInsercion {
             if (costo == INFINITO) {
                 continue;
             }
-            double delta = costo - estado.costoRuta(unidad);
+            int sinMargen = deltaSinMargenNuevo[base + unidad];
+            double delta = costo - estado.costoRuta(unidad) + pesoSinMargen * sinMargen;
             if (unidad == unidadVigente) {
                 delta -= pesoEstabilidad;
             }
@@ -503,6 +553,7 @@ public final class MotorInsercion {
                 if (delta < mejorVacia || (delta == mejorVacia && riesgo < riesgoVacia)) {
                     mejorVacia = delta;
                     riesgoVacia = riesgo;
+                    sinMargenVacia = sinMargen;
                     unidadVacia = unidad;
                 }
                 continue;
@@ -510,6 +561,7 @@ public final class MotorInsercion {
             alternativas++;
             if (delta < primero || (delta == primero && riesgo < riesgoPrimera)) {
                 riesgoPrimera = riesgo;
+                sinMargenPrimera = sinMargen;
                 tercero = segundo;
                 segundo = primero;
                 primero = delta;
@@ -525,6 +577,7 @@ public final class MotorInsercion {
             alternativas++;
             if (mejorVacia < primero || (mejorVacia == primero && riesgoVacia < riesgoPrimera)) {
                 riesgoPrimera = riesgoVacia;
+                sinMargenPrimera = sinMargenVacia;
                 tercero = segundo;
                 segundo = primero;
                 primero = mejorVacia;
@@ -540,6 +593,7 @@ public final class MotorInsercion {
         mejorUnidad[tarea] = unidadPrimera;
         mejorDelta[tarea] = primero;
         mejorDeltaRiesgo[tarea] = riesgoPrimera;
+        mejorDeltaSinMargen[tarea] = sinMargenPrimera;
         if (ordenArrepentimiento < 2) {
             return;
         }

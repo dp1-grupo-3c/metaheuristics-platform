@@ -146,7 +146,7 @@ public final class BusquedaAdaptativaVecindadAmplia implements Algoritmo {
 
     public BusquedaAdaptativaVecindadAmplia(HeuristicaConstructiva constructiva,
                                             ParametrosAlns parametros, long semilla) {
-        this(constructiva, parametros, new FuncionObjetivoJerarquica(), semilla);
+        this(constructiva, parametros, new FuncionObjetivoJerarquica(parametros.fraccionMargenPlazo()), semilla);
     }
 
     /**
@@ -289,9 +289,10 @@ public final class BusquedaAdaptativaVecindadAmplia implements Algoritmo {
         final CriterioAceptacion criterio = new CriterioAceptacion(parametros);
 
         final int margenHolgura = parametros.holguraObjetivoMinutos();
-        final EstadoAlns vigente = new EstadoAlns(instancia, tareas, programador, margenHolgura);
-        final EstadoAlns candidato = new EstadoAlns(instancia, tareas, programador, margenHolgura);
-        final EstadoAlns mejor = new EstadoAlns(instancia, tareas, programador, margenHolgura);
+        final double fraccionMargen = parametros.fraccionMargenPlazo();
+        final EstadoAlns vigente = new EstadoAlns(instancia, tareas, programador, margenHolgura, fraccionMargen);
+        final EstadoAlns candidato = new EstadoAlns(instancia, tareas, programador, margenHolgura, fraccionMargen);
+        final EstadoAlns mejor = new EstadoAlns(instancia, tareas, programador, margenHolgura, fraccionMargen);
 
         // El plan vigente del apartado 11.4 se traduce a indices locales una sola vez, antes
         // de que la busqueda arranque: dentro del bucle el termino de estabilidad se resuelve
@@ -308,6 +309,10 @@ public final class BusquedaAdaptativaVecindadAmplia implements Algoritmo {
         vigente.pesoEstabilidad(pesoEstabilidad);
         candidato.pesoEstabilidad(pesoEstabilidad);
         mejor.pesoEstabilidad(pesoEstabilidad);
+        final double pesoSinMargen = parametros.factorPenalizacionMargen() * penalizacion;
+        vigente.pesoSinMargen(pesoSinMargen);
+        candidato.pesoSinMargen(pesoSinMargen);
+        mejor.pesoSinMargen(pesoSinMargen);
 
         mejor.copiarDesde(vigente);
         ValorObjetivo mejorValor = mejor.valor();

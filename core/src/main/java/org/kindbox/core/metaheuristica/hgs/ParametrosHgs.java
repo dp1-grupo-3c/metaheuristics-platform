@@ -1,5 +1,7 @@
 package org.kindbox.core.metaheuristica.hgs;
 
+import org.kindbox.core.evaluacion.FuncionObjetivoJerarquica;
+
 /**
  * Parametros de la busqueda genetica hibrida, con los valores iniciales del apartado 6.4
  * del ISA.
@@ -48,6 +50,13 @@ public final class ParametrosHgs {
      * modo que ninguna ganancia de costo compensa dejar un pedido sin atender.
      */
     public static final double PENALIZACION_TAREA_NO_ATENDIDA = 1_000_000.0;
+
+    /**
+     * Costo, en soles, con el que la busqueda interna penaliza cada pedido que llega con menos
+     * margen que el exigido. Queda un orden por debajo de una tarea sin atender y por encima
+     * del costo de cualquier plan, como el nivel que ocupa en la funcion objetivo.
+     */
+    public static final double PENALIZACION_PEDIDO_SIN_MARGEN = 100_000.0;
 
     /**
      * Costo, en soles, con el que la busqueda interna penaliza cada pedido que cambia de
@@ -104,6 +113,20 @@ public final class ParametrosHgs {
     private long maximoGeneracionesSinMejora = 0L;
 
     private boolean filtroCotaInferior = false;
+    private double fraccionMargenPlazo = FuncionObjetivoJerarquica.FRACCION_MARGEN_PLAZO;
+
+    /**
+     * Fraccion del plazo de cada pedido que su llegada debe dejar libre: es el nivel de pedidos
+     * sin margen de la funcion objetivo compartida con ALNS.
+     */
+    public double fraccionMargenPlazo() {
+        return fraccionMargenPlazo;
+    }
+
+    public ParametrosHgs fraccionMargenPlazo(double valor) {
+        this.fraccionMargenPlazo = FuncionObjetivoJerarquica.exigirFraccionMargen(valor);
+        return this;
+    }
 
     /** Parametros con los valores iniciales del apartado 6.4 del ISA. */
     public static ParametrosHgs porDefecto() {
@@ -540,6 +563,7 @@ public final class ParametrosHgs {
                 + " esfuerzoElite=" + esfuerzoElite
                 + " maximoGeneraciones=" + maximoGeneraciones
                 + " maximoGeneracionesSinMejora=" + maximoGeneracionesSinMejora
-                + " filtroCotaInferior=" + filtroCotaInferior + "]";
+                + " filtroCotaInferior=" + filtroCotaInferior
+                + " fraccionMargenPlazo=" + fraccionMargenPlazo + "]";
     }
 }
