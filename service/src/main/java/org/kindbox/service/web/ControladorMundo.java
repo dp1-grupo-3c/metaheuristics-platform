@@ -43,6 +43,13 @@ public class ControladorMundo {
         return vista(mundo.vigente());
     }
 
+    /** Mapa y almacenes del enunciado, para restaurarlos desde la configuracion; no cambia nada. */
+    @GetMapping("/defecto")
+    public VistaMundo defecto() {
+        ParametrosMundo d = ParametrosMundo.delEnunciado();
+        return new VistaMundo(0, d.mapa(), d.almacenes(), null);
+    }
+
     @PutMapping
     public VistaMundo actualizar(@RequestBody SolicitudMundo solicitud) {
         if (solicitud == null || solicitud.mapa() == null || solicitud.mapa().largoKm() == null
