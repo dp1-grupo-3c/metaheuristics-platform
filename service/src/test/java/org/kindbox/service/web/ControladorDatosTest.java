@@ -2,11 +2,13 @@ package org.kindbox.service.web;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -18,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.kindbox.core.io.RepositorioDatos;
 import org.kindbox.service.operacion.CoordinadorEjecucion;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
@@ -28,6 +31,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 class ControladorDatosTest {
 
     static final String BLOQUEO = "01d08h00m-01d18h30m:12,20,13,20,13,21\n";
+    static final String VENTA = "01d01h30m:56,30,c4910,02,36\n";
 
     @TempDir
     Path raiz;
@@ -216,5 +220,59 @@ class ControladorDatosTest {
                 .andExpect(jsonPath("$.registros").value(1));
         mvc.perform(get("/api/datos"))
                 .andExpect(jsonPath("$.mantenimiento[0]").value("mantenimiento/2026/mant.preventivo.09.10"));
+    }
+
+    @Test
+    void crearVerReemplazarYBorrarUnArchivo() throws Exception {
+        String ruta = "ventas/ventas.202601.txt";
+        mvc.perform(multipart("/api/datos/ventas").file(archivo("ventas.202601.txt", VENTA)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ruta").value(ruta))
+                .andExpect(jsonPath("$.registros").value(1))
+                .andExpect(jsonPath("$.reemplazado").value(false));
+        mvc.perform(get("/api/datos")).andExpect(jsonPath("$.ventas[0]").value(ruta));
+
+        mvc.perform(get("/api/datos/archivo").param("ruta", ruta))
+                .andExpect(status().isOk())
+                .andExpect(content().string(VENTA));
+
+        String dos = VENTA + "01d04h55m:21,29,c9599,06,18\n";
+        mvc.perform(multipart(HttpMethod.PUT, "/api/datos/archivo").file(archivo("otro.txt", dos)).param("ruta", ruta))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ruta").value(ruta))
+                .andExpect(jsonPath("$.registros").value(2))
+                .andExpect(jsonPath("$.reemplazado").value(true));
+        assertEquals(dos, Files.readString(raiz.resolve(ruta)));
+
+        mvc.perform(delete("/api/datos/archivo").param("ruta", ruta)).andExpect(status().isOk());
+        assertFalse(Files.exists(raiz.resolve(ruta)));
+        mvc.perform(get("/api/datos")).andExpect(jsonPath("$.ventas").isEmpty());
+    }
+
+    @Test
+    void erroresDelCrudDeArchivos() throws Exception {
+        // Solo rutas del inventario: nada fuera de la raiz ni archivos inexistentes.
+        mvc.perform(get("/api/datos/archivo").param("ruta", "../fuera.txt")).andExpect(status().isNotFound());
+        mvc.perform(delete("/api/datos/archivo").param("ruta", "ventas/ventas.209901.txt")).andExpect(status().isNotFound());
+        mvc.perform(multipart("/api/datos/ventas").file(archivo("cualquiera.txt", VENTA))).andExpect(status().isBadRequest());
+
+        mvc.perform(multipart("/api/datos/bloqueos").file(archivo("202601.bloqueadas", BLOQUEO))).andExpect(status().isOk());
+        mvc.perform(multipart(HttpMethod.PUT, "/api/datos/archivo").file(archivo("x.txt", "basura\n"))
+                        .param("ruta", "bloqueos/202601.bloqueadas"))
+                .andExpect(status().isBadRequest());
+        assertEquals(BLOQUEO, Files.readString(raiz.resolve("bloqueos/202601.bloqueadas")));
+
+        try (var reserva = coordinador.reservar("simulacion")) {
+            mvc.perform(multipart(HttpMethod.PUT, "/api/datos/archivo").file(archivo("x.txt", BLOQUEO))
+                            .param("ruta", "bloqueos/202601.bloqueadas"))
+                    .andExpect(status().isConflict());
+            mvc.perform(delete("/api/datos/archivo").param("ruta", "bloqueos/202601.bloqueadas"))
+                    .andExpect(status().isConflict());
+            mvc.perform(multipart("/api/datos/ventas").file(archivo("ventas.202601.txt", VENTA)))
+                    .andExpect(status().isConflict());
+            // Ver no escribe: se permite durante la ejecucion.
+            mvc.perform(get("/api/datos/archivo").param("ruta", "bloqueos/202601.bloqueadas")).andExpect(status().isOk());
+        }
+        assertTrue(Files.exists(raiz.resolve("bloqueos/202601.bloqueadas")));
     }
 }

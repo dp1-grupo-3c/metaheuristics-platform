@@ -73,6 +73,7 @@ public final class RepositorioDatos {
     // Nombres mensuales que reconoce la carga de escenarios.
     private static final Pattern NOMBRE_VENTAS = Pattern.compile("(?i)ventas\\d{6}(\\.txt)?|ventas\\.\\d{6}\\.txt");
     private static final Pattern NOMBRE_BLOQUEOS = Pattern.compile("(?i)\\d{6}\\.bloqueadas(\\.txt)?|bloqueo\\.\\d{4}\\.txt");
+    private static final Pattern MES_VENTAS = Pattern.compile("(?i)ventas\\.?(\\d{4})(\\d{2})(\\.txt)?");
     private static final Pattern MES_BLOQUEOS = Pattern.compile(
             "(?i)(\\d{4})(\\d{2})\\.?bloqueadas(\\.txt)?|bloqueo\\.(\\d{2})(\\d{2})\\.txt");
 
@@ -561,6 +562,87 @@ public final class RepositorioDatos {
         boolean reemplazado = escribirAtomico(origen, destino);
         cantidadesFlota = null;
         return new ArchivoGuardado(relativa(destino), flota.unidades().size(), reemplazado);
+    }
+
+    // Sin mes se deduce del nombre del archivo; reemplaza el archivo del mes o crea ventas.AAAAMM.txt.
+    public synchronized ArchivoGuardado guardarVentas(YearMonth mes, Path origen) throws IOException {
+        exigirArchivo(origen);
+        YearMonth periodo = mes != null ? mes : mesDeArchivoVentas(origen.getFileName().toString());
+        int registros = new LectorVentas(CalendarioEscenario.desde(periodo)).leer(origen, periodo, 1).size();
+        Path existente = archivoVentas(periodo);
+        Path destino = existente != null ? existente : raiz.resolve(DIRECTORIO_VENTAS)
+                .resolve(String.format("ventas.%04d%02d.txt", periodo.getYear(), periodo.getMonthValue()));
+        boolean reemplazado = escribirAtomico(origen, destino);
+        return new ArchivoGuardado(relativa(destino), registros, reemplazado);
+    }
+
+    private enum TipoArchivo { FLOTA, VENTAS, BLOQUEOS, MANTENIMIENTO }
+
+    // Solo se aceptan las rutas que lista el inventario, de modo que nunca se sale de la raiz.
+    private TipoArchivo tipoInventariado(String ruta) throws IOException {
+        Inventario inventario = inventario();
+        if (ruta != null) {
+            if (ruta.equals(inventario.flota())) return TipoArchivo.FLOTA;
+            if (inventario.ventas().contains(ruta)) return TipoArchivo.VENTAS;
+            if (inventario.bloqueos().contains(ruta)) return TipoArchivo.BLOQUEOS;
+            if (inventario.mantenimiento().contains(ruta)) return TipoArchivo.MANTENIMIENTO;
+        }
+        throw new NoSuchElementException("No existe el archivo de datos \"" + ruta + "\"");
+    }
+
+    /** Contenido de un archivo del inventario, por su ruta relativa a la raiz. */
+    public byte[] contenido(String ruta) throws IOException {
+        tipoInventariado(ruta);
+        return Files.readAllBytes(raiz.resolve(ruta));
+    }
+
+    // Reemplaza ese archivo validado con el lector de su tipo; conserva su nombre y su ubicacion.
+    public synchronized ArchivoGuardado reemplazar(String ruta, Path origen) throws IOException {
+        TipoArchivo tipo = tipoInventariado(ruta);
+        exigirArchivo(origen);
+        Path destino = raiz.resolve(ruta);
+        String nombre = destino.getFileName().toString();
+        int registros = switch (tipo) {
+            case FLOTA -> new LectorFlota().leer(origen).unidades().size();
+            case VENTAS -> {
+                YearMonth mes = mesDeArchivoVentas(nombre);
+                yield new LectorVentas(CalendarioEscenario.desde(mes)).leer(origen, mes, 1).size();
+            }
+            case BLOQUEOS -> {
+                YearMonth mes = mesDeArchivoBloqueos(nombre);
+                yield new LectorBloqueos(CalendarioEscenario.desde(mes)).leer(origen, mes).size();
+            }
+            case MANTENIMIENTO -> new LectorMantenimiento().leer(origen).size();
+        };
+        escribirAtomico(origen, destino);
+        if (tipo == TipoArchivo.FLOTA) {
+            cantidadesFlota = null;
+        }
+        return new ArchivoGuardado(ruta, registros, true);
+    }
+
+    // Borrar la flota hace que se use la del enunciado (o flota.csv, si existe).
+    public synchronized void eliminar(String ruta) throws IOException {
+        TipoArchivo tipo = tipoInventariado(ruta);
+        Files.delete(raiz.resolve(ruta));
+        if (tipo == TipoArchivo.FLOTA) {
+            cantidadesFlota = null;
+        }
+    }
+
+    // Acepta ventasAAAAMM, ventasAAAAMM.txt y ventas.AAAAMM.txt.
+    public static YearMonth mesDeArchivoVentas(String nombre) {
+        Matcher m = nombre == null ? null : MES_VENTAS.matcher(nombre);
+        if (m == null || !m.matches()) {
+            throw new IllegalArgumentException("No se puede deducir el mes del archivo de ventas \"" + nombre
+                    + "\"; se esperaba ventas.AAAAMM.txt o ventasAAAAMM, o indicar el mes");
+        }
+        int mes = Integer.parseInt(m.group(2));
+        if (mes < 1 || mes > 12) {
+            throw new IllegalArgumentException("El archivo de ventas \"" + nombre + "\" declara el mes "
+                    + mes + ", que no existe");
+        }
+        return YearMonth.of(Integer.parseInt(m.group(1)), mes);
     }
 
     // Sin mes se deduce del nombre del archivo; reemplaza el archivo del mes donde este.

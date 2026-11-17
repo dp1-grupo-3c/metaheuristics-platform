@@ -10,6 +10,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.stream.Stream;
+import jakarta.servlet.http.HttpServletResponse;
 import org.kindbox.core.io.RepositorioDatos;
 import org.kindbox.service.dto.SolicitudBloqueo;
 import org.kindbox.service.dto.VistaRegistroBloqueo;
@@ -70,6 +71,40 @@ public class ControladorDatos {
         return guardar(archivo, "flota.txt", repositorio::guardarFlota);
     }
 
+    @PostMapping("/ventas")
+    public RepositorioDatos.ArchivoGuardado ventas(@RequestParam("archivo") MultipartFile archivo,
+                                                   @RequestParam(name = "mes", required = false) String mes) {
+        exigirSinEjecucion("un archivo de ventas");
+        YearMonth periodo = mes == null || mes.isBlank() ? null : mes(mes);
+        return guardar(archivo, "ventas.txt", origen -> repositorio.guardarVentas(periodo, origen));
+    }
+
+    // Contenido de un archivo del inventario, por la ruta que lista GET /api/datos.
+    @GetMapping("/archivo")
+    public void archivo(@RequestParam("ruta") String ruta, HttpServletResponse respuesta) throws IOException {
+        byte[] contenido = editarBloqueos(() -> repositorio.contenido(ruta));
+        respuesta.setContentType("text/plain;charset=UTF-8");
+        respuesta.setHeader("Content-Disposition", "inline; filename=\"" + Path.of(ruta).getFileName() + "\"");
+        respuesta.getOutputStream().write(contenido);
+    }
+
+    @PutMapping("/archivo")
+    public RepositorioDatos.ArchivoGuardado reemplazar(@RequestParam("ruta") String ruta,
+                                                       @RequestParam("archivo") MultipartFile archivo) {
+        exigirSinEjecucion("un archivo de datos");
+        return guardar(archivo, Path.of(ruta).getFileName().toString(), origen -> repositorio.reemplazar(ruta, origen));
+    }
+
+    @DeleteMapping("/archivo")
+    public void eliminar(@RequestParam("ruta") String ruta) {
+        exigirSinEjecucion("un archivo de datos");
+        editarBloqueos(() -> {
+            repositorio.eliminar(ruta);
+            return null;
+        });
+        LOG.info("Archivo de datos {} borrado", ruta);
+    }
+
     @PostMapping("/bloqueos")
     public RepositorioDatos.ArchivoGuardado bloqueos(@RequestParam("archivo") MultipartFile archivo,
                                                      @RequestParam(name = "mes", required = false) String mes) {
@@ -123,6 +158,7 @@ public class ControladorDatos {
         return guardado;
     }
 
+    // Tambien traduce los errores de ver, reemplazar y borrar archivos.
     private interface EdicionBloqueos<T> {
         T aplicar() throws IOException;
     }
@@ -138,7 +174,7 @@ public class ControladorDatos {
         } catch (IllegalStateException e) {
             throw new ConflictoDeEstado(e.getMessage());
         } catch (IOException e) {
-            throw new ErrorDeDatos("No se pudo editar los bloqueos del directorio de datos " + repositorio.raiz(), e);
+            throw new ErrorDeDatos("No se pudo acceder al directorio de datos " + repositorio.raiz(), e);
         }
     }
 
@@ -191,6 +227,8 @@ public class ControladorDatos {
             RepositorioDatos.ArchivoGuardado resultado = guardado.en(origen);
             LOG.info("Archivo de datos {} guardado con {} registros", resultado.ruta(), resultado.registros());
             return resultado;
+        } catch (NoSuchElementException e) {
+            throw new RecursoNoEncontrado(e.getMessage());
         } catch (IllegalArgumentException e) {
             throw new SolicitudInvalida(e.getMessage(), e);
         } catch (IllegalStateException e) {
